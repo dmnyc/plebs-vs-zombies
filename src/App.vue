@@ -266,35 +266,35 @@ export default {
     },
     async connectNostr() {
       try {
-        // Check if NIP-07 extension is available
-        if (typeof window.nostr === 'undefined') {
-          console.error('window.nostr is undefined');
-          alert('No Nostr extension found. Please install a NIP-07 compatible extension like nos2x or Alby, then refresh the page.');
-          return;
-        }
-
-        console.log('window.nostr found:', window.nostr);
-        console.log('Available methods:', Object.keys(window.nostr));
-
-        // Request public key
-        console.log('Requesting public key...');
-        const pubkey = await nostrService.getPublicKey();
-        console.log('Got pubkey:', pubkey);
+        console.log('🚀 Starting Nostr connection...');
+        
+        // Use the new proper connection flow
+        const connectionResult = await nostrService.connectExtension();
+        console.log('✅ Extension connected successfully:', connectionResult);
         
         this.isConnected = true;
         this.userProfile = nostrService.userProfile;
         
-        // Initialize services
-        await nostrService.initialize();
+        // Initialize other services (NDK is already initialized by connectExtension)
         backupService.init();
         await immunityService.init();
         
-        console.log('Successfully connected to Nostr');
+        console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
         
       } catch (error) {
-        console.error('Failed to connect to Nostr:', error);
-        console.error('Error details:', error.message, error.stack);
-        alert(`Failed to connect to Nostr: ${error.message}. Check the console for details.`);
+        console.error('❌ Failed to connect to Nostr:', error);
+        
+        // Provide more specific error messages for different scenarios
+        let userMessage = error.message;
+        if (error.message.includes('timeout')) {
+          userMessage = 'Extension connection timed out. Please make sure your Alby extension is unlocked and responding, then try again.';
+        } else if (error.message.includes('denied') || error.message.includes('rejected')) {
+          userMessage = 'Connection was denied. Please approve the connection request in your Nostr extension.';
+        } else if (error.message.includes('No Nostr extension found')) {
+          userMessage = 'No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension, then refresh the page.';
+        }
+        
+        alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
       }
     },
     
@@ -324,9 +324,14 @@ export default {
   async mounted() {
     // Try to restore session from localStorage
     const sessionRestored = await nostrService.restoreSession();
-    if (sessionRestored) {
+    if (sessionRestored && nostrService.isExtensionReady()) {
       this.isConnected = true;
       this.userProfile = nostrService.userProfile;
+      console.log('✅ Session restored successfully');
+    } else if (sessionRestored) {
+      // Session data exists but extension not ready - clear it
+      console.log('⚠️ Session data found but extension not ready - clearing session');
+      nostrService.logout();
     }
     
     // Initialize services

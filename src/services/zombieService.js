@@ -95,29 +95,63 @@ class ZombieService {
         });
       }
       
-      // Check if account is deleted first (highest priority)
+      // Check if account is deleted first (highest priority) with improved validation
       if (profileData && profileData.has(pubkey)) {
         const profile = profileData.get(pubkey);
         if (profile.deleted) {
-          console.log(`User ${pubkey.substring(0, 8)}... is BURNED zombie: account marked as deleted`);
-          zombies.burned.push({
-            pubkey,
-            lastActivity: events.length > 0 ? events[0].created_at : null,
-            daysSinceActivity: events.length > 0 ? differenceInDays(now * 1000, events[0].created_at * 1000) : null,
-            reason: 'deleted_account'
-          });
+          const timeline = profile.deletionTimeline;
+          const hasRecentActivity = events.length > 0;
+          const lastActivityTime = hasRecentActivity ? events[0].created_at : null;
           
-          // Immediately update progress when a zombie is found
-          if (progressCallback) {
-            const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
-            progressCallback({
-              stage: 'Found burned zombie (deleted account)...',
-              currentNpub: pubkey.substring(0, 8) + '...',
-              zombiesFound: currentZombieCount,
-              processed: processedCount
-            });
+          // Cross-validate: Check if they've been active AFTER marking as deleted
+          let isGenuinelyDeleted = true;
+          let validationReason = 'deleted_account';
+          
+          if (timeline && hasRecentActivity) {
+            const activityAfterDeletion = lastActivityTime > timeline.markedDeletedAt;
+            const daysSinceDeletion = Math.floor((now - timeline.markedDeletedAt) / (24 * 60 * 60));
+            const daysSinceLastActivity = Math.floor((now - lastActivityTime) / (24 * 60 * 60));
+            
+            if (activityAfterDeletion && daysSinceLastActivity < 7) {
+              // They've been active within the last week AFTER marking as deleted
+              console.log(`⚠️  User ${pubkey.substring(0, 8)}... marked deleted ${daysSinceDeletion}d ago but posted ${daysSinceLastActivity}d ago - SUSPICIOUS`);
+              isGenuinelyDeleted = false;
+              validationReason = 'deleted_but_active';
+            }
           }
-          continue;
+          
+          if (isGenuinelyDeleted) {
+            const deletionInfo = timeline ? {
+              markedDeletedAt: timeline.markedDeletedAt,
+              deletionAge: timeline.deletionAge,
+              profileUpdatesAfterDeletion: timeline.profileUpdatesAfterDeletion
+            } : null;
+            
+            console.log(`🔥 User ${pubkey.substring(0, 8)}... is BURNED zombie: account marked as deleted${timeline ? ` ${Math.floor(timeline.deletionAge / (24 * 60 * 60))}d ago` : ''}`);
+            
+            zombies.burned.push({
+              pubkey,
+              lastActivity: lastActivityTime,
+              daysSinceActivity: hasRecentActivity ? differenceInDays(now * 1000, lastActivityTime * 1000) : null,
+              reason: validationReason,
+              deletionInfo: deletionInfo
+            });
+            
+            // Immediately update progress when a zombie is found
+            if (progressCallback) {
+              const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+              progressCallback({
+                stage: 'Found burned zombie (deleted account)...',
+                currentNpub: pubkey.substring(0, 8) + '...',
+                zombiesFound: currentZombieCount,
+                processed: processedCount
+              });
+            }
+            continue;
+          } else {
+            // They're marked as deleted but are still active - treat as regular zombie based on activity
+            console.log(`📝 User ${pubkey.substring(0, 8)}... marked deleted but still active - treating as regular zombie`);
+          }
         }
       }
       
