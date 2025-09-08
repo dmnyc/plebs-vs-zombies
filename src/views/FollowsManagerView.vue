@@ -42,26 +42,6 @@
             </div>
           </div>
           
-          <div class="border-t border-gray-700 pt-4 mt-6">
-            <h4 class="text-lg mb-3">Import/Export</h4>
-            
-            <div class="space-y-3">
-              <button @click="exportFollowList" class="btn-secondary w-full">
-                Export Follow List
-              </button>
-              
-              <input 
-                type="file" 
-                ref="fileInput" 
-                accept=".json" 
-                class="hidden" 
-                @change="handleFileUpload"
-              />
-              <button @click="$refs.fileInput.click()" class="btn-secondary w-full">
-                Import Follow List
-              </button>
-            </div>
-          </div>
         </div>
       </div>
       
@@ -102,6 +82,27 @@
           </div>
           
           <div v-else class="space-y-3">
+            <!-- Profile Loading Progress -->
+            <div v-if="profilesLoading" class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-300">Loading profile data...</span>
+                <span class="text-xs text-gray-400">{{ totalProfilesToLoad }} profiles</span>
+              </div>
+              <div class="w-full bg-gray-700 rounded-full h-2 mb-2">
+                <div 
+                  class="bg-zombie-green h-2 rounded-full transition-all duration-300"
+                  :style="{ width: totalBatches > 0 ? (currentBatch / totalBatches * 100) + '%' : '0%' }"
+                ></div>
+              </div>
+              <div class="flex justify-between text-xs text-gray-500">
+                <span>Batch {{ currentBatch }} of {{ totalBatches }}</span>
+                <span>{{ profilesLoaded }} users processed</span>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                Follow list is visible, profiles are loading in the background...
+              </div>
+            </div>
+            
             <!-- Pagination Controls -->
             <div v-if="totalPages > 1" class="flex items-center justify-between pb-4 border-b border-gray-700">
               <div class="text-sm text-gray-400">
@@ -151,10 +152,13 @@
                   <!-- Avatar -->
                   <div class="flex-shrink-0">
                     <img 
-                      :src="follow.profile?.picture || '/default-avatar.svg'" 
+                      :src="getAvatarUrl(follow.profile?.picture)" 
                       :alt="follow.profile?.display_name || follow.profile?.name || 'User'"
-                      class="w-12 h-12 rounded-full object-cover bg-gray-700"
+                      class="w-12 h-12 rounded-full object-cover bg-gray-700 cursor-pointer hover:opacity-80 transition-opacity"
                       @error="handleAvatarError"
+                      @click="openProfile(follow.pubkey)"
+                      loading="lazy"
+                      title="Click to view profile"
                     />
                   </div>
                   
@@ -164,7 +168,11 @@
                       <div class="flex-1 min-w-0">
                         <!-- Name and Username -->
                         <div class="flex items-center gap-2 mb-1">
-                          <h4 class="font-bold text-white truncate">
+                          <h4 
+                            class="font-bold text-white truncate cursor-pointer hover:text-blue-400 transition-colors"
+                            @click="openProfile(follow.pubkey)"
+                            title="Click to view profile"
+                          >
                             {{ follow.profile?.display_name || follow.profile?.name || 'Unknown User' }}
                           </h4>
                           <span 
@@ -188,7 +196,13 @@
                         
                         <!-- NIP-05 -->
                         <div v-if="follow.profile?.nip05" class="text-xs text-blue-400 mb-2">
-                          ✓ {{ follow.profile.nip05 }}
+                          <span 
+                            class="cursor-pointer hover:text-blue-300 transition-colors"
+                            @click="openProfile(follow.pubkey)"
+                            title="Click to view profile"
+                          >
+                            ✓ {{ follow.profile.nip05 }}
+                          </span>
                         </div>
                         
                         <!-- NPUB -->
@@ -209,11 +223,12 @@
                         </button>
                         
                         <button 
-                          @click="removeFollow(follow.pubkey)" 
+                          @click="removeFollow(follow.pubkey, $event)" 
                           class="text-sm px-3 py-1 bg-red-900 hover:bg-red-800 rounded transition-colors"
                           title="Unfollow"
+                          :disabled="follow.unfollowing"
                         >
-                          💔 Unfollow
+                          {{ follow.unfollowing ? '⏳ Unfollowing...' : '💔 Unfollow' }}
                         </button>
                       </div>
                     </div>
@@ -243,6 +258,47 @@
         </button>
       </div>
     </div>
+    
+    <!-- Custom Alert Modal -->
+    <div 
+      v-if="alertModal.show" 
+      class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-75"
+      @click.self="closeAlert"
+    >
+      <div class="card max-w-md mx-auto p-6">
+        <div class="flex items-center mb-4">
+          <div 
+            class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+            :class="{
+              'bg-blue-600': alertModal.type === 'info',
+              'bg-red-600': alertModal.type === 'error',
+              'bg-zombie-green': alertModal.type === 'success',
+              'bg-yellow-600': alertModal.type === 'warning'
+            }"
+          >
+            <span v-if="alertModal.type === 'info'">ℹ️</span>
+            <span v-else-if="alertModal.type === 'error'">❌</span>
+            <span v-else-if="alertModal.type === 'success'">✅</span>
+            <span v-else-if="alertModal.type === 'warning'">⚠️</span>
+          </div>
+          <h3 
+            class="text-xl font-bold"
+            :class="{
+              'text-blue-400': alertModal.type === 'info',
+              'text-red-400': alertModal.type === 'error',
+              'text-zombie-green': alertModal.type === 'success',
+              'text-yellow-400': alertModal.type === 'warning'
+            }"
+          >
+            {{ alertModal.title }}
+          </h3>
+        </div>
+        <p class="text-gray-300 mb-6 whitespace-pre-wrap">{{ alertModal.message }}</p>
+        <button @click="closeAlert" class="btn-primary w-full">
+          OK
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -267,7 +323,18 @@ export default {
       sortOption: 'recent',
       successMessage: '',
       currentPage: 1,
-      itemsPerPage: 20
+      itemsPerPage: 20,
+      profilesLoading: false,
+      profilesLoaded: 0,
+      totalProfilesToLoad: 0,
+      currentBatch: 0,
+      totalBatches: 0,
+      alertModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'info' // 'info', 'error', 'success', 'warning'
+      }
     };
   },
   computed: {
@@ -346,8 +413,12 @@ export default {
     },
     async loadFollowList() {
       this.loading = true;
+      this.profilesLoading = false;
+      this.profilesLoaded = 0;
+      this.totalProfilesToLoad = 0;
       
       try {
+        // First, get the follow list and show it immediately
         const followList = await nostrService.getFollowList();
         this.followList = followList.map(pubkey => {
           return {
@@ -358,27 +429,79 @@ export default {
           };
         });
         
-        // Fetch profile metadata for all follows
-        console.log(`Fetching profile data for ${followList.length} follows...`);
-        const profileMap = await nostrService.getProfileMetadata(followList);
-        
-        // Update follows with profile data
-        this.followList = this.followList.map(follow => {
-          const profile = profileMap.get(follow.pubkey);
-          return {
-            ...follow,
-            profile: profile || null
-          };
-        });
-        
         this.lastUpdated = Date.now();
-        console.log(`Loaded ${this.followList.length} follows with profile data`);
+        this.loading = false; // Show follow list immediately
+        
+        // Then fetch profile metadata in the background with progress
+        if (followList.length > 0) {
+          this.profilesLoading = true;
+          this.totalProfilesToLoad = followList.length;
+          
+          console.log(`Fetching profile data for ${followList.length} follows...`);
+          
+          // Use the getProfileMetadata with a progress callback if available
+          const profileMap = await this.getProfilesWithProgress(followList);
+          
+          // Update follows with profile data
+          this.followList = this.followList.map(follow => {
+            const profile = profileMap.get(follow.pubkey);
+            return {
+              ...follow,
+              profile: profile || null
+            };
+          });
+          
+          console.log(`Loaded ${this.followList.length} follows with profile data`);
+        }
       } catch (error) {
         console.error('Failed to load follow list:', error);
-        alert('Failed to load follow list. See console for details.');
+        this.showError('Failed to load follow list. See console for details.');
       } finally {
         this.loading = false;
+        this.profilesLoading = false;
       }
+    },
+    
+    async getProfilesWithProgress(pubkeys) {
+      if (!pubkeys || pubkeys.length === 0) {
+        return new Map();
+      }
+      
+      // Calculate batch info (matching nostrService batch size of 25)
+      const batchSize = 25;
+      this.totalBatches = Math.ceil(pubkeys.length / batchSize);
+      this.currentBatch = 0;
+      this.profilesLoaded = 0;
+      
+      // Initialize result map
+      const profileMap = new Map();
+      
+      // Process in batches to show progress
+      for (let i = 0; i < pubkeys.length; i += batchSize) {
+        const batch = pubkeys.slice(i, i + batchSize);
+        this.currentBatch = Math.floor(i / batchSize) + 1;
+        
+        try {
+          // Fetch profiles for this batch
+          const batchProfiles = await nostrService.getProfileMetadata(batch);
+          
+          // Merge results
+          for (const [pubkey, profile] of batchProfiles) {
+            profileMap.set(pubkey, profile);
+          }
+          
+          this.profilesLoaded += batch.length;
+          
+          // Small delay to allow UI to update and prevent overwhelming the relays
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error(`Failed to fetch batch ${this.currentBatch}:`, error);
+          // Continue with next batch even if this one fails
+        }
+      }
+      
+      return profileMap;
     },
     async refreshFollowList() {
       await this.loadFollowList();
@@ -392,110 +515,68 @@ export default {
         if (result.success) {
           this.successMessage = `Backup created successfully with ${result.backup.followCount} follows.`;
         } else {
-          alert(`Failed to create backup: ${result.message}`);
+          this.showError(`Failed to create backup: ${result.message}`);
         }
       } catch (error) {
         console.error('Failed to create backup:', error);
-        alert('Failed to create backup. See console for details.');
+        this.showError('Failed to create backup. See console for details.');
       } finally {
         this.loading = false;
       }
     },
-    async exportFollowList() {
-      try {
-        const backup = await nostrService.backupFollowList();
-        backupService.exportBackupToJson(backup);
-      } catch (error) {
-        console.error('Failed to export follow list:', error);
-        alert('Failed to export follow list. See console for details.');
-      }
-    },
-    async handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      this.loading = true;
-      
-      try {
-        const reader = new FileReader();
-        
-        reader.onload = async (e) => {
-          try {
-            const content = e.target.result;
-            const backup = JSON.parse(content);
-            
-            // Validate the backup data
-            if (!backup.pubkey || !backup.follows || !Array.isArray(backup.follows)) {
-              throw new Error('Invalid backup file format');
-            }
-            
-            // Apply the imported follow list
-            const applyResult = await this.applyImportedFollowList(backup);
-            
-            if (applyResult.success) {
-              // Store the backup
-              const result = await backupService.importBackupFromJson(content);
-              
-              if (result.success) {
-                this.successMessage = `Follow list imported successfully with ${backup.follows.length} follows.`;
-                await this.loadFollowList();
-              } else {
-                alert(`Failed to import follow list: ${result.message}`);
-              }
-            } else {
-              alert(`Failed to apply follow list: ${applyResult.message}`);
-            }
-          } catch (error) {
-            console.error('Failed to import follow list:', error);
-            alert('Failed to import follow list. See console for details.');
-          } finally {
-            this.loading = false;
-          }
-        };
-        
-        reader.readAsText(file);
-      } catch (error) {
-        console.error('Failed to read file:', error);
-        alert('Failed to read file. See console for details.');
-        this.loading = false;
-      }
-      
-      // Reset the file input
-      event.target.value = '';
-    },
-    async applyImportedFollowList(backup) {
-      try {
-        const result = await backupService.applyImportedFollowList(backup);
-        return result;
-      } catch (error) {
-        console.error('Failed to apply imported follow list:', error);
-        return {
-          success: false,
-          message: error.message
-        };
-      }
-    },
-    async removeFollow(pubkey) {
+    async removeFollow(pubkey, event) {
       if (!confirm(`Are you sure you want to unfollow this account?`)) {
         return;
       }
       
-      this.loading = true;
+      // Find the user info for the success message
+      const user = this.followList.find(f => f.pubkey === pubkey);
+      const userName = user?.profile?.display_name || user?.profile?.name || 'User';
+      
+      // Set loading state on the specific user
+      this.followList = this.followList.map(follow => {
+        if (follow.pubkey === pubkey) {
+          return { ...follow, unfollowing: true };
+        }
+        return follow;
+      });
       
       try {
         const result = await nostrService.createUnfollowEvent([pubkey]);
         
         if (result.success) {
-          this.successMessage = 'Account unfollowed successfully.';
-          await this.loadFollowList();
+          // Remove the user from the local follow list immediately
+          this.followList = this.followList.filter(follow => follow.pubkey !== pubkey);
+          
+          // Update last updated timestamp
+          this.lastUpdated = Date.now();
+          
+          // Show success message
+          this.successMessage = `Successfully unfollowed ${userName}`;
+          
+          console.log(`Removed ${pubkey} from local follow list. New count: ${this.followList.length}`);
         } else {
-          alert(`Failed to unfollow account: ${result.message}`);
+          this.showError(`Failed to unfollow account: ${result.message}`);
+          
+          // Remove loading state on failure
+          this.followList = this.followList.map(follow => {
+            if (follow.pubkey === pubkey) {
+              return { ...follow, unfollowing: false };
+            }
+            return follow;
+          });
         }
       } catch (error) {
         console.error('Failed to unfollow account:', error);
-        alert('Failed to unfollow account. See console for details.');
-      } finally {
-        this.loading = false;
+        this.showError('Failed to unfollow account. See console for details.');
+        
+        // Remove loading state on failure
+        this.followList = this.followList.map(follow => {
+          if (follow.pubkey === pubkey) {
+            return { ...follow, unfollowing: false };
+          }
+          return follow;
+        });
       }
     },
     async scanForZombies() {
@@ -529,11 +610,11 @@ export default {
           
           this.successMessage = `Scan complete. Found ${result.zombieCount} zombies out of ${result.totalFollows} follows.`;
         } else {
-          alert(`Failed to scan for zombies: ${result.message}`);
+          this.showError(`Failed to scan for zombies: ${result.message}`);
         }
       } catch (error) {
         console.error('Failed to scan for zombies:', error);
-        alert('Failed to scan for zombies. See console for details.');
+        this.showError('Failed to scan for zombies. See console for details.');
       } finally {
         this.loading = false;
       }
@@ -544,7 +625,19 @@ export default {
       }
     },
     handleAvatarError(event) {
-      event.target.src = '/default-avatar.svg';
+      const img = event.target;
+      const originalSrc = img.src;
+      
+      // Log common problematic domains for debugging
+      if (originalSrc.includes('instagram.com') || originalSrc.includes('facebook.com')) {
+        console.warn(`Failed to load avatar from ${new URL(originalSrc).hostname} (likely blocked by CORS/403)`);
+      } else {
+        console.warn(`Failed to load avatar: ${originalSrc}`);
+      }
+      
+      // Set fallback avatar
+      img.src = '/default-avatar.svg';
+      img.onerror = null; // Prevent infinite loop if default avatar also fails
     },
     openProfile(pubkey) {
       // Open profile in a new tab using jumble.social
@@ -553,10 +646,155 @@ export default {
         // Use jumble.social as primary profile viewer
         window.open(`https://jumble.social/users/${npub}`, '_blank');
       }
+    },
+    showError(message) {
+      this.showAlert('Error', message, 'error');
+    },
+    showSuccess(message) {
+      this.showAlert('Success', message, 'success');
+    },
+    showWarning(message) {
+      this.showAlert('Warning', message, 'warning');
+    },
+    showInfo(message) {
+      this.showAlert('Info', message, 'info');
+    },
+    showAlert(title, message, type = 'info') {
+      this.alertModal = {
+        show: true,
+        title,
+        message,
+        type
+      };
+    },
+    closeAlert() {
+      this.alertModal.show = false;
+    },
+    getAvatarUrl(pictureUrl) {
+      if (!pictureUrl) {
+        return '/default-avatar.svg';
+      }
+      
+      // Check for known problematic domains and use default avatar instead
+      const problematicDomains = [
+        'instagram.com',
+        'facebook.com',
+        'fbcdn.net',
+        'cdninstagram.com'
+      ];
+      
+      const url = pictureUrl.toLowerCase();
+      if (problematicDomains.some(domain => url.includes(domain))) {
+        console.warn(`Skipping potentially blocked avatar from: ${new URL(pictureUrl).hostname}`);
+        return '/default-avatar.svg';
+      }
+      
+      return pictureUrl;
+    },
+    async debugSpecificUser(npub) {
+      console.log('🔍 DEBUGGING UNKNOWN USER ISSUE');
+      console.log('================================');
+      console.log(`NPUB: ${npub}`);
+      
+      try {
+        // Convert npub to hex
+        let hex;
+        try {
+          const { decode } = await import('nostr-tools/nip19');
+          const decoded = decode(npub);
+          hex = decoded.data;
+          console.log(`HEX:  ${hex}`);
+        } catch (decodeError) {
+          console.error('❌ Failed to decode npub:', decodeError.message);
+          return;
+        }
+        
+        console.log('');
+        
+        // Check if user is in current follows list
+        console.log('1. 📝 Checking current follows list...');
+        const userInList = this.followList.find(f => f.pubkey === hex);
+        if (userInList) {
+          console.log('✅ User found in follows list:');
+          console.log('- Pubkey:', userInList.pubkey);
+          console.log('- Profile data:', userInList.profile);
+          console.log('- Display name would be:', userInList.profile?.display_name || userInList.profile?.name || 'Unknown User');
+          console.log('- Name:', userInList.profile?.name || 'null');
+          console.log('- Display Name:', userInList.profile?.display_name || 'null');
+          console.log('- About:', userInList.profile?.about ? userInList.profile.about.substring(0, 100) + '...' : 'null');
+          console.log('- Picture:', userInList.profile?.picture || 'null');
+          console.log('- NIP-05:', userInList.profile?.nip05 || 'null');
+          console.log('- Deleted:', userInList.profile?.deleted);
+        } else {
+          console.log('❌ User not found in current follows list');
+        }
+        
+        console.log('');
+        console.log('2. 📋 Fetching profile metadata directly...');
+        const profileMap = await nostrService.getProfileMetadata([hex]);
+        const profile = profileMap.get(hex);
+        
+        console.log('Profile data received:');
+        console.log('- Raw profile object:', profile);
+        console.log('- Name:', profile?.name || 'null');
+        console.log('- Display Name:', profile?.display_name || 'null');
+        console.log('- About:', profile?.about ? profile.about.substring(0, 100) + '...' : 'null');
+        console.log('- Picture:', profile?.picture || 'null');
+        console.log('- NIP-05:', profile?.nip05 || 'null');
+        console.log('- Deleted:', profile?.deleted);
+        console.log('');
+        
+        // Check what the display logic would show
+        const displayName = profile?.display_name || profile?.name || 'Unknown User';
+        console.log(`3. 🖥️ Display logic result: "${displayName}"`);
+        console.log('');
+        
+        console.log('4. 🔍 Checking for profile events directly from relays...');
+        await nostrService.initialize();
+        
+        const profileFilter = {
+          kinds: [0],
+          authors: [hex],
+          limit: 5
+        };
+        
+        const events = await nostrService.ndk.fetchEvents(profileFilter);
+        console.log(`Found ${events.size} profile events for this user`);
+        
+        let eventIndex = 0;
+        events.forEach((event) => {
+          eventIndex++;
+          console.log(`Event ${eventIndex}:`);
+          console.log('- Created at:', new Date(event.created_at * 1000).toISOString());
+          console.log('- Content length:', event.content.length);
+          console.log('- Content preview:', event.content.substring(0, 100) + '...');
+          
+          try {
+            const parsed = JSON.parse(event.content);
+            console.log('- Parsed name:', parsed.name);
+            console.log('- Parsed display_name:', parsed.display_name);
+            console.log('- Parsed deleted:', parsed.deleted);
+          } catch (e) {
+            console.log('- JSON parse error:', e.message);
+          }
+          console.log('---');
+        });
+        
+      } catch (error) {
+        console.error('❌ Error during investigation:', error);
+      }
+      
+      console.log('🏁 INVESTIGATION COMPLETE');
+      console.log('You can now call window.debugUnknownUser("npub...") to debug other users');
     }
   },
   mounted() {
     this.loadFollowList();
+    
+    // Add debug method to window for console access
+    window.debugUnknownUser = (npub) => {
+      this.debugSpecificUser(npub);
+    };
   }
 };
 </script>
@@ -571,5 +809,15 @@ export default {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Profile clickable elements */
+.cursor-pointer:hover {
+  transform: translateX(1px);
+}
+
+/* Avatar hover effect */
+img.cursor-pointer:hover {
+  transform: scale(1.05);
 }
 </style>

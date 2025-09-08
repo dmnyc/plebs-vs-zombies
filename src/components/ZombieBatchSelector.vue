@@ -18,39 +18,43 @@
           <div class="text-sm text-gray-400">
             Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }}-{{ Math.min(currentPage * itemsPerPage, availableZombies.length) }} of {{ availableZombies.length }} zombies
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 sm:gap-3">
             <button 
               @click="currentPage = 1" 
               :disabled="currentPage === 1"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
               title="First page"
             >
-              ⇤ First
+              <span class="hidden sm:inline">⇤ First</span>
+              <span class="sm:hidden">⇤</span>
             </button>
             <button 
               @click="previousPage" 
               :disabled="currentPage === 1"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              ← Previous
+              <span class="hidden sm:inline">← Previous</span>
+              <span class="sm:hidden">←</span>
             </button>
-            <span class="text-sm text-gray-300 px-3 py-1 bg-gray-700 rounded">
-              {{ currentPage }} / {{ totalPages }}
+            <span class="text-xs sm:text-sm text-gray-300 px-2 sm:px-3 py-1 bg-gray-700 rounded whitespace-nowrap">
+              {{ currentPage }}/{{ totalPages }}
             </span>
             <button 
               @click="nextPage" 
               :disabled="currentPage === totalPages"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              Next →
+              <span class="hidden sm:inline">Next →</span>
+              <span class="sm:hidden">→</span>
             </button>
             <button 
               @click="currentPage = totalPages" 
               :disabled="currentPage === totalPages"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
               title="Last page"
             >
-              Last ⇥
+              <span class="hidden sm:inline">Last ⇥</span>
+              <span class="sm:hidden">⇥</span>
             </button>
           </div>
         </div>
@@ -60,29 +64,18 @@
           <div 
             v-for="zombie in paginatedZombies" 
             :key="zombie.pubkey" 
-            class="flex items-center p-3 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
+            class="p-3 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
           >
-          <input 
-            type="checkbox" 
-            :id="zombie.pubkey" 
-            :value="zombie.pubkey" 
-            v-model="selectedZombies"
-            class="mr-3 h-5 w-5 rounded text-zombie-green focus:ring-zombie-green"
-          />
-          <div class="flex-grow">
+            <!-- Top Row: Profile Picture + Info + Badge -->
             <div class="flex items-center justify-between">
-              <div class="flex items-center">
+              <div class="flex items-center min-w-0 flex-grow">
                 <!-- Profile Picture -->
                 <img 
-                  v-if="zombie.profile?.picture" 
-                  :src="zombie.profile.picture" 
+                  :src="zombie.profile?.picture || '/default-avatar.svg'" 
                   :alt="getDisplayName(zombie)"
-                  class="w-10 h-10 rounded-full mr-3 border-2 border-gray-600"
-                  @error="$event.target.style.display = 'none'"
+                  class="w-10 h-10 rounded-full mr-3 border-2 border-gray-600 flex-shrink-0 bg-gray-700"
+                  @error="$event.target.src = '/default-avatar.svg'"
                 />
-                <div v-else class="w-10 h-10 rounded-full mr-3 bg-gray-700 flex items-center justify-center text-gray-400 text-xs">
-                  👤
-                </div>
                 
                 <div>
                   <!-- Display Name -->
@@ -117,6 +110,11 @@
               </div>
             </div>
             
+            <!-- Bio/About Text (if available) -->
+            <div v-if="zombie.profile?.about" class="mt-2 text-xs text-gray-400 line-clamp-2">
+              {{ zombie.profile.about }}
+            </div>
+            
             <!-- Activity Info -->
             <div class="mt-2 text-sm text-gray-400">
               <div v-if="zombie.type === 'burned'" class="space-y-1">
@@ -142,30 +140,41 @@
               </div>
             </div>
             
-            <!-- About/Bio if available -->
-            <div v-if="zombie.profile?.about" class="mt-1 text-xs text-gray-500 truncate">
-              {{ zombie.profile.about.substring(0, 100) }}{{ zombie.profile.about.length > 100 ? '...' : '' }}
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="mt-2 flex flex-col sm:flex-row gap-1 sm:gap-2">
-              <button 
-                @click="viewProfile(zombie)" 
-                class="text-xs px-2 py-1 bg-pleb-blue hover:bg-blue-600 rounded transition-colors"
-                title="View full profile"
-              >
-                View Profile
-              </button>
-              <button 
-                @click="grantImmunity(zombie)" 
-                class="text-xs px-2 py-1 bg-green-700 hover:bg-green-600 rounded transition-colors"
-                title="Grant zombie immunity (whitelist)"
-              >
-                🛡️ Grant Immunity
-              </button>
+            <!-- Checkbox and Action Buttons Row -->
+            <div class="mt-2 flex items-center justify-between">
+              <div class="flex items-center">
+                <!-- Checkbox aligned with avatar -->
+                <input 
+                  type="checkbox" 
+                  :id="zombie.pubkey" 
+                  :value="zombie.pubkey" 
+                  v-model="selectedZombies"
+                  class="h-5 w-5 rounded text-zombie-green focus:ring-zombie-green mr-3 flex-shrink-0"
+                />
+                <!-- Label aligned with text above -->
+                <label :for="zombie.pubkey" class="text-sm text-gray-300">
+                  Select for purging
+                </label>
+              </div>
+              
+              <div class="flex gap-2">
+                <button 
+                  @click="viewProfile(zombie)" 
+                  class="text-xs px-2 py-1 bg-pleb-blue hover:bg-blue-600 rounded transition-colors"
+                  title="View full profile"
+                >
+                  View Profile
+                </button>
+                <button 
+                  @click="grantImmunity(zombie)" 
+                  class="text-xs px-2 py-1 bg-green-700 hover:bg-green-600 rounded transition-colors"
+                  title="Grant zombie immunity (whitelist)"
+                >
+                  🛡️ Grant Immunity
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </div>
         
         <!-- Bottom Pagination Controls (duplicate for convenience) -->
@@ -173,34 +182,38 @@
           <div class="text-sm text-gray-400">
             Page {{ currentPage }} of {{ totalPages }} ({{ availableZombies.length }} total zombies)
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 sm:gap-3">
             <button 
               @click="currentPage = 1" 
               :disabled="currentPage === 1"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              ⇤ First
+              <span class="hidden sm:inline">⇤ First</span>
+              <span class="sm:hidden">⇤</span>
             </button>
             <button 
               @click="previousPage" 
               :disabled="currentPage === 1"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              ← Previous
+              <span class="hidden sm:inline">← Previous</span>
+              <span class="sm:hidden">←</span>
             </button>
             <button 
               @click="nextPage" 
               :disabled="currentPage === totalPages"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              Next →
+              <span class="hidden sm:inline">Next →</span>
+              <span class="sm:hidden">→</span>
             </button>
             <button 
               @click="currentPage = totalPages" 
               :disabled="currentPage === totalPages"
-              class="btn-secondary text-sm disabled:opacity-50"
+              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
             >
-              Last ⇥
+              <span class="hidden sm:inline">Last ⇥</span>
+              <span class="sm:hidden">⇥</span>
             </button>
           </div>
         </div>
@@ -209,7 +222,7 @@
     
     <div class="mt-6 space-y-4">
       <!-- Selection Summary -->
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 bg-gray-800 rounded-lg">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 p-3 bg-gray-800 rounded-lg">
         <div class="text-sm text-gray-300">
           <div class="font-medium">
             {{ totalSelectedCount }} of {{ availableZombies.length }} total selected
@@ -284,6 +297,60 @@
         <span>({{ totalSelectedCount }})</span>
       </button>
     </div>
+
+    <!-- Alert Modal -->
+    <div 
+      v-if="alertModal.show" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+      @click="closeAlert"
+    >
+      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+        <div class="flex items-center mb-4">
+          <div 
+            class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+            :class="{
+              'bg-blue-600': alertModal.type === 'info',
+              'bg-red-600': alertModal.type === 'error',
+              'bg-zombie-green': alertModal.type === 'success',
+              'bg-yellow-600': alertModal.type === 'warning'
+            }"
+          >
+            <span v-if="alertModal.type === 'info'">ℹ️</span>
+            <span v-else-if="alertModal.type === 'error'">❌</span>
+            <span v-else-if="alertModal.type === 'success'">✅</span>
+            <span v-else-if="alertModal.type === 'warning'">⚠️</span>
+          </div>
+          <h3 
+            class="text-lg font-medium"
+            :class="{
+              'text-blue-400': alertModal.type === 'info',
+              'text-red-400': alertModal.type === 'error',
+              'text-zombie-green': alertModal.type === 'success',
+              'text-yellow-400': alertModal.type === 'warning'
+            }"
+          >
+            {{ alertModal.title }}
+          </h3>
+        </div>
+        
+        <p class="text-gray-300 mb-6 whitespace-pre-wrap">{{ alertModal.message }}</p>
+        
+        <div class="flex justify-end">
+          <button 
+            @click="closeAlert"
+            class="px-4 py-2 rounded transition-colors"
+            :class="{
+              'bg-blue-600 hover:bg-blue-500 text-white': alertModal.type === 'info',
+              'bg-red-600 hover:bg-red-500 text-white': alertModal.type === 'error',
+              'bg-zombie-green hover:bg-green-500 text-zombie-dark': alertModal.type === 'success',
+              'bg-yellow-600 hover:bg-yellow-500 text-black': alertModal.type === 'warning'
+            }"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -317,7 +384,13 @@ export default {
       selectedZombies: [], // Tracks selected pubkeys across all pages
       currentPage: 1,
       itemsPerPage: 25,
-      immuneZombies: new Set() // Track zombies that have been granted immunity in this session
+      immuneZombies: new Set(), // Track zombies that have been granted immunity in this session
+      alertModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'info'
+      }
     };
   },
   computed: {
@@ -351,6 +424,18 @@ export default {
     }
   },
   methods: {
+    // Alert Modal Methods
+    showAlert(title, message, type = 'info') {
+      this.alertModal = {
+        show: true,
+        title,
+        message,
+        type
+      };
+    },
+    closeAlert() {
+      this.alertModal.show = false;
+    },
     formatPubkey(pubkey) {
       if (!pubkey) return '';
       return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
@@ -419,7 +504,7 @@ export default {
       // Validate pubkey format first
       if (!zombie.pubkey || typeof zombie.pubkey !== 'string' || zombie.pubkey.length !== 64 || !/^[0-9a-fA-F]+$/i.test(zombie.pubkey)) {
         console.error('Invalid pubkey format:', zombie.pubkey, 'length:', zombie.pubkey?.length);
-        alert(`Cannot view profile: Invalid pubkey format`);
+        this.showAlert('Error', 'Cannot view profile: Invalid pubkey format', 'error');
         return;
       }
       
@@ -429,17 +514,15 @@ export default {
         window.open(profileUrl, '_blank');
       } catch (error) {
         console.error('Failed to generate profile URL:', error);
-        alert(`Cannot view profile: ${error.message}`);
+        this.showAlert('Error', `Cannot view profile: ${error.message}`, 'error');
       }
     },
     async grantImmunity(zombie) {
       const displayName = this.getDisplayName(zombie);
-      const reason = prompt(
-        `Grant zombie immunity to ${displayName}?\n\nThis will add them to your whitelist and they won't appear in future scans.\n\nOptional reason:`,
-        'Manual review - not actually inactive'
-      );
+      // For now, use a default reason (TODO: Create input modal for custom reasons)
+      const reason = 'Manual immunity grant - flagged as active user';
       
-      if (reason !== null) { // null means cancelled
+      if (reason) {
         try {
           await immunityService.grantImmunity(zombie.pubkey, reason || 'Manual immunity grant');
           
@@ -461,25 +544,25 @@ export default {
           // Emit event to parent to update statistics
           this.$emit('immunity-granted', zombie.pubkey);
           
-          alert(`${displayName} has been granted zombie immunity! 🛡️`);
+          this.showAlert('Success', `${displayName} has been granted zombie immunity! 🛡️`, 'success');
         } catch (error) {
           console.error('Failed to grant immunity:', error);
-          alert('Failed to grant immunity. See console for details.');
+          this.showAlert('Error', 'Failed to grant immunity. See console for details.', 'error');
         }
       }
     },
-    confirmPurge() {
+    async confirmPurge() {
       // Additional warning for very large batches
       if (this.totalSelectedCount > 50) {
-        const confirmed = confirm(
-          `⚠️ WARNING: You're about to unfollow ${this.totalSelectedCount} accounts.\n\n` +
-          `Large batches may fail due to Nostr extension limitations.\n\n` +
-          `Recommendation: Try 10-30 accounts at a time for better success rates.\n\n` +
-          `Continue with ${this.totalSelectedCount} accounts anyway?`
-        );
-        if (!confirmed) {
-          return;
-        }
+        this.$emit('confirm-purge', {
+          title: 'WARNING: Large Batch Purge',
+          message: `⚠️ WARNING: You're about to unfollow ${this.totalSelectedCount} accounts.\n\nLarge batches may fail due to Nostr extension limitations.\n\nRecommendation: Try 10-30 accounts at a time for better success rates.\n\nContinue with ${this.totalSelectedCount} accounts anyway?`,
+          type: 'warning',
+          confirmText: 'Continue',
+          cancelText: 'Cancel',
+          zombies: this.selectedZombies
+        });
+        return;
       }
       
       this.$emit('purge', this.selectedZombies);
