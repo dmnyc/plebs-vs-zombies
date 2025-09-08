@@ -1,0 +1,427 @@
+<template>
+  <div>
+    <h2 class="text-2xl mb-6">Dashboard</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="card">
+        <h3 class="text-xl mb-4">Follow List Overview</h3>
+        <div v-if="loading" class="text-center py-4">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+          <p class="mt-2 text-gray-400">Loading follow data...</p>
+        </div>
+        <div v-else>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-300">Total follows:</span>
+              <span class="font-bold">{{ followStats.total || 0 }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-300">Immune users:</span>
+              <span class="font-bold text-green-400">🛡️ {{ followStats.immune || 0 }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-300">Last scan:</span>
+              <span v-if="lastScanDate" class="font-bold">{{ formatDate(lastScanDate) }}</span>
+              <span v-else class="text-gray-400">Never</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-300">Zombie score:</span>
+              <span 
+                class="font-bold"
+                :class="{
+                  'text-green-500': zombieScore < 20,
+                  'text-yellow-400': zombieScore >= 20 && zombieScore < 50,
+                  'text-orange-500': zombieScore >= 50 && zombieScore < 80,
+                  'text-red-500': zombieScore >= 80
+                }"
+              >
+                {{ zombieScore }}%
+              </span>
+            </div>
+          </div>
+          
+          <div class="mt-6">
+            <button @click="scanForZombies" class="btn-primary w-full" :disabled="scanning">
+              {{ scanning ? 'Scanning...' : 'Scan for Zombies' }}
+            </button>
+            
+            <!-- Real-time Progress Feedback (matching Hunt Zombies page) -->
+            <div v-if="scanning" class="mt-4 p-4 bg-gray-800 rounded-lg border border-gray-600 h-32">
+              <div class="flex flex-col h-full justify-between">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium text-gray-300 truncate">{{ scanProgress.stage || 'Initializing...' }}</span>
+                  <span class="text-xs text-gray-400 flex-shrink-0 ml-2">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    class="bg-zombie-green h-2 rounded-full transition-all duration-300"
+                    :style="{ width: scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total * 100) + '%' : '0%' }"
+                  ></div>
+                </div>
+                
+                <!-- Current Processing Info -->
+                <div class="text-xs text-gray-400 font-mono break-all h-4 flex items-center">
+                  <span v-if="scanProgress.currentNpub">
+                    <span class="text-gray-400">Processing:</span>
+                    <span class="font-mono text-xs ml-1">{{ scanProgress.currentNpub }}</span>
+                  </span>
+                  <span v-else>&nbsp;</span>
+                </div>
+                
+                <!-- Live Stats -->
+                <div class="flex justify-between text-sm">
+                  <div>
+                    <span class="text-blue-400 font-bold">{{ scanProgress.processed || 0 }}</span>
+                    <span class="text-gray-400"> users processed</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-400 font-bold">{{ scanProgress.total || 0 }}</span>
+                    <span class="text-gray-400"> total follows</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <ZombieStats
+        v-if="zombieStatsReady"
+        title="Zombie Statistics"
+        :stats="zombieStats"
+      >
+        <div class="mt-6">
+          <button @click="goToZombieHunting" class="btn-danger w-full">
+            Start Zombie Hunt
+          </button>
+        </div>
+      </ZombieStats>
+      
+      <div class="card">
+        <h3 class="text-xl mb-4">Hunt Status</h3>
+        <div class="space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-300">Zombies purged:</span>
+            <span class="font-bold text-zombie-green">{{ huntStats.totalPurged || 0 }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-300">Purge events:</span>
+            <span class="font-bold">{{ huntStats.purgeEvents || 0 }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-300">Bandwidth saved:</span>
+            <span class="font-bold text-pleb-blue">{{ formatBytes(huntStats.estimatedBandwidthSaved || 0) }}</span>
+          </div>
+        </div>
+        <div class="mt-6 space-y-2">
+          <button @click="goToBackups" class="btn-secondary w-full">
+            Manage Backups
+          </button>
+          <button 
+            @click="resetImmunity" 
+            class="btn-danger w-full text-sm"
+            :disabled="followStats.immune === 0"
+          >
+            Reset Immunity ({{ followStats.immune }})
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mt-8">
+      <h3 class="text-xl mb-4">Recent Activity</h3>
+      <div class="card">
+        <div v-if="recentActivity.length === 0" class="text-center py-4">
+          <p class="text-gray-400">No recent activity</p>
+        </div>
+        <div v-else>
+          <ul class="space-y-2">
+            <li 
+              v-for="(activity, index) in recentActivity" 
+              :key="index"
+              class="p-3 border border-gray-700 rounded-lg"
+            >
+              <div class="flex items-center">
+                <div 
+                  class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+                  :class="{
+                    'bg-zombie-green text-zombie-dark': activity.type === 'scan',
+                    'bg-red-600': activity.type === 'purge',
+                    'bg-pleb-blue': activity.type === 'backup'
+                  }"
+                >
+                  <span v-if="activity.type === 'scan'">🔍</span>
+                  <span v-else-if="activity.type === 'purge'">💀</span>
+                  <span v-else-if="activity.type === 'backup'">💾</span>
+                </div>
+                <div>
+                  <div class="font-medium">{{ activity.title }}</div>
+                  <div class="text-sm text-gray-400">{{ formatDate(activity.timestamp) }}</div>
+                </div>
+              </div>
+              <div v-if="activity.details" class="mt-2 text-sm text-gray-400">
+                {{ activity.details }}
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { format } from 'date-fns';
+import ZombieStats from '../components/ZombieStats.vue';
+import nostrService from '../services/nostrService';
+import zombieService from '../services/zombieService';
+import immunityService from '../services/immunityService';
+
+export default {
+  name: 'DashboardView',
+  components: {
+    ZombieStats
+  },
+  data() {
+    return {
+      loading: true,
+      scanning: false,
+      followStats: {
+        total: 0,
+        immune: 0,
+      },
+      zombieStats: {
+        total: 0,
+        active: 0,
+        fresh: 0,
+        rotting: 0,
+        ancient: 0
+      },
+      scanProgress: {
+        total: 0,
+        processed: 0,
+        currentNpub: '',
+        stage: 'initializing'
+      },
+      huntStats: {
+        totalPurged: 0,
+        purgeEvents: 0,
+        estimatedBandwidthSaved: 0
+      },
+      lastScanDate: null,
+      recentActivity: []
+    };
+  },
+  computed: {
+    zombieStatsReady() {
+      return this.zombieStats.total > 0;
+    },
+    zombieScore() {
+      if (this.zombieStats.total === 0) return 0;
+      
+      const zombieCount = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
+      return Math.round((zombieCount / this.zombieStats.total) * 100);
+    }
+  },
+  methods: {
+    formatDate(timestamp) {
+      if (!timestamp) return '';
+      return format(new Date(timestamp), 'MMM d, yyyy, HH:mm');
+    },
+    formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    async loadDashboardData() {
+      this.loading = true;
+      
+      try {
+        // Initialize immunity service
+        await immunityService.init();
+        
+        // Get follow list and immune count
+        const followList = await nostrService.getFollowList();
+        this.followStats.total = followList.length;
+        this.followStats.immune = immunityService.getImmunePubkeys().length;
+        
+        // Get zombie statistics
+        const scanResults = await zombieService.getLatestScanResults();
+        if (scanResults) {
+          this.lastScanDate = scanResults.timestamp;
+          
+          const { data } = scanResults;
+          this.zombieStats = {
+            total: data.active.length + (data.burned?.length || 0) + data.fresh.length + data.rotting.length + data.ancient.length,
+            active: data.active.length,
+            burned: data.burned?.length || 0,
+            fresh: data.fresh.length,
+            rotting: data.rotting.length,
+            ancient: data.ancient.length
+          };
+        }
+        
+        // Get hunt statistics
+        this.huntStats = await zombieService.getZombieStatistics();
+        
+        // Load recent activity
+        await this.loadRecentActivity();
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async scanForZombies() {
+      this.scanning = true;
+      
+      // Reset progress (matching Hunt Zombies page)
+      this.scanProgress = {
+        total: 0,
+        processed: 0,
+        currentNpub: '',
+        stage: 'Initializing scan...'
+      };
+      
+      try {
+        const result = await zombieService.scanForZombies(true, (progress) => {
+          this.scanProgress = {
+            ...this.scanProgress,
+            ...progress
+          };
+        });
+        
+        if (result.success) {
+          this.lastScanDate = Date.now();
+          
+          this.zombieStats = {
+            total: result.totalFollows,
+            active: result.zombieData.active.length,
+            burned: result.zombieData.burned?.length || 0,
+            fresh: result.zombieData.fresh.length,
+            rotting: result.zombieData.rotting.length,
+            ancient: result.zombieData.ancient.length
+          };
+          
+          // Update immune count after scan
+          this.followStats.immune = result.immuneCount || 0;
+          
+          // Add scan activity
+          this.addActivity({
+            type: 'scan',
+            title: 'Zombie Scan Completed',
+            timestamp: Date.now(),
+            details: `Found ${result.zombieCount} zombies out of ${result.totalFollows} follows`
+          });
+          
+          alert('Scan completed successfully!');
+        } else {
+          alert(`Failed to scan for zombies: ${result.message}`);
+        }
+      } catch (error) {
+        console.error('Failed to scan for zombies:', error);
+        alert('Failed to scan for zombies. See console for details.');
+      } finally {
+        this.scanning = false;
+      }
+    },
+    async loadRecentActivity() {
+      try {
+        // Combine scan history, purge history, and backup history
+        const scanHistory = await zombieService.getScanHistory();
+        const purgeHistory = await zombieService.getPurgeHistory();
+        
+        const activity = [];
+        
+        // Add scan activities
+        scanHistory.forEach(scan => {
+          activity.push({
+            type: 'scan',
+            title: 'Zombie Scan Completed',
+            timestamp: scan.timestamp,
+            details: `Found ${scan.freshCount + scan.rottingCount + scan.ancientCount} zombies`
+          });
+        });
+        
+        // Add purge activities
+        purgeHistory.forEach(purge => {
+          activity.push({
+            type: 'purge',
+            title: 'Zombies Purged',
+            timestamp: purge.timestamp,
+            details: `Removed ${purge.count} zombie follows`
+          });
+        });
+        
+        // Sort by timestamp (newest first)
+        activity.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Keep only the 10 most recent activities
+        this.recentActivity = activity.slice(0, 10);
+      } catch (error) {
+        console.error('Failed to load recent activity:', error);
+      }
+    },
+    addActivity(activity) {
+      this.recentActivity.unshift(activity);
+      
+      // Keep only the 10 most recent activities
+      if (this.recentActivity.length > 10) {
+        this.recentActivity = this.recentActivity.slice(0, 10);
+      }
+    },
+    goToZombieHunting() {
+      this.$parent.setActiveView('hunting');
+    },
+    goToBackups() {
+      this.$parent.setActiveView('backups');
+    },
+    async resetImmunity() {
+      const count = this.followStats.immune;
+      
+      if (count === 0) {
+        alert('No immune users to reset.');
+        return;
+      }
+      
+      const confirmed = confirm(`Are you sure you want to reset immunity for all ${count} users?\n\nThis will remove all immunity records and they may appear as zombies in future scans.`);
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      try {
+        const result = await immunityService.resetAllImmunity();
+        
+        if (result.success) {
+          this.followStats.immune = 0;
+          
+          // Add reset activity
+          this.addActivity({
+            type: 'purge',
+            title: 'Immunity Reset',
+            timestamp: Date.now(),
+            details: `Reset immunity for ${result.clearedCount} users`
+          });
+          
+          alert(`Successfully reset immunity for ${result.clearedCount} users.`);
+        } else {
+          alert('Failed to reset immunity.');
+        }
+      } catch (error) {
+        console.error('Failed to reset immunity:', error);
+        alert('Failed to reset immunity. See console for details.');
+      }
+    }
+  },
+  mounted() {
+    this.loadDashboardData();
+  }
+};
+</script>

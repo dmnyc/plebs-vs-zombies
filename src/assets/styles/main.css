@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-900 text-gray-100 font-main;
+  }
+  h1, h2, h3 {
+    @apply font-horror text-zombie-green;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded font-semibold transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-zombie-green text-zombie-dark hover:bg-green-400;
+  }
+  .btn-secondary {
+    @apply btn bg-pleb-blue hover:bg-blue-500;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 hover:bg-red-500;
+  }
+  .card {
+    @apply bg-zombie-dark p-6 rounded-lg shadow-lg border border-gray-700;
+  }
+  .input {
+    @apply bg-gray-800 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-zombie-green;
+  }
+}
