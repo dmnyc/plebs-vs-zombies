@@ -72,8 +72,8 @@ class BackupService {
   /**
    * Get all backups
    */
-  async getBackups() {
-    if (this.backups.length === 0) {
+  async getBackups(forceReload = false) {
+    if (this.backups.length === 0 || forceReload) {
       const backups = await localforage.getItem('backups') || [];
       this.backups = backups;
     }

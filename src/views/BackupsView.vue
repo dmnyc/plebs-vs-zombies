@@ -3,72 +3,14 @@
     <h2 class="text-2xl mb-6">Backups & Restoration</h2>
     
     <div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
-      <BackupManager title="Follow List Backups" />
+      <!-- Backup Controls with Information -->
+      <BackupControls 
+        @backup-created="handleBackupCreated"
+        @backup-imported="handleBackupImported"
+      />
       
-      <div class="card">
-        <h3 class="text-xl mb-4">Automatic Backups</h3>
-        
-        <div class="mb-6">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-gray-300">Automatic backups:</span>
-            <span class="font-bold" :class="autoBackupsEnabled ? 'text-zombie-green' : 'text-gray-400'">
-              {{ autoBackupsEnabled ? 'Enabled' : 'Disabled' }}
-            </span>
-          </div>
-          
-          <div class="mb-4">
-            <label class="block text-gray-300 mb-2">Backup Frequency</label>
-            <select 
-              v-model="backupFrequency" 
-              class="input w-full"
-              :disabled="!autoBackupsEnabled"
-            >
-              <option value="1">Daily</option>
-              <option value="7">Weekly</option>
-              <option value="14">Bi-weekly</option>
-              <option value="30">Monthly</option>
-            </select>
-          </div>
-          
-          <div class="flex gap-3">
-            <button 
-              v-if="!autoBackupsEnabled" 
-              @click="enableAutoBackups" 
-              class="btn-primary flex-grow"
-            >
-              Enable Auto-Backups
-            </button>
-            <button 
-              v-else 
-              @click="disableAutoBackups" 
-              class="btn-danger flex-grow"
-            >
-              Disable Auto-Backups
-            </button>
-          </div>
-        </div>
-        
-        <div class="border-t border-gray-700 pt-4">
-          <h4 class="text-lg mb-3">Backup Information</h4>
-          
-          <div class="space-y-3">
-            <p class="text-gray-300">
-              Backups store your Nostr follows and public key information locally in your browser.
-            </p>
-            <p class="text-gray-300">
-              We recommend exporting backups regularly and storing them securely.
-            </p>
-            <p class="text-gray-300 mt-4">
-              <strong>What's included in backups:</strong>
-            </p>
-            <ul class="list-disc list-inside text-gray-400 ml-2">
-              <li>Your public key (npub)</li>
-              <li>Complete list of follows (pubkeys)</li>
-              <li>Timestamp and metadata</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <!-- Backup History -->
+      <BackupHistory ref="backupHistory" />
       
       <!-- Remote Backup Section -->
       <div class="card">
@@ -148,39 +90,21 @@
 </template>
 
 <script>
-import BackupManager from '../components/BackupManager.vue';
-import backupService from '../services/backupService';
+import BackupControls from '../components/BackupControls.vue';
+import BackupHistory from '../components/BackupHistory.vue';
 
 export default {
   name: 'BackupsView',
   components: {
-    BackupManager
+    BackupControls,
+    BackupHistory
   },
   data() {
     return {
-      autoBackupsEnabled: false,
-      backupFrequency: '7', // Weekly by default
       relayCopied: false
     };
   },
   methods: {
-    enableAutoBackups() {
-      const intervalDays = parseInt(this.backupFrequency, 10);
-      backupService.setupAutomaticBackups(intervalDays);
-      this.autoBackupsEnabled = true;
-    },
-    disableAutoBackups() {
-      backupService.stopAutomaticBackups();
-      this.autoBackupsEnabled = false;
-    },
-    loadSettings() {
-      // Check if automatic backups are enabled
-      const intervalDays = localStorage.getItem('automaticBackupIntervalDays');
-      if (intervalDays) {
-        this.autoBackupsEnabled = true;
-        this.backupFrequency = intervalDays;
-      }
-    },
     async copyRelay() {
       try {
         await navigator.clipboard.writeText('wss://hist.nostr.land');
@@ -191,18 +115,19 @@ export default {
       } catch (error) {
         console.error('Failed to copy relay URL:', error);
       }
-    }
-  },
-  watch: {
-    backupFrequency(newValue) {
-      if (this.autoBackupsEnabled) {
-        const intervalDays = parseInt(newValue, 10);
-        backupService.setupAutomaticBackups(intervalDays);
+    },
+    handleBackupCreated(backup) {
+      // Refresh the backup history
+      if (this.$refs.backupHistory) {
+        this.$refs.backupHistory.loadBackups(true);
+      }
+    },
+    handleBackupImported(result) {
+      // Refresh the backup history
+      if (this.$refs.backupHistory) {
+        this.$refs.backupHistory.loadBackups(true);
       }
     }
-  },
-  mounted() {
-    this.loadSettings();
   }
 };
 </script>

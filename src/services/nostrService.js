@@ -15,6 +15,9 @@ class NostrService {
       'wss://nostr.wine'
       // Removed problematic relays: relay.nostrich.de, relay.current.fyi, nostr.mutinywallet.com, relay.snort.social
     ];
+    this.extensionConnected = false;
+    this.extensionAuthorized = false;
+    this.connectionPromise = null; // Prevent multiple simultaneous connections
   }
 
   async initialize() {
@@ -34,21 +37,96 @@ class NostrService {
     return this.ndk;
   }
 
-  async getPublicKey() {
+  /**
+   * Proper NIP-07 extension connection and authorization
+   * This should be called once at app startup, not repeatedly
+   */
+  async connectExtension() {
+    if (this.connectionPromise) {
+      // Already connecting, wait for existing connection
+      return this.connectionPromise;
+    }
+
+    this.connectionPromise = this._connectExtensionImpl();
+    return this.connectionPromise;
+  }
+
+  async _connectExtensionImpl() {
+    console.log('🔌 Starting NIP-07 extension connection...');
+
+    // Check if extension is available
     if (typeof window.nostr === 'undefined') {
-      throw new Error('No Nostr extension found');
+      this.extensionConnected = false;
+      throw new Error('No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension.');
+    }
+
+    try {
+      // Test extension responsiveness first
+      console.log('🔍 Testing extension responsiveness...');
+      
+      // Get public key with reasonable timeout
+      const pubkey = await Promise.race([
+        window.nostr.getPublicKey(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Extension connection timeout')), 15000)
+        )
+      ]);
+
+      this.pubkey = pubkey;
+      this.extensionConnected = true;
+      this.extensionAuthorized = true;
+
+      console.log('✅ Extension connected successfully');
+      console.log('👤 Public key:', pubkey.substring(0, 8) + '...');
+
+      // Initialize NDK after successful extension connection
+      await this.initialize();
+
+      // Load user profile
+      await this.loadUserProfile();
+
+      // Save session
+      this.saveSession();
+
+      return {
+        success: true,
+        pubkey: this.pubkey,
+        extensionType: window.nostr.constructor?.name || 'unknown'
+      };
+
+    } catch (error) {
+      this.extensionConnected = false;
+      this.extensionAuthorized = false;
+      
+      console.error('❌ Extension connection failed:', error);
+      
+      if (error.message.includes('timeout')) {
+        throw new Error('Extension connection timed out. Please check if your Nostr extension is unlocked and responding.');
+      } else if (error.message.toLowerCase().includes('user rejected') || error.message.toLowerCase().includes('denied')) {
+        throw new Error('Connection was denied. Please approve the connection request in your Nostr extension.');
+      } else {
+        throw new Error(`Failed to connect to Nostr extension: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Check if extension is properly connected and authorized
+   */
+  isExtensionReady() {
+    return this.extensionConnected && 
+           this.extensionAuthorized && 
+           this.pubkey && 
+           typeof window.nostr !== 'undefined';
+  }
+
+  async getPublicKey() {
+    // Use the proper connection flow instead of direct access
+    if (!this.isExtensionReady()) {
+      await this.connectExtension();
     }
     
-    const pubkey = await window.nostr.getPublicKey();
-    this.pubkey = pubkey;
-    
-    // Load user profile after getting pubkey
-    await this.loadUserProfile();
-    
-    // Save session for persistence
-    this.saveSession();
-    
-    return pubkey;
+    return this.pubkey;
   }
 
   async loadUserProfile() {
@@ -227,11 +305,12 @@ class NostrService {
       try {
         console.log(`Fetching profiles for batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(validPubkeys.length/batchSize)}...`);
         
-        // Get kind 0 (profile) events
+        // Get kind 0 (profile) events - fetch more to track deletion history
         const profileFilter = {
           kinds: [0],
           authors: batch,
-          limit: 50
+          limit: 100, // Increased to get more profile history
+          since: Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60) // Last year of profile updates
         };
         
         const timeoutPromise = new Promise((_, reject) => 
@@ -243,31 +322,74 @@ class NostrService {
           timeoutPromise
         ]);
         
-        // Process profile events
-        const profileEvents = new Map();
+        // Process all profile events to track deletion timeline
+        const profileEventsByUser = new Map();
         for (const event of events) {
-          const existing = profileEvents.get(event.pubkey);
-          if (!existing || event.created_at > existing.created_at) {
-            profileEvents.set(event.pubkey, event);
+          if (!profileEventsByUser.has(event.pubkey)) {
+            profileEventsByUser.set(event.pubkey, []);
           }
+          profileEventsByUser.get(event.pubkey).push(event);
         }
         
-        // Parse profile data
-        for (const [pubkey, event] of profileEvents) {
+        // Sort events by timestamp for each user
+        for (const [pubkey, userEvents] of profileEventsByUser) {
+          userEvents.sort((a, b) => b.created_at - a.created_at); // Most recent first
+        }
+        
+        // Parse profile data with deletion timeline tracking
+        for (const [pubkey, userEvents] of profileEventsByUser) {
           try {
-            const profile = JSON.parse(event.content);
+            const latestEvent = userEvents[0];
+            const latestProfile = JSON.parse(latestEvent.content);
             const existingProfile = profileMap.get(pubkey);
+            
+            // Track deletion status changes
+            let deletionTimeline = null;
+            let currentlyDeleted = latestProfile.deleted === true || latestProfile.deleted === 'true';
+            
+            if (currentlyDeleted) {
+              // Find when deletion was first marked
+              for (let i = userEvents.length - 1; i >= 0; i--) {
+                try {
+                  const eventProfile = JSON.parse(userEvents[i].content);
+                  const wasDeleted = eventProfile.deleted === true || eventProfile.deleted === 'true';
+                  if (wasDeleted) {
+                    deletionTimeline = {
+                      markedDeletedAt: userEvents[i].created_at,
+                      deletionAge: Math.floor((Date.now() / 1000) - userEvents[i].created_at),
+                      profileUpdatesAfterDeletion: 0
+                    };
+                    
+                    // Count profile updates after deletion
+                    for (let j = i - 1; j >= 0; j--) {
+                      if (userEvents[j].created_at > userEvents[i].created_at) {
+                        deletionTimeline.profileUpdatesAfterDeletion++;
+                      }
+                    }
+                    break;
+                  }
+                } catch (e) {
+                  console.warn(`Failed to parse profile event for deletion timeline: ${pubkey}`);
+                }
+              }
+            }
             
             profileMap.set(pubkey, {
               ...existingProfile,
-              name: profile.name || null,
-              display_name: profile.display_name || profile.displayName || null,
-              about: profile.about || null,
-              picture: profile.picture || null,
-              nip05: profile.nip05 || null,
-              deleted: profile.deleted === true || profile.deleted === 'true',
-              lastSeen: event.created_at
+              name: latestProfile.name || null,
+              display_name: latestProfile.display_name || latestProfile.displayName || null,
+              about: latestProfile.about || null,
+              picture: latestProfile.picture || null,
+              nip05: latestProfile.nip05 || null,
+              deleted: currentlyDeleted,
+              deletionTimeline: deletionTimeline,
+              profileEventCount: userEvents.length,
+              lastSeen: latestEvent.created_at
             });
+            
+            if (deletionTimeline) {
+              console.log(`🔥 User ${pubkey.substring(0, 8)}... marked deleted ${Math.floor(deletionTimeline.deletionAge / (24 * 60 * 60))} days ago, ${deletionTimeline.profileUpdatesAfterDeletion} profile updates since`);
+            }
           } catch (error) {
             console.error(`Failed to parse profile for ${pubkey}:`, error);
           }
@@ -821,6 +943,22 @@ class NostrService {
     // Check if the event would be too large
     if (newFollows.length > 1000) {
       console.warn('⚠️ Large follow list detected:', newFollows.length, 'follows');
+      console.warn('⚠️ Some Nostr extensions may have trouble with very large follow lists');
+      console.warn('⚠️ If signing fails, you may need to unfollow users in smaller batches');
+    }
+    
+    // Estimate event size
+    const estimatedSize = JSON.stringify({
+      kind: 3,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: newFollows.map(pubkey => ['p', pubkey]),
+      content: ''
+    }).length;
+    
+    console.log('📏 Estimated event size:', Math.round(estimatedSize / 1024), 'KB');
+    
+    if (estimatedSize > 1024 * 1024) { // 1MB
+      throw new Error(`Follow list too large (${Math.round(estimatedSize / 1024)} KB). Please unfollow users in smaller batches.`);
     }
     
     // Create new tags for the contacts event
@@ -835,23 +973,33 @@ class NostrService {
       content: ''
     };
     
-    // Validate extension availability
-    if (typeof window.nostr === 'undefined') {
-      throw new Error('No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension.');
+    // Ensure extension is properly connected and authorized
+    if (!this.isExtensionReady()) {
+      console.log('🔄 Extension not ready, attempting connection...');
+      await this.connectExtension();
     }
     
-    // Check extension permissions
-    try {
-      await window.nostr.getPublicKey();
-    } catch (permError) {
-      throw new Error('Extension not authorized for this site. Please check your extension settings and grant permissions.');
+    // Double-check connection is still valid
+    if (!this.isExtensionReady()) {
+      throw new Error('Unable to establish connection with Nostr extension. Please check your extension settings.');
     }
     
     console.log('🔐 Starting signing process...');
+    console.log('Event to sign:', {
+      kind: event.kind,
+      created_at: event.created_at,
+      tags: event.tags.length,
+      content: event.content.length
+    });
+    
+    // Check extension type for better error messages
+    const extensionType = window.nostr.constructor?.name || 'unknown';
+    console.log('🔌 Using extension:', extensionType);
     
     // First, try direct manual signing (often more reliable)
     try {
       console.log('Attempting direct manual signing...');
+      console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
       
       const signedEvent = await Promise.race([
         window.nostr.signEvent(event),
@@ -879,7 +1027,19 @@ class NostrService {
       };
       
     } catch (directSignError) {
-      console.warn('❌ Direct signing failed:', directSignError.message);
+      console.warn('❌ Direct signing failed:', directSignError);
+      console.warn('Error type:', typeof directSignError);
+      console.warn('Error message:', directSignError.message);
+      console.warn('Error stack:', directSignError.stack);
+      
+      // Check for specific signing issues
+      if (directSignError.message && directSignError.message.toLowerCase().includes('user rejected')) {
+        throw new Error('You rejected the signing request. Please try again and approve the signing prompt to update your follow list.');
+      }
+      
+      if (directSignError.message && directSignError.message.toLowerCase().includes('timeout')) {
+        throw new Error('Signing request timed out. Your extension may not be responding. Please check if your extension is unlocked and try again.');
+      }
       
       // Fallback to NDK if direct signing fails
       try {
@@ -1015,14 +1175,19 @@ class NostrService {
     this.pubkey = null;
     this.userProfile = null;
     this.follows.clear();
+    this.extensionConnected = false;
+    this.extensionAuthorized = false;
+    this.connectionPromise = null;
     
     // Clear session from localStorage
     localStorage.removeItem('nostr_session');
     
-    // Optionally disconnect from relays
+    // Disconnect from relays
     if (this.ndk) {
       this.ndk = null;
     }
+    
+    console.log('✅ User logged out - all connection state cleared');
   }
 
   saveSession() {
@@ -1046,15 +1211,46 @@ class NostrService {
         // Check if session is not too old (24 hours)
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
         if (Date.now() - session.timestamp < maxAge) {
+          // Restore session data
           this.pubkey = session.pubkey;
           this.userProfile = session.userProfile;
           
-          // Initialize NDK connection
-          await this.initialize();
-          
-          return true;
+          // Check if extension is still available and responsive
+          if (typeof window.nostr !== 'undefined') {
+            try {
+              // Test if extension is still working (quick check)
+              const currentPubkey = await Promise.race([
+                window.nostr.getPublicKey(),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Extension check timeout')), 3000)
+                )
+              ]);
+              
+              // Verify it's the same user
+              if (currentPubkey === this.pubkey) {
+                this.extensionConnected = true;
+                this.extensionAuthorized = true;
+                
+                // Initialize NDK connection
+                await this.initialize();
+                
+                console.log('✅ Session restored successfully');
+                return true;
+              } else {
+                console.log('⚠️ Different user detected - clearing session');
+                localStorage.removeItem('nostr_session');
+              }
+            } catch (extensionError) {
+              console.log('⚠️ Extension not responsive - session invalid');
+              localStorage.removeItem('nostr_session');
+            }
+          } else {
+            console.log('⚠️ Extension not available - clearing session');
+            localStorage.removeItem('nostr_session');
+          }
         } else {
           // Session expired, clear it
+          console.log('⚠️ Session expired - clearing');
           localStorage.removeItem('nostr_session');
         }
       }

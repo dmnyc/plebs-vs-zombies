@@ -169,20 +169,31 @@
         </div>
       </div>
     </div>
+
+    <!-- Welcome Modal -->
+    <WelcomeModal
+      v-if="showWelcomeModal"
+      @close="closeWelcomeModal"
+      @go-to-backups="handleGoToBackups"
+      @skip-backup="handleSkipBackup"
+    />
   </div>
 </template>
 
 <script>
 import { format } from 'date-fns';
 import ZombieStats from '../components/ZombieStats.vue';
+import WelcomeModal from '../components/WelcomeModal.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
+import backupService from '../services/backupService';
 
 export default {
   name: 'DashboardView',
   components: {
-    ZombieStats
+    ZombieStats,
+    WelcomeModal
   },
   data() {
     return {
@@ -211,7 +222,8 @@ export default {
         estimatedBandwidthSaved: 0
       },
       lastScanDate: null,
-      recentActivity: []
+      recentActivity: [],
+      showWelcomeModal: false
     };
   },
   computed: {
@@ -418,10 +430,48 @@ export default {
         console.error('Failed to reset immunity:', error);
         alert('Failed to reset immunity. See console for details.');
       }
+    },
+    async checkFirstTimeUser() {
+      try {
+        // Check if user has seen welcome modal
+        const welcomeSeen = localStorage.getItem('pvz-welcome-seen');
+        
+        if (!welcomeSeen) {
+          // Check if user has any backups or scan history
+          const backups = await backupService.getBackups();
+          const scanHistory = await zombieService.getScanHistory();
+          
+          // If no backups and no scan history, show welcome modal
+          if (backups.length === 0 && scanHistory.length === 0) {
+            this.showWelcomeModal = true;
+            return;
+          }
+        }
+        
+        this.showWelcomeModal = false;
+      } catch (error) {
+        console.error('Error checking first-time user status:', error);
+        this.showWelcomeModal = false;
+      }
+    },
+    closeWelcomeModal() {
+      localStorage.setItem('pvz-welcome-seen', 'true');
+      this.showWelcomeModal = false;
+    },
+    handleGoToBackups() {
+      localStorage.setItem('pvz-welcome-seen', 'true');
+      this.showWelcomeModal = false;
+      this.$parent.setActiveView('backups');
+    },
+    handleSkipBackup() {
+      this.showWelcomeModal = false;
+      // Skip backup logic is handled in the modal component
     }
   },
-  mounted() {
-    this.loadDashboardData();
+  async mounted() {
+    // Check if first-time user before loading dashboard data
+    await this.checkFirstTimeUser();
+    await this.loadDashboardData();
   }
 };
 </script>

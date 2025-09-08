@@ -20,6 +20,7 @@
                 class="input w-full"
                 @change="updateThreshold"
               >
+                <option value="burned">Burned Zombies (deleted accounts)</option>
                 <option value="90">Fresh Zombies (90+ days)</option>
                 <option value="180">Rotting Zombies (180+ days)</option>
                 <option value="365">Ancient Zombies (365+ days)</option>
@@ -240,22 +241,34 @@
         </div>
       </div>
     </div>
+
+    <!-- Zombie Purge Celebration Modal -->
+    <ZombiePurgeCelebration
+      v-if="showCelebration && lastPurgeResult && prePurgeStats"
+      :purgeResult="lastPurgeResult"
+      :zombieScore="prePurgeStats.zombieScore"
+      :purgeStats="purgeTypeBreakdown"
+      @close="closeCelebration"
+    />
   </div>
 </template>
 
 <script>
 import ZombieStats from '../components/ZombieStats.vue';
 import ZombieBatchSelector from '../components/ZombieBatchSelector.vue';
+import ZombiePurgeCelebration from '../components/ZombiePurgeCelebration.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
+import backupService from '../services/backupService';
 import { nip19 } from 'nostr-tools';
 
 export default {
   name: 'ZombieHuntingView',
   components: {
     ZombieStats,
-    ZombieBatchSelector
+    ZombieBatchSelector,
+    ZombiePurgeCelebration
   },
   data() {
     return {
@@ -264,10 +277,13 @@ export default {
       scanComplete: false,
       purging: false,
       purgeSuccess: false,
+      showCelebration: false,
       selectedThreshold: 'all',
       batchSize: 30,
       zombieData: null,
       lastPurgeResult: null,
+      prePurgeStats: null,
+      purgeTypeBreakdown: null,
       scanCancelled: false,
       scanProgress: {
         total: 0,
@@ -301,7 +317,10 @@ export default {
       const burnedZombies = burned || [];
       let zombies = [];
       
-      if (this.selectedThreshold === 'all') {
+      if (this.selectedThreshold === 'burned') {
+        // Only show burned zombies (deleted accounts) - no date threshold
+        zombies = burnedZombies.map(zombie => ({ ...zombie, type: 'burned' }));
+      } else if (this.selectedThreshold === 'all') {
         zombies = [
           ...burnedZombies.map(zombie => ({ ...zombie, type: 'burned' })), // Always include burned zombies first
           ...ancient.map(zombie => ({ ...zombie, type: 'ancient' })),
@@ -487,9 +506,14 @@ export default {
         return;
       }
       
-      if (!confirm(`Are you sure you want to purge ${selectedPubkeys.length} zombies from your follow list?`)) {
+      // Check if user has recent backups and prompt if not
+      const shouldProceed = await this.checkBackupBeforePurge(selectedPubkeys.length);
+      if (!shouldProceed) {
         return;
       }
+
+      // Capture stats before purging for celebration
+      this.capturePrePurgeStats(selectedPubkeys);
       
       this.purging = true;
       
@@ -498,10 +522,12 @@ export default {
         
         if (result.success) {
           this.lastPurgeResult = result;
-          this.purgeSuccess = true;
           
           // Update stats
           this.stats.zombiesPurged += result.removedCount;
+          
+          // Show celebration modal instead of simple success message
+          this.showCelebration = true;
           
           // Clear current zombie data instead of auto-scanning
           this.zombieData = null;
@@ -511,7 +537,25 @@ export default {
         }
       } catch (error) {
         console.error('Failed to purge zombies:', error);
-        alert('Failed to purge zombies. See console for details.');
+        
+        // Provide specific error messages based on the error type
+        let errorMessage = 'Failed to purge zombies.';
+        
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Signing request timed out. Please check your Nostr extension and try again with a smaller batch of zombies.';
+        } else if (error.message.includes('rejected')) {
+          errorMessage = 'Signing was rejected. Please approve the signing request in your Nostr extension to update your follow list.';
+        } else if (error.message.includes('too large') || error.message.includes('smaller batches')) {
+          errorMessage = 'Your follow list is too large for this operation. Please try unfollowing fewer zombies at a time (try 10-15 instead of ' + selectedPubkeys.length + ').';
+        } else if (error.message.includes('extension')) {
+          errorMessage = 'Nostr extension issue: ' + error.message;
+        } else if (error.message.includes('permission') || error.message.includes('authorized')) {
+          errorMessage = 'Extension permissions not granted. Please check your Nostr extension settings for this site.';
+        } else {
+          errorMessage = error.message || 'Unknown error occurred. Check console for details.';
+        }
+        
+        alert(errorMessage);
       } finally {
         this.purging = false;
       }
@@ -519,10 +563,11 @@ export default {
     handleImmunityGranted(pubkey) {
       // Remove the zombie from the current list
       if (this.zombieData) {
-        ['fresh', 'rotting', 'ancient'].forEach(type => {
-          const index = this.zombieData[type].findIndex(z => z.pubkey === pubkey);
+        ['burned', 'fresh', 'rotting', 'ancient'].forEach(type => {
+          const zombieArray = this.zombieData[type] || [];
+          const index = zombieArray.findIndex(z => z.pubkey === pubkey);
           if (index > -1) {
-            this.zombieData[type].splice(index, 1);
+            zombieArray.splice(index, 1);
             this.zombieStats[type]--;
             this.stats.totalZombies--;
           }
@@ -580,6 +625,117 @@ export default {
       } catch (error) {
         console.error('Failed to reset immunity:', error);
         alert('Failed to reset immunity. See console for details.');
+      }
+    },
+    capturePrePurgeStats(selectedPubkeys) {
+      if (!this.zombieData) return;
+      
+      // Calculate current zombie score (percentage of zombies in follow list)
+      const { active, burned, fresh, rotting, ancient } = this.zombieData;
+      const burnedLength = burned?.length || 0;
+      const totalFollows = active.length + burnedLength + fresh.length + rotting.length + ancient.length;
+      const totalZombies = burnedLength + fresh.length + rotting.length + ancient.length;
+      const zombieScore = totalFollows > 0 ? Math.round((totalZombies / totalFollows) * 100) : 0;
+      
+      this.prePurgeStats = {
+        totalFollows,
+        totalZombies,
+        zombieScore,
+        activeCount: active.length,
+        burnedCount: burnedLength,
+        freshCount: fresh.length,
+        rottingCount: rotting.length,
+        ancientCount: ancient.length
+      };
+      
+      // Analyze the breakdown of selected zombies by type
+      const breakdown = { burned: 0, fresh: 0, rotting: 0, ancient: 0 };
+      
+      // Find which zombies are being purged by matching pubkeys
+      const allZombies = [
+        ...(burned || []).map(z => ({ ...z, type: 'burned' })),
+        ...fresh.map(z => ({ ...z, type: 'fresh' })),
+        ...rotting.map(z => ({ ...z, type: 'rotting' })),
+        ...ancient.map(z => ({ ...z, type: 'ancient' }))
+      ];
+      
+      selectedPubkeys.forEach(pubkey => {
+        const zombie = allZombies.find(z => z.pubkey === pubkey);
+        if (zombie) {
+          breakdown[zombie.type]++;
+        }
+      });
+      
+      this.purgeTypeBreakdown = breakdown;
+      
+      console.log('Pre-purge stats captured:', {
+        zombieScore,
+        totalFollows,
+        breakdown
+      });
+    },
+    closeCelebration() {
+      this.showCelebration = false;
+      this.purgeSuccess = false;
+    },
+    async checkBackupBeforePurge(zombieCount) {
+      try {
+        // Get user's backups
+        const backups = await backupService.getBackups();
+        
+        // Check if user has any backups
+        if (backups.length === 0) {
+          const shouldContinue = confirm(
+            `⚠️ No backups found!\n\nYou're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\n` +
+            `We strongly recommend creating a backup first to protect your follows.\n\n` +
+            `Would you like to go to the Backups page to create one now?\n\n` +
+            `(Click "Cancel" to proceed without backup, "OK" to go to Backups)`
+          );
+          
+          if (shouldContinue) {
+            // Navigate to backups page
+            this.$parent.setActiveView('backups');
+            return false;
+          }
+          
+          // User chose to proceed without backup - final confirmation
+          return confirm(
+            `⚠️ Final Warning!\n\nYou're proceeding without a backup. If you accidentally purge someone important, you won't be able to easily restore them.\n\n` +
+            `Are you absolutely sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'}?`
+          );
+        }
+        
+        // Check if user has a recent backup (within last 7 days)
+        const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const recentBackup = backups.find(backup => backup.createdAt > oneWeekAgo);
+        
+        if (!recentBackup) {
+          const shouldContinue = confirm(
+            `📅 Your last backup is older than 7 days.\n\n` +
+            `You're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\n` +
+            `Would you like to create a fresh backup first?\n\n` +
+            `(Click "Cancel" to proceed anyway, "OK" to go to Backups)`
+          );
+          
+          if (shouldContinue) {
+            // Navigate to backups page  
+            this.$parent.setActiveView('backups');
+            return false;
+          }
+        }
+        
+        // User has recent backup or chose to proceed - final confirmation
+        return confirm(`Are you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?`);
+        
+      } catch (error) {
+        console.error('Error checking backups:', error);
+        
+        // If there's an error checking backups, still ask for confirmation
+        return confirm(
+          `Unable to check backup status.\n\n` +
+          `Are you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?\n\n` +
+          `We recommend creating a backup first in the Backups page.`
+        );
       }
     }
   },
