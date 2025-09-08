@@ -82,6 +82,7 @@ class ZombieService {
     for (const [pubkey, events] of activityData.entries()) {
       processedCount++;
       
+      
       // Report progress more frequently for better UX (every 3 users or when a zombie is found)
       const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
       const shouldReport = processedCount % 3 === 0 || processedCount === totalUsers || currentZombieCount !== (this.lastReportedZombieCount || 0);

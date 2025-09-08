@@ -144,8 +144,8 @@
             <div class="flex flex-col justify-center space-y-4 mb-6">
               <div class="text-sm text-gray-300 break-all text-center h-10 flex items-center justify-center">
                 <span v-if="scanProgress.currentNpub">
-                  <span class="text-gray-400">Processing:</span>
-                  <span class="font-mono text-xs sm:text-sm">{{ scanProgress.currentNpub }}</span>
+                  <span class="text-gray-400">Processing: </span>
+                  <span class="font-mono text-xs sm:text-sm">{{ formatPubkeyForProgress(scanProgress.currentNpub) }}</span>
                 </span>
                 <span v-else>&nbsp;</span>
               </div>
@@ -218,6 +218,7 @@
             :zombies="zombiesFiltered"
             :loading="scanning"
             @purge="purgeZombies"
+            @confirm-purge="handleConfirmPurge"
             @immunity-granted="handleImmunityGranted"
           />
         </div>
@@ -250,6 +251,18 @@
       :purgeStats="purgeTypeBreakdown"
       @close="closeCelebration"
     />
+
+    <!-- Confirmation Modal -->
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :type="confirmModal.type"
+      :confirmText="confirmModal.confirmText"
+      :cancelText="confirmModal.cancelText"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -257,6 +270,7 @@
 import ZombieStats from '../components/ZombieStats.vue';
 import ZombieBatchSelector from '../components/ZombieBatchSelector.vue';
 import ZombiePurgeCelebration from '../components/ZombiePurgeCelebration.vue';
+import ConfirmModal from '../components/ConfirmModal.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
@@ -268,7 +282,8 @@ export default {
   components: {
     ZombieStats,
     ZombieBatchSelector,
-    ZombiePurgeCelebration
+    ZombiePurgeCelebration,
+    ConfirmModal
   },
   data() {
     return {
@@ -303,6 +318,15 @@ export default {
         fresh: 0,
         rotting: 0,
         ancient: 0
+      },
+      confirmModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'warning',
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        resolve: null
       }
     };
   },
@@ -363,6 +387,51 @@ export default {
     }
   },
   methods: {
+    // Confirmation Modal Methods
+    showConfirm(title, message, type = 'warning', confirmText = 'OK', cancelText = 'Cancel') {
+      return new Promise((resolve) => {
+        this.confirmModal = {
+          show: true,
+          title,
+          message,
+          type,
+          confirmText,
+          cancelText,
+          resolve
+        };
+      });
+    },
+    handleConfirm() {
+      this.confirmModal.show = false;
+      if (this.confirmModal.resolve) {
+        this.confirmModal.resolve(true);
+      }
+    },
+    handleCancel() {
+      this.confirmModal.show = false;
+      if (this.confirmModal.resolve) {
+        this.confirmModal.resolve(false);
+      }
+    },
+    async handleConfirmPurge(confirmData) {
+      const confirmed = await this.showConfirm(
+        confirmData.title,
+        confirmData.message,
+        confirmData.type,
+        confirmData.confirmText,
+        confirmData.cancelText
+      );
+      
+      if (confirmed) {
+        this.purgeZombies(confirmData.zombies);
+      }
+    },
+
+    formatPubkeyForProgress(pubkey) {
+      if (!pubkey) return '';
+      if (pubkey.length <= 16) return pubkey;
+      return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
+    },
     async loadInitialData() {
       this.loading = true;
       
@@ -529,9 +598,8 @@ export default {
           // Show celebration modal instead of simple success message
           this.showCelebration = true;
           
-          // Clear current zombie data instead of auto-scanning
-          this.zombieData = null;
-          this.scanComplete = false;
+          // Remove purged zombies from current data instead of clearing everything
+          this.updateZombieDataAfterPurge(result.removedPubkeys);
         } else {
           alert(`Failed to purge zombies: ${result.message}`);
         }
@@ -598,6 +666,31 @@ export default {
         console.error('Failed to view immune users:', error);
         alert('Failed to load immune users. See console for details.');
       }
+    },
+    updateZombieDataAfterPurge(removedPubkeys) {
+      if (!this.zombieData || !removedPubkeys || removedPubkeys.length === 0) {
+        return;
+      }
+      
+      // Create a Set for faster lookup
+      const removedSet = new Set(removedPubkeys);
+      
+      // Remove purged zombies from each category
+      const updatedData = {
+        active: this.zombieData.active.filter(z => !removedSet.has(z.pubkey || z)),
+        burned: this.zombieData.burned ? this.zombieData.burned.filter(z => !removedSet.has(z.pubkey || z)) : [],
+        fresh: this.zombieData.fresh.filter(z => !removedSet.has(z.pubkey || z)),
+        rotting: this.zombieData.rotting.filter(z => !removedSet.has(z.pubkey || z)),
+        ancient: this.zombieData.ancient.filter(z => !removedSet.has(z.pubkey || z))
+      };
+      
+      // Update zombie data
+      this.zombieData = updatedData;
+      
+      // Clear any selections for the purged zombies
+      this.selectedZombies = this.selectedZombies.filter(pubkey => !removedSet.has(pubkey));
+      
+      console.log(`Updated zombie data after purge. Removed ${removedPubkeys.length} zombies from scan results.`);
     },
     async resetImmunity() {
       const count = this.stats.immuneUsers;

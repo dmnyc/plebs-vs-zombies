@@ -64,8 +64,8 @@
                 <!-- Current Processing Info -->
                 <div class="text-xs text-gray-400 font-mono break-all h-4 flex items-center">
                   <span v-if="scanProgress.currentNpub">
-                    <span class="text-gray-400">Processing:</span>
-                    <span class="font-mono text-xs ml-1">{{ scanProgress.currentNpub }}</span>
+                    <span class="text-gray-400">Processing: </span>
+                    <span class="font-mono text-xs">{{ formatPubkeyForProgress(scanProgress.currentNpub) }}</span>
                   </span>
                   <span v-else>&nbsp;</span>
                 </div>
@@ -241,6 +241,11 @@ export default {
     formatDate(timestamp) {
       if (!timestamp) return '';
       return format(new Date(timestamp), 'MMM d, yyyy, HH:mm');
+    },
+    formatPubkeyForProgress(pubkey) {
+      if (!pubkey) return '';
+      if (pubkey.length <= 16) return pubkey;
+      return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
     },
     formatBytes(bytes) {
       if (bytes === 0) return '0 Bytes';

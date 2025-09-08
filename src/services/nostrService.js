@@ -146,7 +146,23 @@ class NostrService {
       
       if (eventArray.length > 0) {
         const profileEvent = eventArray[0];
-        const profileData = JSON.parse(profileEvent.content);
+        let profileData;
+        
+        try {
+          profileData = JSON.parse(profileEvent.content);
+        } catch (jsonError) {
+          console.warn(`Failed to parse user profile JSON: ${jsonError.message}`);
+          // Create basic profile with just pubkey if JSON is invalid
+          this.userProfile = {
+            pubkey: this.pubkey,
+            name: null,
+            display_name: null,
+            about: null,
+            picture: null,
+            nip05: null
+          };
+          return this.userProfile;
+        }
         
         this.userProfile = {
           pubkey: this.pubkey,
@@ -309,8 +325,8 @@ class NostrService {
         const profileFilter = {
           kinds: [0],
           authors: batch,
-          limit: 100, // Increased to get more profile history
-          since: Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60) // Last year of profile updates
+          limit: 100 // Increased to get more profile history
+          // Removed 'since' filter to get all profile events, not just recent ones
         };
         
         const timeoutPromise = new Promise((_, reject) => 
@@ -340,7 +356,16 @@ class NostrService {
         for (const [pubkey, userEvents] of profileEventsByUser) {
           try {
             const latestEvent = userEvents[0];
-            const latestProfile = JSON.parse(latestEvent.content);
+            let latestProfile;
+            
+            try {
+              latestProfile = JSON.parse(latestEvent.content);
+            } catch (jsonError) {
+              console.warn(`Failed to parse profile JSON for ${pubkey.substring(0, 8)}...: ${jsonError.message}`);
+              // Skip this profile if JSON is invalid
+              continue;
+            }
+            
             const existingProfile = profileMap.get(pubkey);
             
             // Track deletion status changes
@@ -351,7 +376,13 @@ class NostrService {
               // Find when deletion was first marked
               for (let i = userEvents.length - 1; i >= 0; i--) {
                 try {
-                  const eventProfile = JSON.parse(userEvents[i].content);
+                  let eventProfile;
+                  try {
+                    eventProfile = JSON.parse(userEvents[i].content);
+                  } catch (jsonError) {
+                    console.warn(`Failed to parse deletion timeline JSON for ${pubkey.substring(0, 8)}...: ${jsonError.message}`);
+                    continue; // Skip this event if JSON is invalid
+                  }
                   const wasDeleted = eventProfile.deleted === true || eventProfile.deleted === 'true';
                   if (wasDeleted) {
                     deletionTimeline = {
@@ -374,7 +405,7 @@ class NostrService {
               }
             }
             
-            profileMap.set(pubkey, {
+            const updatedProfile = {
               ...existingProfile,
               name: latestProfile.name || null,
               display_name: latestProfile.display_name || latestProfile.displayName || null,
@@ -385,7 +416,9 @@ class NostrService {
               deletionTimeline: deletionTimeline,
               profileEventCount: userEvents.length,
               lastSeen: latestEvent.created_at
-            });
+            };
+            
+            profileMap.set(pubkey, updatedProfile);
             
             if (deletionTimeline) {
               console.log(`🔥 User ${pubkey.substring(0, 8)}... marked deleted ${Math.floor(deletionTimeline.deletionAge / (24 * 60 * 60))} days ago, ${deletionTimeline.profileUpdatesAfterDeletion} profile updates since`);
