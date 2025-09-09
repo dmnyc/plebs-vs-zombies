@@ -34,14 +34,14 @@
             <button 
               v-if="!isConnected" 
               @click="connectNostr" 
-              class="btn-primary flex-grow"
+              class="btn-primary"
             >
               Connect to Nostr
             </button>
             <button 
               v-else 
               @click="disconnectNostr" 
-              class="btn-danger flex-grow"
+              class="btn-danger"
             >
               Disconnect
             </button>
@@ -51,18 +51,79 @@
         <div class="border-t border-gray-700 pt-4">
           <h4 class="text-lg mb-3">Relay Configuration</h4>
           
-          <div class="mb-4">
-            <div class="text-gray-300 mb-2">Active relays:</div>
-            <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
+          <!-- User's NIP-65 Relay List -->
+          <div v-if="userRelayList" class="mb-6 p-3 bg-gray-800 rounded-lg">
+            <div class="text-green-400 mb-2 flex items-center">
+              <span class="mr-2">📡</span>
+              Your Announced Relays (NIP-65)
+            </div>
+            <div class="text-xs text-gray-400 mb-3">
+              Last updated: {{ new Date(userRelayList.lastUpdated * 1000).toLocaleString() }}
+            </div>
+            
+            <div v-if="userRelayList.bothRelays.length > 0" class="mb-2">
+              <div class="text-sm text-gray-300 mb-1">Read & Write:</div>
+              <div class="space-y-1">
+                <div 
+                  v-for="relay in userRelayList.bothRelays" 
+                  :key="relay"
+                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
+                >
+                  {{ relay }}
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="userRelayList.writeRelays.length > 0" class="mb-2">
+              <div class="text-sm text-gray-300 mb-1">Write Only:</div>
+              <div class="space-y-1">
+                <div 
+                  v-for="relay in userRelayList.writeRelays" 
+                  :key="relay"
+                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
+                >
+                  {{ relay }}
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="userRelayList.readRelays.length > 0" class="mb-2">
+              <div class="text-sm text-gray-300 mb-1">Read Only:</div>
+              <div class="space-y-1">
+                <div 
+                  v-for="relay in userRelayList.readRelays" 
+                  :key="relay"
+                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
+                >
+                  {{ relay }}
+                </div>
+              </div>
+            </div>
+            
+            <div class="text-xs text-gray-500 mt-2">
+              These are your announced relay preferences. The app will use these for publishing when available.
+            </div>
+          </div>
+          
+          <div v-else-if="isConnected" class="mb-6 p-3 bg-yellow-900 border border-yellow-600 rounded-lg">
+            <div class="text-yellow-200 text-sm">
+              ℹ️ No NIP-65 relay list found. You can publish your relay preferences using other Nostr clients to optimize your experience.
+            </div>
+          </div>
+          
+          <!-- Manual Relay Configuration -->
+          <div class="mb-4 p-3 bg-gray-800 rounded-lg">
+            <div class="text-gray-300 mb-3">Manual relay configuration:</div>
+            <div class="space-y-1 max-h-60 overflow-y-auto pr-2">
               <div 
                 v-for="(relay, index) in relays" 
                 :key="index" 
-                class="flex items-center p-2 border border-gray-700 rounded-lg"
+                class="flex items-center justify-between"
               >
-                <span class="font-mono text-sm truncate flex-grow">{{ relay }}</span>
+                <span class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded flex-grow mr-2 truncate">{{ relay }}</span>
                 <button 
                   @click="removeRelay(index)" 
-                  class="text-red-500 hover:text-red-400 ml-2"
+                  class="text-red-500 hover:text-red-400 text-sm"
                   title="Remove relay"
                 >
                   ✕
@@ -159,7 +220,7 @@
         </div>
         
         <div class="mt-6">
-          <button @click="saveSettings" class="btn-primary w-full">
+          <button @click="saveSettings" class="btn-primary">
             Save Settings
           </button>
         </div>
@@ -175,25 +236,10 @@
       </div>
       
       <div v-else>
-        <div class="mb-4 flex justify-between items-center">
-          <p class="text-gray-300">
+        <div class="mb-4">
+          <p class="text-gray-300 mb-3">
             Manage accounts that have zombie immunity (whitelist).
           </p>
-          <div class="flex gap-2">
-            <button @click="exportImmunityList" class="btn-secondary text-sm">
-              Export List
-            </button>
-            <input 
-              type="file" 
-              ref="immunityFileInput" 
-              accept=".json" 
-              class="hidden" 
-              @change="importImmunityList"
-            />
-            <button @click="$refs.immunityFileInput.click()" class="btn-secondary text-sm">
-              Import List
-            </button>
-          </div>
         </div>
         
         <div v-if="immunityRecords.length === 0" class="text-center py-8">
@@ -251,12 +297,29 @@
           </div>
           
           <div class="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-            <button 
-              @click="clearAllImmunity" 
-              class="btn-danger text-sm w-full"
-            >
-              Clear All Immunity (Use with caution!)
-            </button>
+            <div class="flex flex-wrap gap-2 justify-between items-center">
+              <div class="flex gap-2">
+                <button @click="exportImmunityList" class="btn-secondary text-sm">
+                  Export List
+                </button>
+                <input 
+                  type="file" 
+                  ref="immunityFileInput" 
+                  accept=".json" 
+                  class="hidden" 
+                  @change="importImmunityList"
+                />
+                <button @click="$refs.immunityFileInput.click()" class="btn-secondary text-sm">
+                  Import List
+                </button>
+              </div>
+              <button 
+                @click="clearAllImmunity" 
+                class="btn-danger text-sm"
+              >
+                Clear All Immunity
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -265,11 +328,11 @@
     <div class="mt-6 card">
       <h3 class="text-xl mb-4">App Information</h3>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div>
           <h4 class="text-lg mb-3">About Plebs vs. Zombies</h4>
           <p class="text-gray-300 mb-2">
-            Version: 0.1.0
+            Version: {{ appVersion }}
           </p>
           <p class="text-gray-300 mb-2">
             A utility for Nostr users to manage their follow lists by identifying and removing dormant accounts.
@@ -291,6 +354,109 @@
             Your keys remain secure in your Nostr extension.
           </p>
         </div>
+        
+        <div>
+          <h4 class="text-lg mb-3">Support the Creator</h4>
+          <p class="text-gray-300 mb-3">
+            Like this app? Show your support!
+          </p>
+          <div class="space-y-2">
+            <a 
+              href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h" 
+              target="_blank"
+              class="flex items-center gap-2 text-sm px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded transition-colors"
+            >
+              🟣 Follow on Nostr
+            </a>
+            <button 
+              @click="showZapModal"
+              class="flex items-center gap-2 text-sm px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-black rounded transition-colors w-full"
+            >
+              ⚡ Zap the Creator
+            </button>
+            <a 
+              href="https://github.com/dmnyc/plebs-vs-zombies" 
+              target="_blank"
+              class="flex items-center gap-2 text-sm px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            >
+              👨‍💻 View on GitHub
+            </a>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">
+            Contribute code, report issues, or just say thanks!
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zap Modal -->
+    <div 
+      v-if="zapModal.show" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+      @click="closeZapModal"
+    >
+      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-yellow-400 flex items-center gap-2">
+            ⚡ Zap the Creator
+          </h3>
+          <button 
+            @click="closeZapModal"
+            class="text-gray-400 hover:text-gray-200 text-xl"
+          >
+            ×
+          </button>
+        </div>
+        
+        <div class="text-center space-y-4">
+          <div class="text-gray-300">
+            Show your appreciation for Plebs vs Zombies!
+          </div>
+          
+          <!-- QR Code -->
+          <div class="flex justify-center">
+            <div class="bg-white p-4 rounded-lg">
+              <img 
+                :src="zapModal.qrCode" 
+                alt="Lightning Address QR Code"
+                class="w-48 h-48"
+              />
+            </div>
+          </div>
+          
+          <!-- Lightning Address -->
+          <div class="space-y-2">
+            <div class="text-sm text-gray-400">Lightning Address:</div>
+            <div class="flex items-center gap-2">
+              <code class="bg-gray-800 px-3 py-2 rounded text-yellow-400 text-sm flex-grow text-center">
+                {{ zapModal.lightningAddress }}
+              </code>
+              <button 
+                @click="copyLightningAddress"
+                class="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded"
+                title="Copy Lightning Address"
+              >
+                📋
+              </button>
+            </div>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex gap-3 mt-6">
+            <button 
+              @click="zapOnNostr"
+              class="flex-1 bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors"
+            >
+              Zap on Nostr
+            </button>
+            <button 
+              @click="closeZapModal"
+              class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2 rounded transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -302,6 +468,7 @@ import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
 import { format } from 'date-fns';
 import { nip19 } from 'nostr-tools';
+import { getVersionSync } from '../utils/version';
 
 export default {
   name: 'SettingsView',
@@ -319,7 +486,13 @@ export default {
       },
       batchSize: 30,
       loading: false,
-      immunityRecords: []
+      immunityRecords: [],
+      userRelayList: null,
+      zapModal: {
+        show: false,
+        lightningAddress: 'plebsvszombies@rizful.com',
+        qrCode: ''
+      }
     };
   },
   computed: {
@@ -332,6 +505,9 @@ export default {
       } catch (error) {
         return false;
       }
+    },
+    appVersion() {
+      return getVersionSync();
     }
   },
   methods: {
@@ -344,6 +520,9 @@ export default {
         
         // Load relays
         this.relays = [...nostrService.relays];
+        
+        // Load user's NIP-65 relay list
+        this.userRelayList = nostrService.userRelayList;
       } catch (error) {
         console.error('Failed to connect to Nostr:', error);
         alert('Failed to connect to Nostr. Please check your extension is installed and working.');
@@ -373,6 +552,19 @@ export default {
     },
     removeRelay(index) {
       this.relays.splice(index, 1);
+    },
+    formatDate(timestamp) {
+      if (!timestamp) return 'Unknown';
+      
+      try {
+        // Nostr timestamps are Unix timestamps in seconds
+        // Convert to milliseconds for JavaScript Date
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleString();
+      } catch (error) {
+        console.warn('Failed to format timestamp:', timestamp, error);
+        return 'Invalid date';
+      }
     },
     async saveSettings() {
       try {
@@ -408,6 +600,9 @@ export default {
       
       // Load relays
       this.relays = [...nostrService.relays];
+      
+      // Load user's NIP-65 relay list
+      this.userRelayList = nostrService.userRelayList;
       
       // Check if connected
       this.isConnected = !!nostrService.pubkey;
@@ -523,6 +718,39 @@ export default {
       
       // Reset file input
       event.target.value = '';
+    },
+    showZapModal() {
+      // Generate QR code for the Lightning address
+      this.generateQRCode();
+      this.zapModal.show = true;
+    },
+    closeZapModal() {
+      this.zapModal.show = false;
+    },
+    generateQRCode() {
+      // Generate QR code URL using a QR service
+      const lightningAddress = this.zapModal.lightningAddress;
+      this.zapModal.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('lightning:' + lightningAddress)}`;
+    },
+    copyLightningAddress() {
+      navigator.clipboard.writeText(this.zapModal.lightningAddress)
+        .then(() => {
+          // Show brief success feedback
+          const button = event.target;
+          const originalText = button.innerHTML;
+          button.innerHTML = '✅';
+          setTimeout(() => {
+            button.innerHTML = originalText;
+          }, 1500);
+        })
+        .catch(err => {
+          console.error('Failed to copy Lightning address:', err);
+        });
+    },
+    zapOnNostr() {
+      const creatorNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
+      const nostrUrl = `https://jumble.social/users/${creatorNpub}`;
+      window.open(nostrUrl, '_blank');
     }
   },
   async mounted() {

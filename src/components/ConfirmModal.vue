@@ -33,6 +33,7 @@
       
       <div class="flex justify-end space-x-3">
         <button 
+          v-if="cancelText"
           @click="handleCancel"
           class="px-4 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors"
         >

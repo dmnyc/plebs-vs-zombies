@@ -217,6 +217,7 @@
             :title="`Zombie Batch (${zombiesFiltered.length} found)`"
             :zombies="zombiesFiltered"
             :loading="scanning"
+            :batchSize="batchSize"
             @purge="purgeZombies"
             @confirm-purge="handleConfirmPurge"
             @immunity-granted="handleImmunityGranted"
@@ -262,6 +263,18 @@
       :cancelText="confirmModal.cancelText"
       @confirm="handleConfirm"
       @cancel="handleCancel"
+    />
+
+    <!-- Alert Modal -->
+    <ConfirmModal
+      :show="alertModal.show"
+      :title="alertModal.title"
+      :message="alertModal.message"
+      :type="alertModal.type"
+      confirmText="OK"
+      cancelText=""
+      @confirm="closeAlert"
+      @cancel="closeAlert"
     />
   </div>
 </template>
@@ -327,6 +340,12 @@ export default {
         confirmText: 'OK',
         cancelText: 'Cancel',
         resolve: null
+      },
+      alertModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'info'
       }
     };
   },
@@ -412,6 +431,17 @@ export default {
       if (this.confirmModal.resolve) {
         this.confirmModal.resolve(false);
       }
+    },
+    showAlert(title, message, type = 'info') {
+      this.alertModal = {
+        show: true,
+        title,
+        message,
+        type
+      };
+    },
+    closeAlert() {
+      this.alertModal.show = false;
     },
     async handleConfirmPurge(confirmData) {
       const confirmed = await this.showConfirm(
@@ -525,14 +555,14 @@ export default {
           this.stats.totalZombies = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
           this.stats.immuneUsers = result.immuneCount || 0;
         } else if (!this.scanCancelled) {
-          alert(`Failed to scan for zombies: ${result.message}`);
+          this.showAlert('Scan Failed', `Failed to scan for zombies: ${result.message}`, 'error');
         }
       } catch (error) {
         if (error.message === 'Scan cancelled by user') {
           console.log('Scan cancelled by user');
         } else {
           console.error('Failed to scan for zombies:', error);
-          alert('Failed to scan for zombies. See console for details.');
+          this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
         }
       } finally {
         this.scanning = false;
@@ -571,7 +601,7 @@ export default {
     },
     async purgeZombies(selectedPubkeys) {
       if (!selectedPubkeys || selectedPubkeys.length === 0) {
-        alert('No zombies selected for purging');
+        this.showAlert('No Selection', 'No zombies selected for purging', 'warning');
         return;
       }
       
@@ -601,7 +631,7 @@ export default {
           // Remove purged zombies from current data instead of clearing everything
           this.updateZombieDataAfterPurge(result.removedPubkeys);
         } else {
-          alert(`Failed to purge zombies: ${result.message}`);
+          this.showAlert('Purge Failed', `Failed to purge zombies: ${result.message}`, 'error');
         }
       } catch (error) {
         console.error('Failed to purge zombies:', error);
@@ -623,7 +653,7 @@ export default {
           errorMessage = error.message || 'Unknown error occurred. Check console for details.';
         }
         
-        alert(errorMessage);
+        this.showAlert('Purge Error', errorMessage, 'error');
       } finally {
         this.purging = false;
       }
@@ -650,7 +680,7 @@ export default {
         const immuneRecords = await immunityService.getAllImmunityRecords();
         
         if (immuneRecords.length === 0) {
-          alert('No immune users found.');
+          this.showAlert('No Immune Users', 'No immune users found.', 'info');
           return;
         }
         
@@ -661,10 +691,14 @@ export default {
           return `• ${npub} - ${record.reason} (${date})`;
         }).join('\n');
         
-        alert(`Immune Users (${immuneRecords.length}):\n\n${immuneList}`);
+        this.showAlert(
+          `Immune Users (${immuneRecords.length})`,
+          immuneList,
+          'info'
+        );
       } catch (error) {
         console.error('Failed to view immune users:', error);
-        alert('Failed to load immune users. See console for details.');
+        this.showAlert('Load Failed', 'Failed to load immune users. See console for details.', 'error');
       }
     },
     updateZombieDataAfterPurge(removedPubkeys) {
@@ -696,11 +730,17 @@ export default {
       const count = this.stats.immuneUsers;
       
       if (count === 0) {
-        alert('No immune users to reset.');
+        this.showAlert('No Immune Users', 'No immune users to reset.', 'info');
         return;
       }
       
-      const confirmed = confirm(`Are you sure you want to reset immunity for all ${count} users?\n\nThis will remove all immunity records and they may appear as zombies in future scans.`);
+      const confirmed = await this.showConfirm(
+        'Reset Immunity',
+        `Are you sure you want to reset immunity for all ${count} users?\n\nThis will remove all immunity records and they may appear as zombies in future scans.`,
+        'warning',
+        'Reset All',
+        'Cancel'
+      );
       
       if (!confirmed) {
         return;
@@ -711,13 +751,13 @@ export default {
         
         if (result.success) {
           this.stats.immuneUsers = 0;
-          alert(`Successfully reset immunity for ${result.clearedCount} users.`);
+          this.showAlert('Reset Complete', `Successfully reset immunity for ${result.clearedCount} users.`, 'success');
         } else {
-          alert('Failed to reset immunity.');
+          this.showAlert('Reset Failed', 'Failed to reset immunity.', 'error');
         }
       } catch (error) {
         console.error('Failed to reset immunity:', error);
-        alert('Failed to reset immunity. See console for details.');
+        this.showAlert('Reset Error', 'Failed to reset immunity. See console for details.', 'error');
       }
     },
     capturePrePurgeStats(selectedPubkeys) {
@@ -778,11 +818,12 @@ export default {
         
         // Check if user has any backups
         if (backups.length === 0) {
-          const shouldContinue = confirm(
-            `⚠️ No backups found!\n\nYou're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\n` +
-            `We strongly recommend creating a backup first to protect your follows.\n\n` +
-            `Would you like to go to the Backups page to create one now?\n\n` +
-            `(Click "Cancel" to proceed without backup, "OK" to go to Backups)`
+          const shouldContinue = await this.showConfirm(
+            'No Backups Found!',
+            `You're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\nWe strongly recommend creating a backup first to protect your follows.\n\nWould you like to go to the Backups page to create one now?`,
+            'warning',
+            'Go to Backups',
+            'Proceed Without Backup'
           );
           
           if (shouldContinue) {
@@ -792,9 +833,12 @@ export default {
           }
           
           // User chose to proceed without backup - final confirmation
-          return confirm(
-            `⚠️ Final Warning!\n\nYou're proceeding without a backup. If you accidentally purge someone important, you won't be able to easily restore them.\n\n` +
-            `Are you absolutely sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'}?`
+          return await this.showConfirm(
+            'Final Warning!',
+            `You're proceeding without a backup. If you accidentally purge someone important, you won't be able to easily restore them.\n\nAre you absolutely sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'}?`,
+            'error',
+            'Purge Anyway',
+            'Cancel'
           );
         }
         
@@ -803,11 +847,12 @@ export default {
         const recentBackup = backups.find(backup => backup.createdAt > oneWeekAgo);
         
         if (!recentBackup) {
-          const shouldContinue = confirm(
-            `📅 Your last backup is older than 7 days.\n\n` +
-            `You're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\n` +
-            `Would you like to create a fresh backup first?\n\n` +
-            `(Click "Cancel" to proceed anyway, "OK" to go to Backups)`
+          const shouldContinue = await this.showConfirm(
+            'Backup Recommendation',
+            `Your last backup is older than 7 days.\n\nYou're about to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list.\n\nWould you like to create a fresh backup first?`,
+            'warning',
+            'Go to Backups',
+            'Proceed Anyway'
           );
           
           if (shouldContinue) {
@@ -818,16 +863,24 @@ export default {
         }
         
         // User has recent backup or chose to proceed - final confirmation
-        return confirm(`Are you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?`);
+        return await this.showConfirm(
+          'Confirm Purge',
+          `Are you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?`,
+          'warning',
+          'Purge Zombies',
+          'Cancel'
+        );
         
       } catch (error) {
         console.error('Error checking backups:', error);
         
         // If there's an error checking backups, still ask for confirmation
-        return confirm(
-          `Unable to check backup status.\n\n` +
-          `Are you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?\n\n` +
-          `We recommend creating a backup first in the Backups page.`
+        return await this.showConfirm(
+          'Confirm Purge (No Backup Check)',
+          `Unable to check backup status.\n\nAre you sure you want to purge ${zombieCount} ${zombieCount === 1 ? 'zombie' : 'zombies'} from your follow list?\n\nWe recommend creating a backup first in the Backups page.`,
+          'warning',
+          'Purge Anyway',
+          'Cancel'
         );
       }
     }
