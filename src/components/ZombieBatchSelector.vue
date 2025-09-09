@@ -160,7 +160,7 @@
                 />
                 <!-- Label aligned with text above -->
                 <label :for="zombie.pubkey" class="text-sm text-gray-300">
-                  Select for purging
+                  Target for purging
                 </label>
               </div>
               
