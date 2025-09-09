@@ -163,7 +163,8 @@ class ZombieService {
         zombies.ancient.push({
           pubkey,
           lastActivity: null,
-          daysSinceActivity: null
+          daysSinceActivity: null,
+          confidence: this.calculateConfidenceScore([], profileData ? profileData.get(pubkey) : null, pubkey)
         });
         
         // Immediately update progress when a zombie is found
@@ -189,7 +190,8 @@ class ZombieService {
       const zombieInfo = {
         pubkey,
         lastActivity: latestEvent.created_at,
-        daysSinceActivity: daysSinceLastActivity
+        daysSinceActivity: daysSinceLastActivity,
+        confidence: this.calculateConfidenceScore(events, profileData ? profileData.get(pubkey) : null, pubkey)
       };
 
       // ULTRA CONSERVATIVE - if there's ANY activity within 120 days (4 months), mark as active
@@ -254,6 +256,62 @@ class ZombieService {
   }
 
   /**
+   * Calculate confidence score for zombie classification
+   * Higher score = more confident in the classification
+   * Lower score = uncertain, may need manual review
+   */
+  calculateConfidenceScore(events, profile, pubkey) {
+    let confidence = 0.5; // Start at medium confidence
+    
+    // Factor 1: Number of events found (more events = higher confidence)
+    if (events.length === 0) {
+      confidence -= 0.3; // Very low confidence if no events found
+    } else if (events.length >= 5) {
+      confidence += 0.2; // Higher confidence with many events
+    } else if (events.length >= 2) {
+      confidence += 0.1; // Some confidence with multiple events
+    }
+    
+    // Factor 2: Relay list availability (having relay list = higher confidence)
+    const hasRelayList = nostrService.followsRelayLists.has(pubkey);
+    if (hasRelayList) {
+      confidence += 0.2; // More confident when we know their preferred relays
+    } else {
+      confidence -= 0.2; // Less confident when we don't know their relay preferences
+    }
+    
+    // Factor 3: Profile completeness (complete profile = likely active user)
+    if (profile && profile.name && profile.about) {
+      confidence += 0.1; // Complete profiles are less likely to be zombies
+    } else if (profile && (profile.name || profile.about)) {
+      confidence += 0.05; // Partial profile information
+    }
+    
+    // Factor 4: Activity pattern consistency (recent events spread over time = higher confidence)
+    if (events.length >= 2) {
+      const timeSpan = events[0].created_at - events[events.length - 1].created_at;
+      const daySpan = timeSpan / (24 * 60 * 60);
+      if (daySpan > 30) {
+        confidence += 0.1; // Activity spread over time indicates consistent usage
+      }
+    }
+    
+    // Factor 5: Account age (very new accounts might be missed due to indexing delays)
+    if (events.length > 0) {
+      const oldestEvent = events[events.length - 1];
+      const accountAge = (Date.now() / 1000 - oldestEvent.created_at) / (24 * 60 * 60);
+      if (accountAge < 30) {
+        confidence -= 0.1; // Lower confidence for very new accounts
+      }
+    }
+    
+    // Clamp confidence to reasonable bounds
+    confidence = Math.max(0.1, Math.min(0.9, confidence));
+    
+    return Math.round(confidence * 100) / 100; // Round to 2 decimal places
+  }
+
+  /**
    * Scan follow list and detect zombies with profile enrichment
    */
   async scanForZombies(fetchProfiles = true, progressCallback = null) {
@@ -303,6 +361,29 @@ class ZombieService {
           zombiesFound: 0
         });
       }
+
+      // Fetch relay lists for follows to optimize activity scanning
+      console.log('📡 Fetching relay lists for follows to optimize activity scanning...');
+      if (progressCallback) {
+        progressCallback({
+          stage: 'Fetching relay lists for better accuracy...',
+          processed: 0,
+          total: followList.length
+        });
+      }
+      
+      const relayListProgress = (progress) => {
+        if (progressCallback) {
+          progressCallback({
+            stage: `Fetching relay lists... (${progress.processed}/${progress.total})`,
+            processed: progress.processed,
+            total: progress.total
+          });
+        }
+      };
+      
+      await nostrService.fetchFollowsRelayLists(followList, relayListProgress);
+      console.log('✅ Relay list fetching complete');
       
       // Get activity data for each follow
       if (progressCallback) {
@@ -312,36 +393,60 @@ class ZombieService {
         });
       }
       
+      // Use standard activity scanning (relay optimization is still beneficial for retry phase)
       const activityData = await nostrService.getProfilesActivity(followList, 10, progressCallback);
       
-      // AGGRESSIVE RETRY: Find users with no activity and retry with different strategies
+      // SMART RETRY: Use relay-aware targeting for high-accuracy verification
       const usersWithNoActivity = followList.filter(pubkey => {
         const events = activityData.get(pubkey) || [];
         return events.length === 0;
       });
       
       if (usersWithNoActivity.length > 0) {
-        console.log(`🔍 AGGRESSIVE RETRY NEEDED: ${usersWithNoActivity.length} users have no detected activity - retrying with aggressive search`);
+        console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
         
         if (progressCallback) {
           progressCallback({
-            stage: `Aggressive retry for ${usersWithNoActivity.length} users with unknown activity...`,
+            stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
             processed: followList.length
           });
         }
         
-        const retryResults = await nostrService.aggressiveActivityRetry(usersWithNoActivity, progressCallback);
+        const retryResults = await nostrService.smartRelayRetry(usersWithNoActivity, progressCallback);
         
         // Merge retry results back into main activity data
+        let recoveredUsers = 0;
         for (const [pubkey, events] of retryResults.entries()) {
           if (events.length > 0) {
             activityData.set(pubkey, events);
-            console.log(`🎉 RETRY RESCUED: Found ${events.length} events for ${pubkey.substring(0, 8)}... (was previously unknown)`);
+            console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
+            recoveredUsers++;
           }
         }
         
-        const rescuedCount = Array.from(retryResults.values()).filter(events => events.length > 0).length;
-        console.log(`🎉 AGGRESSIVE RETRY SUMMARY: Rescued ${rescuedCount}/${usersWithNoActivity.length} users from "unknown" status`);
+        console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
+        
+        // Fall back to aggressive retry for remaining users without relay lists
+        const stillNoActivity = usersWithNoActivity.filter(pubkey => {
+          const events = activityData.get(pubkey) || [];
+          return events.length === 0;
+        });
+        
+        if (stillNoActivity.length > 0) {
+          console.log(`🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`);
+          
+          const aggressiveResults = await nostrService.aggressiveActivityRetry(stillNoActivity, progressCallback);
+          
+          let fallbackRecovered = 0;
+          for (const [pubkey, events] of aggressiveResults.entries()) {
+            if (events.length > 0) {
+              activityData.set(pubkey, events);
+              fallbackRecovered++;
+            }
+          }
+          
+          console.log(`🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`);
+        }
       }
       
       // Get profile data first for deleted account detection

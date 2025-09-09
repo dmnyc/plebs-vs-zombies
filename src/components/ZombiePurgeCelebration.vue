@@ -192,17 +192,8 @@ export default {
       return this.purgeResult.removedCount || 0;
     },
     shareMessage() {
-      // Generate dynamic message based on purge stats
-      const zombieTypes = [];
-      if (this.purgeStats.burned > 0) zombieTypes.push(`${this.purgeStats.burned} burned`);
-      if (this.purgeStats.ancient > 0) zombieTypes.push(`${this.purgeStats.ancient} ancient`);
-      if (this.purgeStats.rotting > 0) zombieTypes.push(`${this.purgeStats.rotting} rotting`);
-      if (this.purgeStats.fresh > 0) zombieTypes.push(`${this.purgeStats.fresh} fresh`);
-      
-      // Proper pluralization
-      const zombieDescription = zombieTypes.length > 0 
-        ? zombieTypes.join(' + ') + (this.totalPurged === 1 ? ' Nostr zombie' : ' Nostr zombies')
-        : this.totalPurged === 1 ? '1 Nostr zombie' : `${this.totalPurged} Nostr zombies`;
+      // Simple total count description
+      const zombieDescription = this.totalPurged === 1 ? '1 Nostr zombie' : `${this.totalPurged} Nostr zombies`;
 
       // Fun variation based on number purged
       let action = 'slaughtered';
@@ -213,7 +204,7 @@ export default {
 
       const message = `I just ${action} ${zombieDescription} using #PlebsVsZombies! 🔪🧟‍♂️🧟‍♀️
 
-My Zombie score was ${this.zombieScore}%! What's yours?
+My Zombie Score was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
@@ -224,7 +215,7 @@ https://plebs-vs-zombies.vercel.app`;
     scoreBarEmojis() {
       // Create visual score bar matching the UI display
       const bars = [];
-      const totalBars = 16; // Nice visual length
+      const totalBars = 14; // Shorter for better mobile display
       
       // Get the pre-purge stats to calculate accurate percentages
       if (!this.prePurgeStats) {

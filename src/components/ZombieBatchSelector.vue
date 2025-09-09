@@ -14,48 +14,55 @@
       
       <div v-else class="space-y-4">
         <!-- Pagination Controls at Top -->
-        <div v-if="availableZombies.length > itemsPerPage" class="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div class="text-sm text-gray-400">
+        <div v-if="availableZombies.length > itemsPerPage" class="space-y-3 p-4 bg-gray-800 border border-gray-700 rounded-lg">
+          <!-- Info Text (Full Width) -->
+          <div class="text-sm text-gray-400 text-center">
             Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }}-{{ Math.min(currentPage * itemsPerPage, availableZombies.length) }} of {{ availableZombies.length }} zombies
           </div>
-          <div class="flex items-center gap-1 sm:gap-3">
-            <button 
-              @click="currentPage = 1" 
-              :disabled="currentPage === 1"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-              title="First page"
-            >
-              <span class="hidden sm:inline">⇤ First</span>
-              <span class="sm:hidden">⇤</span>
-            </button>
-            <button 
-              @click="previousPage" 
-              :disabled="currentPage === 1"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">← Previous</span>
-              <span class="sm:hidden">←</span>
-            </button>
-            <span class="text-xs sm:text-sm text-gray-300 px-2 sm:px-3 py-1 bg-gray-700 rounded whitespace-nowrap">
-              {{ currentPage }}/{{ totalPages }}
-            </span>
-            <button 
-              @click="nextPage" 
-              :disabled="currentPage === totalPages"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">Next →</span>
-              <span class="sm:hidden">→</span>
-            </button>
-            <button 
-              @click="currentPage = totalPages" 
-              :disabled="currentPage === totalPages"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-              title="Last page"
-            >
-              <span class="hidden sm:inline">Last ⇥</span>
-              <span class="sm:hidden">⇥</span>
-            </button>
+          
+          <!-- Navigation Controls (Centered, Responsive) -->
+          <div class="flex items-center justify-center">
+            <div class="flex items-center gap-2">
+              <button 
+                @click="currentPage = 1" 
+                :disabled="currentPage === 1"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="First page"
+              >
+                <span class="hidden sm:inline">⇤ First</span>
+                <span class="sm:hidden">⇤</span>
+              </button>
+              <button 
+                @click="previousPage" 
+                :disabled="currentPage === 1"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Previous page"
+              >
+                <span class="hidden sm:inline">← Prev</span>
+                <span class="sm:hidden">←</span>
+              </button>
+              <span class="text-sm text-gray-300 px-4 py-2 bg-gray-700 rounded whitespace-nowrap min-w-[60px] text-center">
+                {{ currentPage }}/{{ totalPages }}
+              </span>
+              <button 
+                @click="nextPage" 
+                :disabled="currentPage === totalPages"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Next page"
+              >
+                <span class="hidden sm:inline">Next →</span>
+                <span class="sm:hidden">→</span>
+              </button>
+              <button 
+                @click="currentPage = totalPages" 
+                :disabled="currentPage === totalPages"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Last page"
+              >
+                <span class="hidden sm:inline">Last ⇥</span>
+                <span class="sm:hidden">⇥</span>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -178,43 +185,55 @@
         </div>
         
         <!-- Bottom Pagination Controls (duplicate for convenience) -->
-        <div v-if="availableZombies.length > itemsPerPage" class="mt-6 flex flex-col sm:flex-row justify-center items-center gap-3 p-4 bg-gray-800 border border-gray-700 rounded-lg">
-          <div class="text-sm text-gray-400">
+        <div v-if="availableZombies.length > itemsPerPage" class="mt-6 space-y-3 p-4 bg-gray-800 border border-gray-700 rounded-lg">
+          <!-- Info Text (Full Width) -->
+          <div class="text-sm text-gray-400 text-center">
             Page {{ currentPage }} of {{ totalPages }} ({{ availableZombies.length }} total zombies)
           </div>
-          <div class="flex items-center gap-1 sm:gap-3">
-            <button 
-              @click="currentPage = 1" 
-              :disabled="currentPage === 1"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">⇤ First</span>
-              <span class="sm:hidden">⇤</span>
-            </button>
-            <button 
-              @click="previousPage" 
-              :disabled="currentPage === 1"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">← Previous</span>
-              <span class="sm:hidden">←</span>
-            </button>
-            <button 
-              @click="nextPage" 
-              :disabled="currentPage === totalPages"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">Next →</span>
-              <span class="sm:hidden">→</span>
-            </button>
-            <button 
-              @click="currentPage = totalPages" 
-              :disabled="currentPage === totalPages"
-              class="btn-secondary text-xs sm:text-sm disabled:opacity-50 px-2 sm:px-3"
-            >
-              <span class="hidden sm:inline">Last ⇥</span>
-              <span class="sm:hidden">⇥</span>
-            </button>
+          
+          <!-- Navigation Controls (Centered, Responsive) -->
+          <div class="flex items-center justify-center">
+            <div class="flex items-center gap-2">
+              <button 
+                @click="currentPage = 1" 
+                :disabled="currentPage === 1"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="First page"
+              >
+                <span class="hidden sm:inline">⇤ First</span>
+                <span class="sm:hidden">⇤</span>
+              </button>
+              <button 
+                @click="previousPage" 
+                :disabled="currentPage === 1"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Previous page"
+              >
+                <span class="hidden sm:inline">← Prev</span>
+                <span class="sm:hidden">←</span>
+              </button>
+              <span class="text-sm text-gray-300 px-4 py-2 bg-gray-700 rounded whitespace-nowrap min-w-[60px] text-center">
+                {{ currentPage }}/{{ totalPages }}
+              </span>
+              <button 
+                @click="nextPage" 
+                :disabled="currentPage === totalPages"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Next page"
+              >
+                <span class="hidden sm:inline">Next →</span>
+                <span class="sm:hidden">→</span>
+              </button>
+              <button 
+                @click="currentPage = totalPages" 
+                :disabled="currentPage === totalPages"
+                class="btn-secondary text-sm disabled:opacity-50 px-3 py-2 min-w-[44px] flex items-center justify-center"
+                title="Last page"
+              >
+                <span class="hidden sm:inline">Last ⇥</span>
+                <span class="sm:hidden">⇥</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -377,13 +396,16 @@ export default {
     loading: {
       type: Boolean,
       default: false
+    },
+    batchSize: {
+      type: Number,
+      default: 25
     }
   },
   data() {
     return {
       selectedZombies: [], // Tracks selected pubkeys across all pages
       currentPage: 1,
-      itemsPerPage: 25,
       immuneZombies: new Set(), // Track zombies that have been granted immunity in this session
       alertModal: {
         show: false,
@@ -394,6 +416,10 @@ export default {
     };
   },
   computed: {
+    // Use batchSize as itemsPerPage for consistent UX
+    itemsPerPage() {
+      return this.batchSize;
+    },
     // Filter out zombies that have been granted immunity in this session
     availableZombies() {
       return this.zombies.filter(zombie => !this.immuneZombies.has(zombie.pubkey));

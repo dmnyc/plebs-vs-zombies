@@ -18,6 +18,10 @@ class NostrService {
     this.extensionConnected = false;
     this.extensionAuthorized = false;
     this.connectionPromise = null; // Prevent multiple simultaneous connections
+    
+    // NIP-65 relay lists
+    this.userRelayList = null; // User's own relay preferences
+    this.followsRelayLists = new Map(); // Map of pubkey -> relay list
   }
 
   async initialize() {
@@ -84,6 +88,21 @@ class NostrService {
 
       // Load user profile
       await this.loadUserProfile();
+
+      // Fetch user's relay list (NIP-65)
+      console.log('📡 Fetching user relay list...');
+      try {
+        await this.fetchUserRelayList();
+        if (this.userRelayList) {
+          const writeRelays = this.getWriteRelays(this.userRelayList);
+          const readRelays = this.getReadRelays(this.userRelayList);
+          console.log(`✅ User relay list loaded: ${writeRelays.length} write, ${readRelays.length} read relays`);
+        } else {
+          console.log('ℹ️ No user relay list found, using default relays');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch user relay list:', error);
+      }
 
       // Save session
       this.saveSession();
@@ -1046,7 +1065,7 @@ class NostrService {
       // Publish to relays using simple WebSocket connections
       const publishResults = await this.publishEventToRelays(signedEvent);
       
-      console.log(`✅ Event published to ${publishResults.successful}/${this.relays.length} relays`);
+      console.log(`✅ Event published to ${publishResults.successful}/${this.getPublishRelays().length} relays`);
       
       if (publishResults.successful === 0) {
         throw new Error('Failed to publish to any relays. Please check your internet connection.');
@@ -1126,7 +1145,8 @@ class NostrService {
   }
   
   async publishEventToRelays(signedEvent) {
-    const publishPromises = this.relays.map(async (relayUrl) => {
+    const relaysToUse = this.getPublishRelays();
+    const publishPromises = relaysToUse.map(async (relayUrl) => {
       try {
         return new Promise((resolve, reject) => {
           const ws = new WebSocket(relayUrl);
@@ -1293,6 +1313,466 @@ class NostrService {
     }
     
     return false;
+  }
+
+  /**
+   * Parse a NIP-65 relay list event into a structured format
+   */
+  parseRelayList(event) {
+    if (!event || event.kind !== 10002) {
+      return null;
+    }
+
+    const relayList = {
+      readRelays: [],
+      writeRelays: [],
+      bothRelays: [],
+      lastUpdated: event.created_at
+    };
+
+    // Parse r tags from the relay list event
+    for (const tag of event.tags) {
+      if (tag[0] === 'r' && tag[1]) {
+        const relayUrl = tag[1];
+        const permission = tag[2]; // 'read', 'write', or undefined (both)
+        
+        if (permission === 'read') {
+          relayList.readRelays.push(relayUrl);
+        } else if (permission === 'write') {
+          relayList.writeRelays.push(relayUrl);
+        } else {
+          // No permission specified means both read and write
+          relayList.bothRelays.push(relayUrl);
+        }
+      }
+    }
+
+    return relayList;
+  }
+
+  /**
+   * Get effective read relays for a user (bothRelays + readRelays)
+   */
+  getReadRelays(relayList) {
+    if (!relayList) return [];
+    return [...relayList.bothRelays, ...relayList.readRelays];
+  }
+
+  /**
+   * Get effective write relays for a user (bothRelays + writeRelays)
+   */
+  getWriteRelays(relayList) {
+    if (!relayList) return [];
+    return [...relayList.bothRelays, ...relayList.writeRelays];
+  }
+
+  /**
+   * Fetch the relay list for a specific pubkey
+   */
+  async fetchRelayList(pubkey) {
+    if (!this.ndk) {
+      await this.initialize();
+    }
+
+    try {
+      const filter = {
+        kinds: [10002],
+        authors: [pubkey],
+        limit: 1
+      };
+
+      console.log(`🔍 Fetching NIP-65 relay list for ${pubkey.substring(0, 8)}...`);
+      
+      const events = [];
+      const subscription = this.ndk.subscribe(filter);
+      
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          subscription.stop();
+          console.log(`⏰ Relay list fetch timeout for ${pubkey.substring(0, 8)}...`);
+          resolve(null); // Return null on timeout rather than rejecting
+        }, 5000);
+
+        subscription.on('event', (event) => {
+          events.push(event);
+        });
+
+        subscription.on('eose', () => {
+          clearTimeout(timeout);
+          subscription.stop();
+          
+          if (events.length > 0) {
+            // Get the most recent relay list event
+            events.sort((a, b) => b.created_at - a.created_at);
+            const relayList = this.parseRelayList(events[0]);
+            console.log(`✅ Found relay list for ${pubkey.substring(0, 8)}...:`, relayList);
+            resolve(relayList);
+          } else {
+            console.log(`❌ No relay list found for ${pubkey.substring(0, 8)}...`);
+            resolve(null);
+          }
+        });
+
+        subscription.on('error', (error) => {
+          clearTimeout(timeout);
+          subscription.stop();
+          console.error(`❌ Error fetching relay list for ${pubkey.substring(0, 8)}...:`, error);
+          resolve(null); // Return null on error rather than rejecting
+        });
+      });
+    } catch (error) {
+      console.error(`❌ Failed to fetch relay list for ${pubkey.substring(0, 8)}...:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch and cache the logged-in user's relay list
+   */
+  async fetchUserRelayList() {
+    if (!this.pubkey) {
+      console.warn('❌ Cannot fetch user relay list - no pubkey available');
+      return null;
+    }
+
+    const relayList = await this.fetchRelayList(this.pubkey);
+    this.userRelayList = relayList;
+    return relayList;
+  }
+
+  /**
+   * Fetch relay lists for multiple pubkeys (follows)
+   */
+  async fetchFollowsRelayLists(pubkeys, progressCallback = null) {
+    if (!Array.isArray(pubkeys) || pubkeys.length === 0) {
+      return new Map();
+    }
+
+    console.log(`🔍 Fetching relay lists for ${pubkeys.length} follows...`);
+    
+    const relayLists = new Map();
+    const batchSize = 20; // Process in batches to avoid overwhelming relays
+    
+    for (let i = 0; i < pubkeys.length; i += batchSize) {
+      const batch = pubkeys.slice(i, i + batchSize);
+      
+      if (progressCallback) {
+        progressCallback({
+          stage: 'Fetching relay lists...',
+          processed: i,
+          total: pubkeys.length
+        });
+      }
+      
+      const batchPromises = batch.map(async (pubkey) => {
+        const relayList = await this.fetchRelayList(pubkey);
+        if (relayList) {
+          relayLists.set(pubkey, relayList);
+          this.followsRelayLists.set(pubkey, relayList); // Cache it
+        }
+        return { pubkey, relayList };
+      });
+      
+      await Promise.all(batchPromises);
+      
+      // Small delay between batches to be nice to relays
+      if (i + batchSize < pubkeys.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    if (progressCallback) {
+      progressCallback({
+        stage: 'Relay lists fetched',
+        processed: pubkeys.length,
+        total: pubkeys.length
+      });
+    }
+    
+    console.log(`✅ Fetched relay lists for ${relayLists.size} out of ${pubkeys.length} follows`);
+    return relayLists;
+  }
+
+  /**
+   * Enhanced activity scanning using per-user relay preferences
+   * This method queries each user's preferred write relays for more accurate results
+   */
+  async getProfilesActivityOptimized(pubkeys, limit = 10, progressCallback = null) {
+    if (!pubkeys || pubkeys.length === 0) {
+      return new Map();
+    }
+
+    await this.initialize();
+    
+    const activityMap = new Map();
+    
+    // Initialize all pubkeys with empty arrays
+    pubkeys.forEach(pubkey => {
+      activityMap.set(pubkey, []);
+    });
+    
+    console.log('🚀 Using optimized activity scanning with per-user relay preferences');
+    
+    // Process users individually or in small relay-specific batches
+    let processed = 0;
+    for (const pubkey of pubkeys) {
+      if (progressCallback) {
+        progressCallback({
+          stage: `Scanning activity... (${processed}/${pubkeys.length})`,
+          processed: processed,
+          total: pubkeys.length
+        });
+      }
+      
+      const relaysToScan = this.getActivityScanRelays(pubkey);
+      
+      try {
+        const events = await this.fetchUserActivity(pubkey, relaysToScan, limit);
+        if (events.length > 0) {
+          activityMap.set(pubkey, events);
+          console.log(`📊 Found ${events.length} events for ${pubkey.substring(0, 8)}... using ${relaysToScan.length} relays`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to fetch activity for ${pubkey.substring(0, 8)}...:`, error.message);
+      }
+      
+      processed++;
+      
+      // Small delay to be nice to relays
+      if (processed % 20 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    if (progressCallback) {
+      progressCallback({
+        stage: 'Activity scanning complete',
+        processed: pubkeys.length,
+        total: pubkeys.length
+      });
+    }
+    
+    const foundActivity = Array.from(activityMap.values()).filter(events => events.length > 0).length;
+    console.log(`✅ Optimized activity scan complete: found activity for ${foundActivity}/${pubkeys.length} users`);
+    
+    return activityMap;
+  }
+
+  /**
+   * Smart relay-aware retry for users with no detected activity
+   * This targets only users who have specific relay preferences to prevent false positives
+   */
+  async smartRelayRetry(pubkeys, progressCallback = null) {
+    if (!pubkeys || pubkeys.length === 0) {
+      return new Map();
+    }
+
+    console.log(`🎯 Starting smart relay retry for ${pubkeys.length} users with cached relay preferences`);
+    
+    const retryResults = new Map();
+    
+    // Initialize all pubkeys with empty arrays
+    pubkeys.forEach(pubkey => {
+      retryResults.set(pubkey, []);
+    });
+    
+    // Group users by their specific relay preferences (only those who have relay lists)
+    const usersWithRelayLists = pubkeys.filter(pubkey => this.followsRelayLists.has(pubkey));
+    const usersWithoutRelayLists = pubkeys.filter(pubkey => !this.followsRelayLists.has(pubkey));
+    
+    console.log(`📊 Smart retry: ${usersWithRelayLists.length} users have relay lists, ${usersWithoutRelayLists.length} don't`);
+    
+    if (usersWithRelayLists.length > 0) {
+      // Process users with relay lists in small batches
+      const batchSize = 10;
+      let processed = 0;
+      
+      for (let i = 0; i < usersWithRelayLists.length; i += batchSize) {
+        const batch = usersWithRelayLists.slice(i, i + batchSize);
+        
+        if (progressCallback) {
+          progressCallback({
+            stage: `Smart retry: ${processed}/${usersWithRelayLists.length} users with relay preferences...`,
+            processed: processed,
+            total: usersWithRelayLists.length
+          });
+        }
+        
+        // Process each user in the batch with their specific relays
+        for (const pubkey of batch) {
+          const relayList = this.followsRelayLists.get(pubkey);
+          const writeRelays = this.getWriteRelays(relayList);
+          
+          if (writeRelays.length > 0) {
+            try {
+              const events = await this.fetchUserActivitySingle(pubkey, writeRelays, 5);
+              if (events.length > 0) {
+                retryResults.set(pubkey, events);
+                console.log(`🎯 SMART SUCCESS: ${pubkey.substring(0, 8)}... found on their ${writeRelays.length} preferred relays`);
+              }
+            } catch (error) {
+              console.warn(`⚠️ Smart retry failed for ${pubkey.substring(0, 8)}...:`, error.message);
+            }
+          }
+        }
+        
+        processed += batch.length;
+        
+        // Small delay between batches to avoid overwhelming relays
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    
+    const recoveredCount = Array.from(retryResults.values()).filter(events => events.length > 0).length;
+    console.log(`✅ Smart relay retry complete: recovered ${recoveredCount}/${usersWithRelayLists.length} users with relay preferences`);
+    
+    return retryResults;
+  }
+
+  /**
+   * Fetch activity for a single user from their preferred relays (optimized for retry)
+   */
+  async fetchUserActivitySingle(pubkey, relays, limit = 5) {
+    const filter = {
+      kinds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      authors: [pubkey],
+      limit: limit,
+      since: Math.floor((Date.now() - (180 * 24 * 60 * 60 * 1000)) / 1000) // Only look back 6 months for retry
+    };
+
+    const events = [];
+    
+    try {
+      // Use main NDK instance but query specific relays temporarily
+      const subscription = this.ndk.subscribe(filter, { closeOnEose: true });
+      
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          subscription.stop();
+          resolve(events);
+        }, 5000); // Shorter timeout for retry
+        
+        subscription.on('event', (event) => {
+          events.push(event);
+        });
+        
+        subscription.on('eose', () => {
+          clearTimeout(timeout);
+          subscription.stop();
+          events.sort((a, b) => b.created_at - a.created_at);
+          resolve(events.slice(0, limit));
+        });
+        
+        subscription.on('error', () => {
+          clearTimeout(timeout);
+          subscription.stop();
+          resolve(events);
+        });
+      });
+    } catch (error) {
+      console.warn(`Single user fetch failed for ${pubkey.substring(0, 8)}...:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch activity for a single user from their preferred relays
+   */
+  async fetchUserActivity(pubkey, relays, limit = 10) {
+    const filter = {
+      kinds: [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44,
+        1063, 1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002,
+        30000, 30001, 30008, 30009, 30017, 30018, 30023, 30024,
+        31890, 31922, 31923, 31924, 31925, 31989, 31990, 34550
+      ],
+      authors: [pubkey],
+      limit: limit * 2, // Get a few extra to account for filtering
+      since: Math.floor((Date.now() - (365 * 24 * 60 * 60 * 1000)) / 1000) // Look back 1 year
+    };
+
+    const events = [];
+    
+    // Try to use NDK with specific relays
+    try {
+      // Create temporary NDK instance with specific relays for this user
+      const specificNdk = new NDK({
+        explicitRelayUrls: relays
+      });
+      
+      await specificNdk.connect();
+      
+      const subscription = specificNdk.subscribe(filter);
+      
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          subscription.stop();
+          specificNdk.pool.close();
+          resolve(events);
+        }, 8000); // 8 second timeout per user
+        
+        subscription.on('event', (event) => {
+          events.push(event);
+        });
+        
+        subscription.on('eose', () => {
+          clearTimeout(timeout);
+          subscription.stop();
+          specificNdk.pool.close();
+          
+          // Sort by creation time and limit results
+          events.sort((a, b) => b.created_at - a.created_at);
+          resolve(events.slice(0, limit));
+        });
+        
+        subscription.on('error', (error) => {
+          clearTimeout(timeout);
+          subscription.stop();
+          specificNdk.pool.close();
+          console.warn(`Error in user-specific relay scan for ${pubkey.substring(0, 8)}...:`, error);
+          resolve(events);
+        });
+      });
+    } catch (error) {
+      console.warn(`Failed to create specific relay connection for ${pubkey.substring(0, 8)}...:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the best relays to scan for a user's activity
+   * Returns write relays (where they publish) + fallback to default relays
+   */
+  getActivityScanRelays(pubkey) {
+    const relayList = this.followsRelayLists.get(pubkey);
+    if (relayList) {
+      const writeRelays = this.getWriteRelays(relayList);
+      if (writeRelays.length > 0) {
+        console.log(`📡 Using ${writeRelays.length} write relays for ${pubkey.substring(0, 8)}...`);
+        return writeRelays;
+      }
+    }
+    
+    // Fallback to default relays if no specific relay list found
+    return this.relays;
+  }
+
+  /**
+   * Get the best relays to publish to for the logged-in user
+   * Returns user's write relays + fallback to default relays
+   */
+  getPublishRelays() {
+    if (this.userRelayList) {
+      const writeRelays = this.getWriteRelays(this.userRelayList);
+      if (writeRelays.length > 0) {
+        console.log(`📡 Using ${writeRelays.length} user write relays for publishing`);
+        return writeRelays;
+      }
+    }
+    
+    // Fallback to default relays if no user relay list
+    console.log(`📡 Using ${this.relays.length} default relays for publishing`);
+    return this.relays;
   }
 }
 

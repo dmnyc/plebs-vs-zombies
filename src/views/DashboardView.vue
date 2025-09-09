@@ -83,6 +83,15 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Stop Scan Button -->
+            <button 
+              v-if="scanning"
+              @click="stopScan" 
+              class="btn-danger w-full mt-2"
+            >
+              Stop Scan
+            </button>
           </div>
         </div>
       </div>
@@ -199,6 +208,7 @@ export default {
     return {
       loading: true,
       scanning: false,
+      scanCancelled: false,
       followStats: {
         total: 0,
         immune: 0,
@@ -297,6 +307,7 @@ export default {
     },
     async scanForZombies() {
       this.scanning = true;
+      this.scanCancelled = false;
       
       // Reset progress (matching Hunt Zombies page)
       this.scanProgress = {
@@ -308,6 +319,11 @@ export default {
       
       try {
         const result = await zombieService.scanForZombies(true, (progress) => {
+          // Check if scan was cancelled
+          if (this.scanCancelled) {
+            throw new Error('Scan cancelled by user');
+          }
+          
           this.scanProgress = {
             ...this.scanProgress,
             ...progress
@@ -338,15 +354,24 @@ export default {
           });
           
           alert('Scan completed successfully!');
-        } else {
+        } else if (!this.scanCancelled) {
           alert(`Failed to scan for zombies: ${result.message}`);
         }
       } catch (error) {
-        console.error('Failed to scan for zombies:', error);
-        alert('Failed to scan for zombies. See console for details.');
+        if (error.message === 'Scan cancelled by user') {
+          console.log('Scan cancelled by user');
+        } else {
+          console.error('Failed to scan for zombies:', error);
+          alert('Failed to scan for zombies. See console for details.');
+        }
       } finally {
         this.scanning = false;
       }
+    },
+    stopScan() {
+      this.scanCancelled = true;
+      this.scanning = false;
+      console.log('Zombie scan stopped by user');
     },
     async loadRecentActivity() {
       try {
