@@ -3,14 +3,14 @@
     <header class="bg-zombie-dark border-b border-gray-700 shadow-lg">
       <div class="container mx-auto px-4 py-4">
         <div class="flex justify-between items-center">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 cursor-pointer" @click="setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
-            <h1 class="text-2xl sm:text-3xl">Plebs vs. Zombies</h1>
+            <h1 class="text-2xl sm:text-3xl hover:text-zombie-green transition-colors">Plebs vs. Zombies</h1>
           </div>
           
           <div class="flex items-center gap-4">
             <!-- Desktop Navigation -->
-            <nav class="hidden lg:block">
+            <nav v-if="isConnected" class="hidden lg:block">
               <ul class="flex gap-6">
                 <li>
                   <a 
@@ -100,6 +100,7 @@
           
           <!-- Mobile/Tablet Hamburger Button -->
           <button 
+            v-if="isConnected"
             @click="mobileMenuOpen = !mobileMenuOpen"
             class="lg:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
             :class="{'bg-gray-800': mobileMenuOpen}"
@@ -111,7 +112,7 @@
         </div>
         
         <!-- Mobile/Tablet Navigation Menu -->
-        <nav v-if="mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
+        <nav v-if="isConnected && mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
           <!-- User Info Section (Mobile) -->
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center gap-3 mb-3">
