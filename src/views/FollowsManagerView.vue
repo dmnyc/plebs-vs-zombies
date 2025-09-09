@@ -583,7 +583,11 @@ export default {
       this.loading = true;
       
       try {
-        const result = await zombieService.scanForZombies();
+        // Get auto backup setting from localStorage
+        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
+        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
+        
+        const result = await zombieService.scanForZombies(true, null, shouldCreateBackup);
         
         if (result.success) {
           // Update the status of each follow

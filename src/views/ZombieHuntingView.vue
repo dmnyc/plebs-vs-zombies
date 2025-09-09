@@ -525,6 +525,10 @@ export default {
         // Update batch size in the service
         zombieService.setBatchSize(this.batchSize);
         
+        // Get auto backup setting from localStorage
+        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
+        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
+        
         // Perform the scan with progress callback
         const result = await zombieService.scanForZombies(true, (progress) => {
           // Check if scan was cancelled
@@ -536,7 +540,7 @@ export default {
             ...this.scanProgress,
             ...progress
           };
-        });
+        }, shouldCreateBackup);
         
         if (result.success && !this.scanCancelled) {
           this.zombieData = result.zombieData;

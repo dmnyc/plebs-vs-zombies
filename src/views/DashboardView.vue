@@ -350,6 +350,10 @@ export default {
       };
       
       try {
+        // Get auto backup setting from localStorage
+        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
+        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
+        
         const result = await zombieService.scanForZombies(true, (progress) => {
           // Check if scan was cancelled
           if (this.scanCancelled) {
@@ -360,7 +364,7 @@ export default {
             ...this.scanProgress,
             ...progress
           };
-        });
+        }, shouldCreateBackup);
         
         if (result.success) {
           this.lastScanDate = Date.now();

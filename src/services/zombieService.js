@@ -314,13 +314,37 @@ class ZombieService {
   /**
    * Scan follow list and detect zombies with profile enrichment
    */
-  async scanForZombies(fetchProfiles = true, progressCallback = null) {
+  async scanForZombies(fetchProfiles = true, progressCallback = null, createBackup = true) {
     try {
       // Initialize tracking for progress reporting
       this.lastReportedZombieCount = 0;
       
       // Initialize immunity service
       await immunityService.init();
+      
+      // Create backup before scanning (if enabled)
+      if (createBackup) {
+        if (progressCallback) {
+          progressCallback({
+            stage: 'Creating pre-scan backup...',
+            processed: 0,
+            total: 0
+          });
+        }
+        
+        try {
+          const backupService = (await import('./backupService')).default;
+          const backupResult = await backupService.createBackup(`Pre-scan backup - ${new Date().toISOString()}`);
+          
+          if (!backupResult.success) {
+            console.warn('Failed to create pre-scan backup:', backupResult.message);
+          } else {
+            console.log('✅ Pre-scan backup created successfully');
+          }
+        } catch (error) {
+          console.warn('Failed to create pre-scan backup:', error);
+        }
+      }
       
       // Get the user's follow list
       const allFollows = await nostrService.getFollowList();

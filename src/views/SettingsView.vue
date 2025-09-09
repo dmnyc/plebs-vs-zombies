@@ -197,6 +197,24 @@
           </div>
         </div>
         
+        <div class="border-t border-gray-700 pt-4 mb-6">
+          <h4 class="text-lg mb-3">Scan Settings</h4>
+          
+          <div class="mb-4">
+            <label class="flex items-center gap-3">
+              <input 
+                type="checkbox" 
+                v-model="autoBackupOnScan"
+                class="h-5 w-5 rounded text-zombie-green focus:ring-zombie-green"
+              />
+              <span class="text-gray-300">Create backup before scanning</span>
+            </label>
+            <div class="text-xs text-gray-500 mt-1 ml-8">
+              Automatically creates a safety backup of your follow list before each scan
+            </div>
+          </div>
+        </div>
+
         <div class="border-t border-gray-700 pt-4">
           <h4 class="text-lg mb-3">Batch Settings</h4>
           
@@ -485,6 +503,7 @@ export default {
         ancient: 730
       },
       batchSize: 30,
+      autoBackupOnScan: true,
       loading: false,
       immunityRecords: [],
       userRelayList: null,
@@ -578,6 +597,9 @@ export default {
         // Save batch size
         zombieService.setBatchSize(this.batchSize);
         
+        // Save auto backup setting
+        localStorage.setItem('autoBackupOnScan', JSON.stringify(this.autoBackupOnScan));
+        
         // Save relays
         nostrService.relays = [...this.relays];
         
@@ -597,6 +619,10 @@ export default {
       
       // Load batch size
       this.batchSize = zombieService.batchSize;
+      
+      // Load auto backup setting
+      const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
+      this.autoBackupOnScan = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
       
       // Load relays
       this.relays = [...nostrService.relays];
