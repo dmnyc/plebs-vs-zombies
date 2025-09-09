@@ -763,7 +763,7 @@ export default {
     capturePrePurgeStats(selectedPubkeys) {
       if (!this.zombieData) return;
       
-      // Calculate current zombie score (percentage of zombies in follow list)
+      // Calculate current Zombie Score (percentage of zombies in follow list)
       const { active, burned, fresh, rotting, ancient } = this.zombieData;
       const burnedLength = burned?.length || 0;
       const totalFollows = active.length + burnedLength + fresh.length + rotting.length + ancient.length;

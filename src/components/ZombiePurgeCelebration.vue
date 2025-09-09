@@ -57,7 +57,7 @@
               <span class="text-gray-300">Previous Zombie Score:</span>
               <span class="text-lg font-bold text-zombie-green">{{ zombieScore }}%</span>
             </div>
-            <!-- Visual zombie score bar -->
+            <!-- Visual Zombie Score bar -->
             <div class="flex gap-1">
               <span 
                 v-for="(square, index) in scoreBarEmojis" 

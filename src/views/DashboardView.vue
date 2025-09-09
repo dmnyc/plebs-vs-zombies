@@ -25,7 +25,7 @@
               <span v-else class="text-gray-400">Never</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-gray-300">Zombie score:</span>
+              <span class="text-gray-300">Zombie Score:</span>
               <span 
                 class="font-bold"
                 :class="{
@@ -186,6 +186,18 @@
       @go-to-backups="handleGoToBackups"
       @skip-backup="handleSkipBackup"
     />
+
+    <!-- Alert Modal -->
+    <ConfirmModal
+      :show="alertModal.show"
+      :title="alertModal.title"
+      :message="alertModal.message"
+      :type="alertModal.type"
+      confirmText="OK"
+      cancelText=""
+      @confirm="closeAlert"
+      @cancel="closeAlert"
+    />
   </div>
 </template>
 
@@ -193,6 +205,7 @@
 import { format } from 'date-fns';
 import ZombieStats from '../components/ZombieStats.vue';
 import WelcomeModal from '../components/WelcomeModal.vue';
+import ConfirmModal from '../components/ConfirmModal.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
@@ -202,7 +215,8 @@ export default {
   name: 'DashboardView',
   components: {
     ZombieStats,
-    WelcomeModal
+    WelcomeModal,
+    ConfirmModal
   },
   data() {
     return {
@@ -233,7 +247,13 @@ export default {
       },
       lastScanDate: null,
       recentActivity: [],
-      showWelcomeModal: false
+      showWelcomeModal: false,
+      alertModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'info'
+      }
     };
   },
   computed: {
@@ -248,6 +268,18 @@ export default {
     }
   },
   methods: {
+    // Alert Modal Methods
+    showAlert(title, message, type = 'info') {
+      this.alertModal = {
+        show: true,
+        title,
+        message,
+        type
+      };
+    },
+    closeAlert() {
+      this.alertModal.show = false;
+    },
     formatDate(timestamp) {
       if (!timestamp) return '';
       return format(new Date(timestamp), 'MMM d, yyyy, HH:mm');
@@ -353,16 +385,16 @@ export default {
             details: `Found ${result.zombieCount} zombies out of ${result.totalFollows} follows`
           });
           
-          alert('Scan completed successfully!');
+          this.showAlert('Scan Complete', 'Scan completed successfully!', 'success');
         } else if (!this.scanCancelled) {
-          alert(`Failed to scan for zombies: ${result.message}`);
+          this.showAlert('Scan Failed', `Failed to scan for zombies: ${result.message}`, 'error');
         }
       } catch (error) {
         if (error.message === 'Scan cancelled by user') {
           console.log('Scan cancelled by user');
         } else {
           console.error('Failed to scan for zombies:', error);
-          alert('Failed to scan for zombies. See console for details.');
+          this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
         }
       } finally {
         this.scanning = false;
@@ -428,7 +460,7 @@ export default {
       const count = this.followStats.immune;
       
       if (count === 0) {
-        alert('No immune users to reset.');
+        this.showAlert('No Immune Users', 'No immune users to reset.', 'info');
         return;
       }
       
@@ -452,13 +484,13 @@ export default {
             details: `Reset immunity for ${result.clearedCount} users`
           });
           
-          alert(`Successfully reset immunity for ${result.clearedCount} users.`);
+          this.showAlert('Reset Complete', `Successfully reset immunity for ${result.clearedCount} users.`, 'success');
         } else {
-          alert('Failed to reset immunity.');
+          this.showAlert('Reset Failed', 'Failed to reset immunity.', 'error');
         }
       } catch (error) {
         console.error('Failed to reset immunity:', error);
-        alert('Failed to reset immunity. See console for details.');
+        this.showAlert('Reset Error', 'Failed to reset immunity. See console for details.', 'error');
       }
     },
     async checkFirstTimeUser() {
