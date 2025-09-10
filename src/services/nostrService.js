@@ -532,126 +532,64 @@ class NostrService {
 
     await this.initialize();
     
-    // Get recent posts for each pubkey to determine activity
     const activityMap = new Map();
-    
-    // Initialize all pubkeys with empty arrays
     pubkeys.forEach(pubkey => {
       activityMap.set(pubkey, []);
     });
     
-    // Use smaller batches to improve reliability 
-    const batchSize = 10;
+    console.log(`🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`);
+    
+    // Balanced approach: reasonable batches, good event coverage, sufficient time window
+    const batchSize = 25; // Balanced batch size
+    const totalBatches = Math.ceil(pubkeys.length / batchSize);
+    
     for (let i = 0; i < pubkeys.length; i += batchSize) {
       const batch = pubkeys.slice(i, i + batchSize);
+      const batchNum = Math.floor(i/batchSize) + 1;
       
       try {
-        // Cast an extremely wide net for activity detection to prevent false positives
-        // Look back much further and include more event types
+        // Comprehensive filter - multiple event types, reasonable time window
         const filter = {
-          kinds: [
-            0,     // Profile metadata
-            1,     // Text notes (posts)
-            2,     // Recommend relay
-            3,     // Contacts (follow lists)
-            4,     // Encrypted DMs
-            5,     // Event deletion
-            6,     // Reposts
-            7,     // Reactions (likes)
-            8,     // Badge award
-            9,     // Group chat message
-            10,    // Group chat threaded reply
-            11,    // Group thread
-            12,    // Group thread reply
-            40,    // Channel creation
-            41,    // Channel metadata
-            42,    // Channel message
-            43,    // Channel hide message
-            44,    // Channel mute user
-            1063,  // File metadata
-            1311,  // Live chat message
-            1984,  // Reporting
-            1985,  // Label
-            9734,  // Zap request
-            9735,  // Zap receipt
-            10000, // Mute list
-            10001, // Pin list
-            10002, // Relay list metadata
-            30000, // People lists
-            30001, // Music lists
-            30008, // Profile badges
-            30009, // Badge definition
-            30017, // Create or update a stall
-            30018, // Create or update a product
-            30023, // Long-form content
-            30024, // Draft long-form content
-            31890, // DVM job request
-            31922, // Date-based calendar event
-            31923, // Time-based calendar event
-            31924, // Calendar
-            31925, // Calendar event RSVP
-            31989, // Handler recommendation
-            31990, // Handler information
-            34550  // Community definition
-          ],
+          kinds: [0, 1, 3, 6, 7, 9735], // Profiles, posts, contacts, reposts, reactions, zaps
           authors: batch,
-          limit: limit * 5, // Even more events per author
-          since: Math.floor((Date.now() - (365 * 24 * 60 * 60 * 1000)) / 1000) // Look back a full year to catch any activity
+          limit: limit * batch.length, // Proportional limit
+          since: Math.floor(Date.now() / 1000) - (120 * 24 * 60 * 60) // 120 days - good balance
         };
         
-        console.log(`🔍 BATCH FILTER: Looking for events since ${new Date(filter.since * 1000).toISOString()} (${Math.floor((Date.now() / 1000 - filter.since) / (24 * 60 * 60))} days ago)`);
+        console.log(`📡 Batch ${batchNum}/${totalBatches}: Scanning ${batch.length} users (balanced approach)...`);
         
-        const batchNum = Math.floor(i/batchSize) + 1;
-        const totalBatches = Math.ceil(pubkeys.length/batchSize);
-        console.log(`Fetching activity for batch ${batchNum}/${totalBatches}...`);
-        
-        // Report progress
+        // Report progress before attempting
         if (progressCallback) {
-          progressCallback({
+          const progressData = {
             total: pubkeys.length,
             processed: i,
-            stage: `Fetching activity batch ${batchNum}/${totalBatches}`,
+            stage: `Scanning batch ${batchNum}/${totalBatches}`,
             currentNpub: batch[0].substring(0, 8) + '...'
-          });
+          };
+          progressCallback(progressData);
         }
         
-        // Shorter timeout for faster failure detection
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 8000)
-        );
-        
-        let events;
-        let retryCount = 0;
-        const maxRetries = 2;
-        
-        while (retryCount <= maxRetries) {
-          try {
-            const attemptTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Request timeout')), 8000)
-            );
-            
-            events = await Promise.race([
-              this.ndk.fetchEvents(filter),
-              attemptTimeoutPromise
-            ]);
-            
-            console.log(`Batch ${Math.floor(i/batchSize) + 1}: Found ${events.size} events for ${batch.length} authors`);
-            break; // Success, exit retry loop
-            
-          } catch (error) {
-            retryCount++;
-            if (retryCount <= maxRetries) {
-              console.log(`Batch ${Math.floor(i/batchSize) + 1} failed (attempt ${retryCount}), retrying...`);
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
-            } else {
-              throw error; // Final failure
-            }
-          }
+        // Balanced timeout approach
+        let events = new Set();
+        try {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 15000) // 15 second timeout
+          );
+          
+          events = await Promise.race([
+            this.ndk.fetchEvents(filter),
+            timeoutPromise
+          ]);
+          
+          console.log(`✅ Batch ${batchNum}: Found ${events.size} events`);
+        } catch (error) {
+          console.warn(`⚠️ Batch ${batchNum} failed: ${error.message}, continuing...`);
+          events = new Set(); // Empty set to continue
         }
         
+        // Process events
         for (const event of events) {
           const pubkey = event.pubkey;
-          
           const currentEvents = activityMap.get(pubkey) || [];
           currentEvents.push({
             id: event.id,
@@ -660,187 +598,58 @@ class NostrService {
             kind: event.kind
           });
           
-          // Sort by most recent and keep only the limit number of events
+          // Sort by most recent and keep only the limit
           currentEvents.sort((a, b) => b.created_at - a.created_at);
           activityMap.set(pubkey, currentEvents.slice(0, limit));
-          
-          // Debug logging for specific problematic users and very recent activity
-          const daysSinceEvent = (Date.now() / 1000 - event.created_at) / (24 * 60 * 60);
-          const debugPrefixes = ['f2aa7b81', '42ca8dc2', '0461fcbe', 'c83723d3', 'd0debf9f'];
-          const isDebugUser = debugPrefixes.some(prefix => pubkey.startsWith(prefix));
-          
-          if (isDebugUser || daysSinceEvent < 90) {
-            console.log(`🔍 SCAN: Found activity for ${pubkey.substring(0, 8)}...: kind=${event.kind}, ${daysSinceEvent.toFixed(1)} days ago, created=${new Date(event.created_at * 1000).toISOString()}`);
-          }
         }
         
-        // Report batch completion progress
+        // Report batch completion with progress update
+        if (progressCallback) {
+          const processed = Math.min(i + batchSize, pubkeys.length);
+          
+          const completionData = {
+            total: pubkeys.length,
+            processed: processed,
+            stage: `Completed batch ${batchNum}/${totalBatches} (${events.size} events)`,
+            currentNpub: ''
+          };
+          progressCallback(completionData);
+        }
+        
+        // Reasonable delay between batches
+        if (i + batchSize < pubkeys.length) {
+          await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
+        }
+        
+      } catch (error) {
+        console.error(`❌ Batch ${batchNum} failed:`, error);
+        
+        // Still report progress even on failure
         if (progressCallback) {
           progressCallback({
+            total: pubkeys.length,
             processed: Math.min(i + batchSize, pubkeys.length),
-            stage: `Completed batch ${batchNum}/${totalBatches} (${events.size} events found)`,
+            stage: `Batch ${batchNum} failed, continuing...`,
             currentNpub: ''
           });
         }
         
-        // Add a small delay between batches to be nice to relays
-        if (i + batchSize < pubkeys.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      } catch (error) {
-        console.error(`Failed to fetch activity for batch starting at ${i}:`, error);
-        // Continue with next batch even if one fails
+        // Continue with next batch
       }
     }
     
     const activeProfiles = Array.from(activityMap.values()).filter(events => events.length > 0).length;
-    const inactiveProfiles = pubkeys.filter(pubkey => {
-      const events = activityMap.get(pubkey) || [];
-      return events.length === 0;
-    });
+    console.log(`📊 Balanced activity scan complete. Found activity for ${activeProfiles} out of ${pubkeys.length} profiles.`);
     
-    console.log(`Initial scan complete. Found activity for ${activeProfiles} out of ${pubkeys.length} profiles.`);
-    
-    // Fallback: Try a second pass for users with no activity found, with broader search
-    if (inactiveProfiles.length > 0) {
-      console.log(`Performing fallback scan for ${inactiveProfiles.length} profiles with no activity...`);
-      
-      const fallbackBatchSize = 5; // Even smaller batches for fallback
-      for (let i = 0; i < inactiveProfiles.length; i += fallbackBatchSize) {
-        const batch = inactiveProfiles.slice(i, i + fallbackBatchSize);
-        
-        try {
-          // Comprehensive fallback search - no time limit, all event types
-          const fallbackFilter = {
-            kinds: [
-              0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-              40, 41, 42, 43, 44,
-              1063, 1311, 1984, 1985,
-              9734, 9735,
-              10000, 10001, 10002,
-              30000, 30001, 30008, 30009, 30017, 30018, 30023, 30024,
-              31890, 31922, 31923, 31924, 31925, 31989, 31990,
-              34550
-            ], // All possible event types
-            authors: batch,
-            limit: 100 // Very high limit for comprehensive search
-            // No 'since' - search all time to find ANY activity
-          };
-          
-          const fallbackBatchNum = Math.floor(i/fallbackBatchSize) + 1;
-          const totalFallbackBatches = Math.ceil(inactiveProfiles.length/fallbackBatchSize);
-          console.log(`Fallback batch ${fallbackBatchNum}/${totalFallbackBatches}...`);
-          
-          // Report fallback progress
-          if (progressCallback) {
-            progressCallback({
-              total: pubkeys.length,
-              processed: pubkeys.length - inactiveProfiles.length + i,
-              stage: `Fallback scan ${fallbackBatchNum}/${totalFallbackBatches} (deeper search)`,
-              currentNpub: batch[0].substring(0, 8) + '...'
-            });
-          }
-          
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Fallback timeout')), 12000)
-          );
-          
-          const events = await Promise.race([
-            this.ndk.fetchEvents(fallbackFilter),
-            timeoutPromise
-          ]);
-          
-          console.log(`Fallback: Found ${events.size} events for ${batch.length} authors`);
-          
-          for (const event of events) {
-            const pubkey = event.pubkey;
-            
-            // Only update if we still have no activity for this pubkey
-            if (!activityMap.get(pubkey) || activityMap.get(pubkey).length === 0) {
-              const currentEvents = activityMap.get(pubkey) || [];
-              currentEvents.push({
-                id: event.id,
-                created_at: event.created_at,
-                content: event.content,
-                kind: event.kind
-              });
-              
-              currentEvents.sort((a, b) => b.created_at - a.created_at);
-              activityMap.set(pubkey, currentEvents.slice(0, limit));
-              
-              console.log(`Fallback found activity for ${pubkey.substring(0, 8)}...: kind=${event.kind}, created=${new Date(event.created_at * 1000).toISOString()}`);
-            }
-          }
-          
-          // Longer delay for fallback to be nice to relays
-          if (i + fallbackBatchSize < inactiveProfiles.length) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          console.error(`Fallback batch failed for batch starting at ${i}:`, error);
-          
-          // Final fallback: try each user individually
-          console.log(`Trying individual queries for batch ${Math.floor(i/fallbackBatchSize) + 1}...`);
-          for (const pubkey of batch) {
-            try {
-              const individualFilter = {
-                kinds: [1], // Just posts for speed
-                authors: [pubkey],
-                limit: 5
-                // No time limit
-              };
-              
-              const individualTimeout = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Individual timeout')), 5000)
-              );
-              
-              const individualEvents = await Promise.race([
-                this.ndk.fetchEvents(individualFilter),
-                individualTimeout
-              ]);
-              
-              if (individualEvents.size > 0) {
-                console.log(`🎯 Individual query found ${individualEvents.size} events for ${pubkey.substring(0, 8)}...`);
-                
-                for (const event of individualEvents) {
-                  const currentEvents = activityMap.get(pubkey) || [];
-                  currentEvents.push({
-                    id: event.id,
-                    created_at: event.created_at,
-                    content: event.content,
-                    kind: event.kind
-                  });
-                  
-                  currentEvents.sort((a, b) => b.created_at - a.created_at);
-                  activityMap.set(pubkey, currentEvents.slice(0, limit));
-                }
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 200)); // Small delay between individuals
-            } catch (individualError) {
-              console.error(`Individual query failed for ${pubkey.substring(0, 8)}...:`, individualError.message);
-            }
-          }
-        }
-      }
-    }
-    
-    const finalActiveProfiles = Array.from(activityMap.values()).filter(events => events.length > 0).length;
-    console.log(`Activity scan complete. Found activity for ${finalActiveProfiles} out of ${pubkeys.length} profiles (improved from ${activeProfiles}).`);
-    
-    // Debug final results for specific users
-    const debugUsers = ['f2aa7b81', 'd0debf9f'];
-    for (const prefix of debugUsers) {
-      const pubkey = pubkeys.find(pk => pk.startsWith(prefix));
-      if (pubkey) {
-        const events = activityMap.get(pubkey) || [];
-        console.log(`🔍 FINAL SCAN RESULT for ${pubkey.substring(0, 8)}...: ${events.length} events found`);
-        if (events.length > 0) {
-          const mostRecent = events[0];
-          const daysSince = (Date.now() / 1000 - mostRecent.created_at) / (24 * 60 * 60);
-          console.log(`  Most recent: kind=${mostRecent.kind}, ${daysSince.toFixed(1)} days ago`);
-        }
-      }
+    // Final progress report
+    if (progressCallback) {
+      const finalData = {
+        total: pubkeys.length,
+        processed: pubkeys.length,
+        stage: 'Activity scanning complete',
+        currentNpub: ''
+      };
+      progressCallback(finalData);
     }
     
     return activityMap;
@@ -1741,20 +1550,171 @@ class NostrService {
 
   /**
    * Get the best relays to scan for a user's activity
-   * Returns write relays (where they publish) + fallback to default relays
+   * Returns write relays (where they publish) + read relays (comprehensive coverage) + fallback to default relays
+   * Enhanced to reduce false positives through better outbox/inbox relay coverage
    */
   getActivityScanRelays(pubkey) {
     const relayList = this.followsRelayLists.get(pubkey);
     if (relayList) {
       const writeRelays = this.getWriteRelays(relayList);
-      if (writeRelays.length > 0) {
-        console.log(`📡 Using ${writeRelays.length} write relays for ${pubkey.substring(0, 8)}...`);
-        return writeRelays;
+      const readRelays = this.getReadRelays(relayList);
+      
+      // Combine write and read relays for comprehensive coverage
+      const combinedRelays = [...new Set([...writeRelays, ...readRelays])];
+      
+      if (combinedRelays.length > 0) {
+        console.log(`📡 Using ${writeRelays.length} write + ${readRelays.length} read relays (${combinedRelays.length} unique) for ${pubkey.substring(0, 8)}...`);
+        return combinedRelays;
       }
     }
     
     // Fallback to default relays if no specific relay list found
     return this.relays;
+  }
+
+  /**
+   * Enhanced activity scanning with parallel relay queries to reduce false positives
+   * Queries both user-specific relays and default relays simultaneously for comprehensive coverage
+   */
+  async getEnhancedUserActivity(pubkeys, progressCallback = null) {
+    console.log(`🔍 ENHANCED SCAN: Starting comprehensive activity scan for ${pubkeys.length} users`);
+    
+    await this.initialize();
+    const results = new Map();
+    
+    // Initialize results map
+    pubkeys.forEach(pubkey => {
+      results.set(pubkey, []);
+    });
+
+    const batchSize = 8; // Smaller batches for parallel processing
+    const totalBatches = Math.ceil(pubkeys.length / batchSize);
+
+    for (let i = 0; i < pubkeys.length; i += batchSize) {
+      const batch = pubkeys.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      
+      console.log(`🔍 Processing enhanced batch ${batchNumber}/${totalBatches} (${batch.length} users)`);
+      
+      if (progressCallback) {
+        progressCallback({
+          stage: `Enhanced scanning batch ${batchNumber}/${totalBatches}...`,
+          processed: i,
+          total: pubkeys.length
+        });
+      }
+
+      // Create parallel queries for each user in the batch
+      const batchPromises = batch.map(pubkey => this.queryUserActivityParallel(pubkey));
+      
+      try {
+        const batchResults = await Promise.allSettled(batchPromises);
+        
+        // Process results
+        batchResults.forEach((result, index) => {
+          const pubkey = batch[index];
+          if (result.status === 'fulfilled' && result.value) {
+            results.set(pubkey, result.value);
+            if (result.value.length > 0) {
+              console.log(`✅ Enhanced scan found ${result.value.length} events for ${pubkey.substring(0, 8)}...`);
+            }
+          } else {
+            console.warn(`⚠️ Enhanced scan failed for ${pubkey.substring(0, 8)}...`);
+          }
+        });
+      } catch (error) {
+        console.error(`Batch ${batchNumber} failed:`, error);
+      }
+
+      // Small delay between batches to prevent overwhelming relays
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+
+    return results;
+  }
+
+  /**
+   * Query user activity from both user-specific and default relays in parallel
+   * This reduces false positives by ensuring comprehensive relay coverage
+   */
+  async queryUserActivityParallel(pubkey) {
+    const userSpecificRelays = this.getActivityScanRelays(pubkey);
+    const defaultRelays = this.relays;
+    
+    // Determine if user has specific relays different from defaults
+    const hasUserSpecificRelays = userSpecificRelays.some(relay => !defaultRelays.includes(relay));
+    
+    const filter = {
+      kinds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063, 1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001, 30008, 30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923, 31924, 31925, 31989, 31990, 34550],
+      authors: [pubkey],
+      since: Math.floor((Date.now() / 1000) - (365 * 24 * 60 * 60)), // Look back 1 year
+      limit: 100
+    };
+
+    const queries = [];
+    
+    // Query 1: User-specific relays (if different from defaults)
+    if (hasUserSpecificRelays) {
+      const userRelayNDK = new (await import('@nostr-dev-kit/ndk')).default({
+        explicitRelayUrls: userSpecificRelays
+      });
+      
+      queries.push(
+        Promise.race([
+          userRelayNDK.connect().then(() => userRelayNDK.fetchEvents(filter)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('User relay timeout')), 8000))
+        ]).catch(error => {
+          console.warn(`User-specific relay query failed for ${pubkey.substring(0, 8)}...:`, error.message);
+          return new Set(); // Return empty set on failure
+        })
+      );
+    }
+
+    // Query 2: Default relays (always query for comprehensive coverage)
+    queries.push(
+      Promise.race([
+        this.ndk.fetchEvents(filter),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Default relay timeout')), 8000))
+      ]).catch(error => {
+        console.warn(`Default relay query failed for ${pubkey.substring(0, 8)}...:`, error.message);
+        return new Set(); // Return empty set on failure
+      })
+    );
+
+    try {
+      // Execute both queries in parallel
+      const queryResults = await Promise.all(queries);
+      
+      // Combine results from all queries, removing duplicates by event ID
+      const allEvents = new Map();
+      
+      queryResults.forEach(eventSet => {
+        if (eventSet && eventSet.size > 0) {
+          for (const event of eventSet) {
+            if (!allEvents.has(event.id)) {
+              allEvents.set(event.id, {
+                id: event.id,
+                created_at: event.created_at,
+                content: event.content,
+                kind: event.kind
+              });
+            }
+          }
+        }
+      });
+
+      const combinedEvents = Array.from(allEvents.values());
+      
+      if (combinedEvents.length > 0) {
+        console.log(`🎯 Parallel query success: Found ${combinedEvents.length} unique events for ${pubkey.substring(0, 8)}... from ${queries.length} relay sets`);
+      }
+      
+      return combinedEvents;
+      
+    } catch (error) {
+      console.error(`Parallel query failed for ${pubkey.substring(0, 8)}...:`, error);
+      return [];
+    }
   }
 
   /**

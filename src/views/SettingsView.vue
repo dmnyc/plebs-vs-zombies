@@ -213,6 +213,23 @@
               Automatically creates a safety backup of your follow list before each scan
             </div>
           </div>
+
+          <!-- Enhanced scanning disabled due to poor results -->
+          <!--
+          <div class="mb-4">
+            <label class="flex items-center gap-3">
+              <input 
+                type="checkbox" 
+                v-model="useEnhancedScanning"
+                class="h-5 w-5 rounded text-zombie-green focus:ring-zombie-green"
+              />
+              <span class="text-gray-300">Enhanced zombie detection (Recommended)</span>
+            </label>
+            <div class="text-xs text-gray-500 mt-1 ml-8">
+              Uses parallel outbox/inbox relay scanning to reduce false positives and improve accuracy
+            </div>
+          </div>
+          -->
         </div>
 
         <div class="border-t border-gray-700 pt-4">
@@ -504,6 +521,7 @@ export default {
       },
       batchSize: 30,
       autoBackupOnScan: true,
+      useEnhancedScanning: false,
       loading: false,
       immunityRecords: [],
       userRelayList: null,
@@ -600,6 +618,9 @@ export default {
         // Save auto backup setting
         localStorage.setItem('autoBackupOnScan', JSON.stringify(this.autoBackupOnScan));
         
+        // Save enhanced scanning setting
+        localStorage.setItem('useEnhancedScanning', JSON.stringify(this.useEnhancedScanning));
+        
         // Save relays
         nostrService.relays = [...this.relays];
         
@@ -623,6 +644,10 @@ export default {
       // Load auto backup setting
       const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
       this.autoBackupOnScan = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
+      
+      // Load enhanced scanning setting
+      const enhancedScanningSetting = localStorage.getItem('useEnhancedScanning');
+      this.useEnhancedScanning = enhancedScanningSetting !== null ? JSON.parse(enhancedScanningSetting) : false;
       
       // Load relays
       this.relays = [...nostrService.relays];

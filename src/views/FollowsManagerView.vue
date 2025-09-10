@@ -35,10 +35,6 @@
               <button @click="createBackup" class="btn-secondary w-full">
                 Create Backup
               </button>
-              
-              <button @click="scanForZombies" class="btn-danger w-full">
-                Scan for Zombies
-              </button>
             </div>
           </div>
           
@@ -175,18 +171,6 @@
                           >
                             {{ follow.profile?.display_name || follow.profile?.name || 'Unknown User' }}
                           </h4>
-                          <span 
-                            v-if="follow.status" 
-                            class="px-2 py-0.5 text-xs rounded-full flex-shrink-0"
-                            :class="{
-                              'bg-pleb-blue text-white': follow.status === 'active',
-                              'bg-yellow-400 text-yellow-900': follow.status === 'fresh',
-                              'bg-orange-500 text-orange-900': follow.status === 'rotting',
-                              'bg-red-500 text-red-900': follow.status === 'ancient'
-                            }"
-                          >
-                            {{ follow.status }}
-                          </span>
                         </div>
                         
                         <!-- Bio -->
@@ -307,7 +291,6 @@ import { format } from 'date-fns';
 import CopyButton from '../components/CopyButton.vue';
 import nostrService from '../services/nostrService';
 import backupService from '../services/backupService';
-import zombieService from '../services/zombieService';
 
 export default {
   name: 'FollowsManagerView',
@@ -424,7 +407,6 @@ export default {
           return {
             pubkey,
             npub: nostrService.hexToNpub(pubkey),
-            status: null, // Will be set when scanning for zombies
             profile: null // Will be populated with profile data
           };
         });
@@ -577,50 +559,6 @@ export default {
           }
           return follow;
         });
-      }
-    },
-    async scanForZombies() {
-      this.loading = true;
-      
-      try {
-        // Get auto backup setting from localStorage
-        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
-        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
-        
-        const result = await zombieService.scanForZombies(true, null, shouldCreateBackup);
-        
-        if (result.success) {
-          // Update the status of each follow
-          const { active, fresh, rotting, ancient } = result.zombieData;
-          
-          this.followList = this.followList.map(follow => {
-            let status = null;
-            
-            if (active.includes(follow.pubkey)) {
-              status = 'active';
-            } else if (fresh.includes(follow.pubkey)) {
-              status = 'fresh';
-            } else if (rotting.includes(follow.pubkey)) {
-              status = 'rotting';
-            } else if (ancient.includes(follow.pubkey)) {
-              status = 'ancient';
-            }
-            
-            return {
-              ...follow,
-              status
-            };
-          });
-          
-          this.successMessage = `Scan complete. Found ${result.zombieCount} zombies out of ${result.totalFollows} follows.`;
-        } else {
-          this.showError(`Failed to scan for zombies: ${result.message}`);
-        }
-      } catch (error) {
-        console.error('Failed to scan for zombies:', error);
-        this.showError('Failed to scan for zombies. See console for details.');
-      } finally {
-        this.loading = false;
       }
     },
     goToPage(page) {
