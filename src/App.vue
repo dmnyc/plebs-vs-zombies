@@ -223,19 +223,21 @@
             </div>
           </label>
           
-          <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg opacity-50 cursor-not-allowed transition-colors">
             <input 
               type="radio" 
               value="nip46" 
               v-model="loginSigningMethod" 
-              class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
+              disabled
+              class="w-5 h-5 text-gray-500 mt-0.5 cursor-not-allowed"
             />
             <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-200">Remote Signer (NIP-46)</span>
-              <p class="text-sm text-gray-400 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
+              <span class="text-lg font-medium text-gray-400">Remote Signer (NIP-46)</span>
+              <p class="text-sm text-gray-500 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
               <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">📱 Mobile friendly</span>
-                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">🔒 Enhanced security</span>
+                <span class="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded">🚧 Coming Soon</span>
+                <span class="text-xs bg-purple-900 text-purple-400 px-2 py-1 rounded opacity-60">📱 Mobile friendly</span>
+                <span class="text-xs bg-yellow-900 text-yellow-400 px-2 py-1 rounded opacity-60">🔒 Enhanced security</span>
               </div>
             </div>
           </label>
