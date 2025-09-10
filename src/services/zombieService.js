@@ -17,7 +17,9 @@ class ZombieService {
       ancient: 365  // 1 year for "ancient" zombie (more conservative)
     };
     this.batchSize = 30;  // Default batch size for unfollows
+    
   }
+
 
   /**
    * Set custom thresholds for zombie classification
@@ -41,6 +43,7 @@ class ZombieService {
    * Classify follows based on their activity and deleted status
    */
   classifyZombies(activityData, profileData = null, progressCallback = null) {
+    
     const now = Date.now() / 1000; // Current time in seconds
     const zombies = {
       burned: [], // Deleted accounts - highest priority for purging
@@ -89,6 +92,7 @@ class ZombieService {
       
       if (progressCallback && shouldReport) {
         this.lastReportedZombieCount = currentZombieCount;
+        
         progressCallback({
           stage: 'Analyzing user activity and deleted accounts...',
           currentNpub: pubkey.substring(0, 8) + '...',
@@ -256,28 +260,41 @@ class ZombieService {
   }
 
   /**
-   * Calculate confidence score for zombie classification
+   * Enhanced confidence score calculation for zombie classification
+   * Incorporates outbox relay coverage and false positive reduction metrics
    * Higher score = more confident in the classification
    * Lower score = uncertain, may need manual review
    */
-  calculateConfidenceScore(events, profile, pubkey) {
+  calculateConfidenceScore(events, profile, pubkey, scanMetrics = {}) {
     let confidence = 0.5; // Start at medium confidence
     
     // Factor 1: Number of events found (more events = higher confidence)
     if (events.length === 0) {
       confidence -= 0.3; // Very low confidence if no events found
+    } else if (events.length >= 10) {
+      confidence += 0.25; // Very high confidence with many events
     } else if (events.length >= 5) {
       confidence += 0.2; // Higher confidence with many events
     } else if (events.length >= 2) {
       confidence += 0.1; // Some confidence with multiple events
     }
     
-    // Factor 2: Relay list availability (having relay list = higher confidence)
+    // Factor 2: Enhanced relay coverage analysis
     const hasRelayList = nostrService.followsRelayLists.has(pubkey);
     if (hasRelayList) {
       confidence += 0.2; // More confident when we know their preferred relays
+      
+      // Additional confidence boost if we successfully scanned their outbox relays
+      if (scanMetrics.scannedUserSpecificRelays) {
+        confidence += 0.1; // Higher confidence when we checked their preferred write/read relays
+      }
+      
+      // Check relay coverage quality
+      if (scanMetrics.relayResponseRate && scanMetrics.relayResponseRate > 0.7) {
+        confidence += 0.05; // Better coverage from relay network
+      }
     } else {
-      confidence -= 0.2; // Less confident when we don't know their relay preferences
+      confidence -= 0.15; // Less confident when we don't know their relay preferences (reduced penalty)
     }
     
     // Factor 3: Profile completeness (complete profile = likely active user)
@@ -294,6 +311,13 @@ class ZombieService {
       if (daySpan > 30) {
         confidence += 0.1; // Activity spread over time indicates consistent usage
       }
+      
+      // Recent activity within 90 days significantly increases confidence
+      const mostRecentActivity = events[0].created_at;
+      const daysSinceRecent = (Date.now() / 1000 - mostRecentActivity) / (24 * 60 * 60);
+      if (daysSinceRecent < 90) {
+        confidence += 0.15; // Recent activity strongly indicates active user
+      }
     }
     
     // Factor 5: Account age (very new accounts might be missed due to indexing delays)
@@ -302,13 +326,284 @@ class ZombieService {
       const accountAge = (Date.now() / 1000 - oldestEvent.created_at) / (24 * 60 * 60);
       if (accountAge < 30) {
         confidence -= 0.1; // Lower confidence for very new accounts
+      } else if (accountAge > 365) {
+        confidence += 0.05; // Slight boost for established accounts
       }
     }
     
+    // Factor 6: Event diversity (different event types suggest active usage)
+    if (events.length > 0) {
+      const uniqueKinds = new Set(events.map(e => e.kind));
+      if (uniqueKinds.size >= 3) {
+        confidence += 0.1; // Multiple event types suggest active engagement
+      } else if (uniqueKinds.size === 2) {
+        confidence += 0.05; // Some diversity in activity
+      }
+    }
+    
+    // Factor 7: Enhanced parallel scan results
+    if (scanMetrics.foundViaEnhancedScan && events.length > 0) {
+      confidence += 0.1; // Bonus confidence when enhanced scanning found activity
+    }
+    
     // Clamp confidence to reasonable bounds
-    confidence = Math.max(0.1, Math.min(0.9, confidence));
+    confidence = Math.max(0.1, Math.min(0.95, confidence));
     
     return Math.round(confidence * 100) / 100; // Round to 2 decimal places
+  }
+
+  /**
+   * Enhanced zombie scanning with improved false positive reduction
+   * Uses standard scanning first, then targeted outbox relay verification for suspected zombies
+   */
+  async scanForZombiesEnhanced(fetchProfiles = true, progressCallback = null, createBackup = true) {
+    console.log('🚀 Starting enhanced zombie scan with false positive reduction...');
+    
+    try {
+      // Initialize tracking for progress reporting
+      this.lastReportedZombieCount = 0;
+      
+      // Initialize immunity service
+      await immunityService.init();
+      
+      // Create backup before scanning (if enabled)
+      if (createBackup) {
+        if (progressCallback) {
+          progressCallback({
+            stage: 'Creating pre-scan backup...',
+            processed: 0,
+            total: 0
+          });
+        }
+        
+        try {
+          const backupService = (await import('./backupService')).default;
+          const backupResult = await backupService.createBackup(`Pre-scan backup (Enhanced) - ${new Date().toISOString()}`);
+          
+          if (!backupResult.success) {
+            console.warn('Failed to create pre-scan backup:', backupResult.message);
+          } else {
+            console.log('✅ Pre-scan backup created successfully');
+          }
+        } catch (error) {
+          console.warn('Failed to create pre-scan backup:', error);
+        }
+      }
+      
+      // Get the user's follow list
+      const allFollows = await nostrService.getFollowList();
+      
+      if (!allFollows || allFollows.length === 0) {
+        return {
+          success: false,
+          message: 'No follows found'
+        };
+      }
+      
+      // Filter out immune users before scanning
+      const immunePubkeys = immunityService.getImmunePubkeys();
+      const followList = allFollows.filter(pubkey => !immunityService.hasImmunity(pubkey));
+      
+      const immuneCount = allFollows.length - followList.length;
+      if (immuneCount > 0) {
+        console.log(`🛡️ Excluded ${immuneCount} immune users from enhanced scan`);
+      }
+      
+      if (followList.length === 0) {
+        return {
+          success: false,
+          message: `All ${allFollows.length} follows are immune from scanning`
+        };
+      }
+
+      console.log(`🔍 Enhanced scanning ${followList.length} follows (${immuneCount} immune users excluded)`);
+
+      // Step 1: Fetch NIP-65 relay lists for all follows (enhanced for better outbox coverage)
+      if (progressCallback) {
+        progressCallback({
+          stage: 'Fetching user relay preferences...',
+          processed: 0,
+          total: followList.length
+        });
+      }
+      
+      const relayListProgress = (progress) => {
+        if (progressCallback) {
+          progressCallback({
+            stage: `Fetching relay preferences... (${progress.processed}/${progress.total})`,
+            processed: progress.processed,
+            total: progress.total
+          });
+        }
+      };
+      
+      await nostrService.fetchFollowsRelayLists(followList, relayListProgress);
+      
+      // Step 2: Standard activity scanning (much faster)
+      if (progressCallback) {
+        progressCallback({
+          stage: 'Initial activity scanning...',
+          processed: 0,
+          total: followList.length
+        });
+      }
+      
+      const activityResults = await nostrService.getProfilesActivity(followList, 10, progressCallback);
+      
+      // Step 3: Identify suspected zombies for deeper verification
+      const suspectedZombies = [];
+      const confirmedActive = [];
+      
+      for (const [pubkey, events] of activityResults.entries()) {
+        if (events.length === 0) {
+          // No activity found - these need deeper verification
+          suspectedZombies.push(pubkey);
+        } else {
+          // Activity found in standard scan - likely active
+          confirmedActive.push({ pubkey, events });
+        }
+      }
+      
+      console.log(`🔍 Standard scan complete: ${confirmedActive.length} confirmed active, ${suspectedZombies.length} suspected zombies need verification`);
+      
+      // Step 4: Enhanced verification for suspected zombies only
+      let verificationResults = new Map();
+      if (suspectedZombies.length > 0) {
+        if (progressCallback) {
+          progressCallback({
+            stage: `Enhanced verification of ${suspectedZombies.length} suspected zombies...`,
+            processed: confirmedActive.length,
+            total: followList.length
+          });
+        }
+        
+        // Use smart relay retry (existing method) for suspected zombies
+        verificationResults = await nostrService.smartRelayRetry(suspectedZombies, progressCallback);
+        
+        // Merge verification results
+        for (const [pubkey, events] of verificationResults.entries()) {
+          if (events.length > 0) {
+            confirmedActive.push({ pubkey, events });
+            console.log(`✅ Enhanced verification rescued ${pubkey.substring(0, 8)}... from false positive (${events.length} events found)`);
+          } else {
+            // Still no activity - likely genuine zombie
+            activityResults.set(pubkey, []);
+          }
+        }
+      }
+      
+      const rescuedFromFalsePositives = Array.from(verificationResults.entries()).filter(([_, events]) => events.length > 0).length;
+      console.log(`🎯 Enhanced verification complete: ${confirmedActive.length} total active, ${rescuedFromFalsePositives} rescued from false positives`);
+      
+      // Update activity results with verification data
+      confirmedActive.forEach(({ pubkey, events }) => {
+        activityResults.set(pubkey, events);
+      });
+      
+      // Step 5: Process results with enhanced confidence scoring
+      const zombies = { active: [], burned: [], fresh: [], rotting: [], ancient: [] };
+      const scanStats = {
+        totalUsers: followList.length,
+        usersWithRelayLists: 0,
+        enhancedScansSuccessful: 0,
+        totalEventsFound: 0
+      };
+
+      for (const [pubkey, events] of activityResults.entries()) {
+        const hasRelayList = nostrService.followsRelayLists.has(pubkey);
+        if (hasRelayList) scanStats.usersWithRelayLists++;
+        
+        if (events.length > 0) {
+          scanStats.enhancedScansSuccessful++;
+          scanStats.totalEventsFound += events.length;
+        }
+        
+        // Get user profile if available
+        const profile = nostrService.follows.get(pubkey);
+        
+        // Enhanced confidence calculation with scan metrics
+        const wasVerified = confirmedActive.some(item => item.pubkey === pubkey);
+        const scanMetrics = {
+          scannedUserSpecificRelays: hasRelayList,
+          foundViaEnhancedScan: wasVerified,
+          relayResponseRate: hasRelayList ? 0.8 : 0.6 // Estimated based on relay list availability
+        };
+        
+        const confidence = this.calculateConfidenceScore(events, profile, pubkey, scanMetrics);
+        
+        // Create zombie info with enhanced metrics
+        const zombieInfo = {
+          pubkey,
+          profile,
+          lastActivity: events.length > 0 ? events[0].created_at : null,
+          daysSinceActivity: events.length > 0 ? Math.floor((Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60)) : null,
+          confidence,
+          scanMetrics,
+          eventCount: events.length,
+          eventTypes: events.length > 0 ? [...new Set(events.map(e => e.kind))] : []
+        };
+
+        // Enhanced classification with improved thresholds
+        if (events.length === 0) {
+          // No activity found - classify as ancient zombie
+          zombieInfo.daysSinceActivity = 999; // Unknown/no activity
+          zombieInfo.type = 'ancient';
+          zombies.ancient.push(zombieInfo);
+          console.log(`User ${pubkey.substring(0, 8)}... is ANCIENT zombie: no activity found (confidence: ${confidence})`);
+        } else {
+          // Activity found - classify by recency with enhanced logic
+          const daysSinceLastActivity = Math.floor((Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60));
+          
+          // Use more conservative thresholds to reduce false positives
+          const conservativeThreshold = 90; // Very conservative - 90 days for "active"
+          
+          if (daysSinceLastActivity < conservativeThreshold) {
+            zombieInfo.type = 'active';
+            zombies.active.push(zombieInfo);
+            console.log(`User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+          } else if (daysSinceLastActivity >= this.zombieThresholds.ancient) {
+            zombieInfo.type = 'ancient';
+            zombies.ancient.push(zombieInfo);
+            console.log(`User ${pubkey.substring(0, 8)}... is ANCIENT zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+          } else if (daysSinceLastActivity >= this.zombieThresholds.rotting) {
+            zombieInfo.type = 'rotting';
+            zombies.rotting.push(zombieInfo);
+            console.log(`User ${pubkey.substring(0, 8)}... is ROTTING zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+          } else if (daysSinceLastActivity >= this.zombieThresholds.fresh) {
+            zombieInfo.type = 'fresh';
+            zombies.fresh.push(zombieInfo);
+            console.log(`User ${pubkey.substring(0, 8)}... is FRESH zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+          } else {
+            zombieInfo.type = 'active';
+            zombies.active.push(zombieInfo);
+            console.log(`User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+          }
+        }
+      }
+
+      const totalZombies = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+      console.log(`🎯 Enhanced scan complete: active=${zombies.active.length}, burned=${zombies.burned.length}, fresh=${zombies.fresh.length}, rotting=${zombies.rotting.length}, ancient=${zombies.ancient.length}`);
+      console.log(`📊 Scan stats: ${scanStats.usersWithRelayLists}/${scanStats.totalUsers} had relay lists, ${scanStats.enhancedScansSuccessful} successful enhanced scans, ${scanStats.totalEventsFound} total events found`);
+
+      return {
+        success: true,
+        zombieData: zombies,
+        totalFollows: allFollows.length,
+        scannedFollows: followList.length,
+        immuneCount: immuneCount,
+        zombieCount: totalZombies,
+        scanStats,
+        enhancedScan: true
+      };
+
+    } catch (error) {
+      console.error('Enhanced zombie scan failed:', error);
+      return {
+        success: false,
+        message: error.message,
+        enhancedScan: true
+      };
+    }
   }
 
   /**
@@ -482,7 +777,7 @@ class ZombieService {
           });
         }
         console.log('Fetching profile metadata for deleted account detection...');
-        profileData = await nostrService.getProfileMetadata(followList);
+        profileData = await nostrService.getProfileMetadata(followList, progressCallback);
       }
       
       // Classify zombies

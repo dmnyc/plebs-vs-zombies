@@ -92,6 +92,11 @@
             >
               Stop Scan
             </button>
+            
+            <!-- Easter Egg / Patience Message -->
+            <div v-if="scanning" class="text-center mt-3">
+              <p class="text-sm text-gray-400">{{ currentEasterEgg || 'This may take time, please be patient.' }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -210,6 +215,7 @@ import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
 import backupService from '../services/backupService';
+import easterEggData from '../data/easterEggs.js';
 
 export default {
   name: 'DashboardView',
@@ -253,7 +259,14 @@ export default {
         title: '',
         message: '',
         type: 'info'
-      }
+      },
+      currentEasterEgg: '',
+      
+      // Easter egg arrays - loaded from external JSON file
+      firstPassEasterEggs: [],
+      phase2EasterEggs: [],
+      zombieEasterEggs: [],
+      aggressiveEasterEggs: []
     };
   },
   computed: {
@@ -268,6 +281,74 @@ export default {
     }
   },
   methods: {
+    // Simple Easter Egg Methods
+    updateEasterEgg() {
+      const currentStage = this.scanProgress.stage || '';
+      const processedCount = this.scanProgress.processed || 0;
+      
+      console.log(`DEBUG: processed=${processedCount}, stage="${currentStage}"`);
+      
+      // Debug: Log stage and processed count
+      if (processedCount >= 300) {
+        console.log(`DEBUG Easter Egg: processed=${processedCount}, stage="${currentStage}"`);
+      }
+      
+      // Determine which phase we're in and use appropriate messages
+      let messages = [];
+      let threshold = 0;
+      let interval = 0;
+      
+      // Zombie scan phase (final phase)
+      if (currentStage.includes('Found') && (currentStage.includes('zombie') || currentStage.includes('burned') || currentStage.includes('ancient') || currentStage.includes('rotting') || currentStage.includes('fresh')) || currentStage.includes('Analyzing user activity') || currentStage.includes('Classifying zombie')) {
+        messages = this.zombieEasterEggs;
+        threshold = 50;
+        interval = 50;
+      }
+      // Smart retry / enhanced verification phase
+      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification')) {
+        messages = this.aggressiveEasterEggs;
+        threshold = 50;
+        interval = 80;
+      }
+      // Aggressive retry phase
+      else if (currentStage.includes('Aggressive retry')) {
+        messages = this.zombieEasterEggs;
+        threshold = 50;
+        interval = 50;
+      }
+      // Batch scanning phase
+      else if (currentStage.includes('Scanning batch') || currentStage.includes('Completed batch')) {
+        messages = this.phase2EasterEggs;
+        threshold = 200;
+        interval = 200;
+      }
+      // First pass phases
+      else if (currentStage.includes('Initial activity') || currentStage.includes('Fetching relay lists') || currentStage.includes('Fetching activity data')) {
+        messages = this.firstPassEasterEggs;
+        threshold = 300;
+        interval = 300;
+      }
+      // Default to phase2 for any unrecognized stage
+      else {
+        messages = this.phase2EasterEggs;
+        threshold = 200;
+        interval = 200;
+      }
+      
+      
+      // Calculate and set the easter egg
+      if (processedCount >= threshold && messages.length > 0) {
+        const index = Math.floor((processedCount - threshold) / interval);
+        if (index < messages.length) {
+          this.currentEasterEgg = messages[index];
+        } else {
+          this.currentEasterEgg = messages[messages.length - 1];
+        }
+      } else {
+        this.currentEasterEgg = '';
+      }
+    },
+    
     // Alert Modal Methods
     showAlert(title, message, type = 'info') {
       this.alertModal = {
@@ -340,8 +421,9 @@ export default {
     async scanForZombies() {
       this.scanning = true;
       this.scanCancelled = false;
+      this.currentEasterEgg = '';
       
-      // Reset progress (matching Hunt Zombies page)
+      // Reset progress
       this.scanProgress = {
         total: 0,
         processed: 0,
@@ -350,11 +432,19 @@ export default {
       };
       
       try {
-        // Get auto backup setting from localStorage
+        // Get settings from localStorage
         const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
         const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
         
-        const result = await zombieService.scanForZombies(true, (progress) => {
+        const enhancedScanningSetting = localStorage.getItem('useEnhancedScanning');
+        const useEnhancedScanning = enhancedScanningSetting !== null ? JSON.parse(enhancedScanningSetting) : false;
+        
+        // Choose scanning method based on user preference
+        const scanMethod = useEnhancedScanning ? 'scanForZombiesEnhanced' : 'scanForZombies';
+        console.log(`🔍 Using ${useEnhancedScanning ? 'Enhanced' : 'Standard'} zombie scanning method`);
+        
+        const result = await zombieService[scanMethod](true, (progress) => {
+          console.log('DEBUG: Progress callback called with:', progress);
           // Check if scan was cancelled
           if (this.scanCancelled) {
             throw new Error('Scan cancelled by user');
@@ -364,6 +454,10 @@ export default {
             ...this.scanProgress,
             ...progress
           };
+          
+          console.log('DEBUG: About to call updateEasterEgg');
+          // Update easter egg
+          this.updateEasterEgg();
         }, shouldCreateBackup);
         
         if (result.success) {
@@ -401,12 +495,14 @@ export default {
           this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
         }
       } finally {
+        this.currentEasterEgg = '';
         this.scanning = false;
       }
     },
     stopScan() {
       this.scanCancelled = true;
       this.scanning = false;
+      this.currentEasterEgg = '';
       console.log('Zombie scan stopped by user');
     },
     async loadRecentActivity() {
@@ -535,6 +631,12 @@ export default {
     }
   },
   async mounted() {
+    // Load easter egg messages from external file
+    this.firstPassEasterEggs = easterEggData.firstPass;
+    this.phase2EasterEggs = easterEggData.phase2;
+    this.zombieEasterEggs = easterEggData.zombie;
+    this.aggressiveEasterEggs = easterEggData.aggressive;
+    
     // Check if first-time user before loading dashboard data
     await this.checkFirstTimeUser();
     await this.loadDashboardData();

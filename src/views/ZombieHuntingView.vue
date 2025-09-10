@@ -29,7 +29,7 @@
             </div>
             
             <div class="mb-4">
-              <label class="block text-gray-300 mb-2">Batch Size</label>
+              <label class="block text-gray-300 mb-2">Unfollow Batch Size</label>
               <div class="flex items-center">
                 <input 
                   type="range" 
@@ -42,7 +42,7 @@
                 <span class="text-zombie-green font-bold">{{ batchSize }}</span>
               </div>
               <p class="text-sm text-gray-400 mt-1">
-                Recommended: 30 zombies per batch
+                How many zombies to unfollow at once (recommended: 30)
               </p>
             </div>
             
@@ -166,9 +166,9 @@
               </div>
             </div>
             
-            <!-- Patience Message -->
+            <!-- Easter Egg / Patience Message -->
             <div class="text-center mb-4">
-              <p class="text-sm text-gray-400">This may take time, please be patient.</p>
+              <p class="text-sm text-gray-400">{{ currentEasterEgg || 'This may take time, please be patient.' }}</p>
               <p class="text-xs text-gray-500 mt-1">Analyzing activity across multiple relays...</p>
             </div>
             
@@ -288,6 +288,7 @@ import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
 import backupService from '../services/backupService';
+import easterEggData from '../data/easterEggs.js';
 import { nip19 } from 'nostr-tools';
 
 export default {
@@ -332,6 +333,14 @@ export default {
         rotting: 0,
         ancient: 0
       },
+      currentEasterEgg: '',
+      
+      // Easter egg arrays - loaded from external JSON file
+      firstPassEasterEggs: [],
+      phase2EasterEggs: [],
+      zombieEasterEggs: [],
+      aggressiveEasterEggs: [],
+      lastEasterEggIndex: -1,
       confirmModal: {
         show: false,
         title: '',
@@ -406,6 +415,68 @@ export default {
     }
   },
   methods: {
+    // Easter Egg Methods
+    
+    updateEasterEgg() {
+      const currentStage = this.scanProgress.stage || '';
+      const processedCount = this.scanProgress.processed || 0;
+      
+      // Determine which phase we're in and use appropriate messages
+      let messages = [];
+      let threshold = 0;
+      let interval = 0;
+      
+      // Zombie scan phase (final phase)
+      if (currentStage.includes('Found') && (currentStage.includes('zombie') || currentStage.includes('burned') || currentStage.includes('ancient') || currentStage.includes('rotting') || currentStage.includes('fresh')) || currentStage.includes('Analyzing user activity') || currentStage.includes('Classifying zombie')) {
+        messages = this.zombieEasterEggs;
+        threshold = 50;
+        interval = 50;
+      }
+      // Smart retry / enhanced verification phase
+      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification')) {
+        messages = this.aggressiveEasterEggs;
+        threshold = 50;
+        interval = 80;
+      }
+      // Aggressive retry phase
+      else if (currentStage.includes('Aggressive retry')) {
+        messages = this.zombieEasterEggs;
+        threshold = 50;
+        interval = 50;
+      }
+      // Batch scanning phase
+      else if (currentStage.includes('Scanning batch') || currentStage.includes('Completed batch')) {
+        messages = this.phase2EasterEggs;
+        threshold = 200;
+        interval = 200;
+      }
+      // First pass phases
+      else if (currentStage.includes('Initial activity') || currentStage.includes('Fetching relay lists') || currentStage.includes('Fetching activity data')) {
+        messages = this.firstPassEasterEggs;
+        threshold = 300;
+        interval = 300;
+      }
+      // Default to phase2 for any unrecognized stage
+      else {
+        messages = this.phase2EasterEggs;
+        threshold = 200;
+        interval = 200;
+      }
+      
+      
+      // Calculate and set the easter egg
+      if (processedCount >= threshold && messages.length > 0) {
+        const index = Math.floor((processedCount - threshold) / interval);
+        if (index < messages.length) {
+          this.currentEasterEgg = messages[index];
+        } else {
+          this.currentEasterEgg = messages[messages.length - 1];
+        }
+      } else {
+        this.currentEasterEgg = '';
+      }
+    },
+    
     // Confirmation Modal Methods
     showConfirm(title, message, type = 'warning', confirmText = 'OK', cancelText = 'Cancel') {
       return new Promise((resolve) => {
@@ -512,6 +583,7 @@ export default {
       this.scanning = true;
       this.scanComplete = false;
       this.scanCancelled = false;
+      this.currentEasterEgg = '';
       
       // Reset progress
       this.scanProgress = {
@@ -525,12 +597,19 @@ export default {
         // Update batch size in the service
         zombieService.setBatchSize(this.batchSize);
         
-        // Get auto backup setting from localStorage
+        // Get settings from localStorage
         const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
         const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
         
+        const enhancedScanningSetting = localStorage.getItem('useEnhancedScanning');
+        const useEnhancedScanning = enhancedScanningSetting !== null ? JSON.parse(enhancedScanningSetting) : false;
+        
+        // Choose scanning method based on user preference
+        const scanMethod = useEnhancedScanning ? 'scanForZombiesEnhanced' : 'scanForZombies';
+        console.log(`🔍 Using ${useEnhancedScanning ? 'Enhanced' : 'Standard'} zombie scanning method`);
+        
         // Perform the scan with progress callback
-        const result = await zombieService.scanForZombies(true, (progress) => {
+        const result = await zombieService[scanMethod](true, (progress) => {
           // Check if scan was cancelled
           if (this.scanCancelled) {
             throw new Error('Scan cancelled by user');
@@ -540,6 +619,9 @@ export default {
             ...this.scanProgress,
             ...progress
           };
+          
+          // Update easter egg
+          this.updateEasterEgg();
         }, shouldCreateBackup);
         
         if (result.success && !this.scanCancelled) {
@@ -569,12 +651,14 @@ export default {
           this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
         }
       } finally {
+        this.currentEasterEgg = '';
         this.scanning = false;
       }
     },
     stopScan() {
       this.scanCancelled = true;
       this.scanning = false;
+      this.resetEasterEggs();
       console.log('Zombie scan stopped by user');
     },
     getScanProgressLabel() {
@@ -890,6 +974,12 @@ export default {
     }
   },
   mounted() {
+    // Load easter egg messages from external file
+    this.firstPassEasterEggs = easterEggData.firstPass;
+    this.phase2EasterEggs = easterEggData.phase2;
+    this.zombieEasterEggs = easterEggData.zombie;
+    this.aggressiveEasterEggs = easterEggData.aggressive;
+    
     this.loadInitialData();
   }
 };

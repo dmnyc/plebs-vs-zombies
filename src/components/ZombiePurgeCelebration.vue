@@ -32,22 +32,22 @@
         <!-- Detailed Stats -->
         <div class="bg-gray-900 rounded-lg p-4">
           <h4 class="text-lg font-semibold mb-3 text-gray-200">Purge Breakdown:</h4>
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div v-if="purgeStats.burned > 0" class="flex justify-between">
+          <div class="space-y-2 text-sm">
+            <div v-if="purgeStats.burned > 0" class="flex justify-between items-center">
               <span class="text-red-300">🔥 Burned (deleted):</span>
-              <span class="font-bold">{{ purgeStats.burned }}</span>
+              <span class="font-bold text-lg">{{ purgeStats.burned }}</span>
             </div>
-            <div v-if="purgeStats.ancient > 0" class="flex justify-between">
+            <div v-if="purgeStats.ancient > 0" class="flex justify-between items-center">
               <span class="text-red-500">💀 Ancient (365+ days):</span>
-              <span class="font-bold">{{ purgeStats.ancient }}</span>
+              <span class="font-bold text-lg">{{ purgeStats.ancient }}</span>
             </div>
-            <div v-if="purgeStats.rotting > 0" class="flex justify-between">
+            <div v-if="purgeStats.rotting > 0" class="flex justify-between items-center">
               <span class="text-orange-500">🧟‍♂️ Rotting (180+ days):</span>
-              <span class="font-bold">{{ purgeStats.rotting }}</span>
+              <span class="font-bold text-lg">{{ purgeStats.rotting }}</span>
             </div>
-            <div v-if="purgeStats.fresh > 0" class="flex justify-between">
+            <div v-if="purgeStats.fresh > 0" class="flex justify-between items-center">
               <span class="text-yellow-400">🧟‍♀️ Fresh (90+ days):</span>
-              <span class="font-bold">{{ purgeStats.fresh }}</span>
+              <span class="font-bold text-lg">{{ purgeStats.fresh }}</span>
             </div>
           </div>
           
@@ -60,11 +60,11 @@
             <!-- Visual Zombie Score bar -->
             <div class="flex gap-1">
               <span 
-                v-for="(square, index) in scoreBarEmojis" 
+                v-for="(square, index) in scoreBarSquares" 
                 :key="index" 
                 class="text-sm"
+                v-html="square"
               >
-                {{ square }}
               </span>
             </div>
           </div>
@@ -123,7 +123,10 @@
           <div class="flex flex-wrap gap-2">
             <button 
               @click="followDeveloper"
-              class="text-xs px-3 py-1 bg-purple-700 hover:bg-purple-600 rounded-full transition-colors"
+              class="text-xs px-3 py-1 rounded-full transition-colors"
+              style="background-color: #8e30eb;"
+              onmouseover="this.style.backgroundColor='#7a2bc7'"
+              onmouseout="this.style.backgroundColor='#8e30eb'"
             >
               View on GitHub 👨‍💻
             </button>
@@ -134,6 +137,12 @@
             >
               Follow on Nostr 🟣
             </a>
+            <button 
+              @click="showZapModal"
+              class="text-xs px-3 py-1 bg-yellow-600 hover:bg-yellow-500 rounded-full transition-colors inline-flex items-center gap-1"
+            >
+              ⚡ Zap Creator
+            </button>
           </div>
         </div>
       </div>
@@ -149,6 +158,78 @@
         >
           Close
         </button>
+      </div>
+    </div>
+
+    <!-- Zap Modal -->
+    <div 
+      v-if="zapModal.show" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+      @click="closeZapModal"
+    >
+      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-yellow-400 flex items-center gap-2">
+            ⚡ Zap the Creator
+          </h3>
+          <button 
+            @click="closeZapModal"
+            class="text-gray-400 hover:text-gray-200 text-xl"
+          >
+            ×
+          </button>
+        </div>
+        
+        <p class="text-sm text-gray-300 mb-4">
+          Support the development of Plebs vs Zombies! Send sats via Lightning Network.
+        </p>
+        
+        <!-- QR Code -->
+        <div class="flex justify-center">
+          <div class="bg-white p-4 rounded-lg">
+            <img 
+              :src="zapModal.qrCode" 
+              alt="Lightning Address QR Code"
+              class="w-48 h-48"
+            />
+          </div>
+        </div>
+        
+        <!-- Lightning Address -->
+        <div class="space-y-2">
+          <div class="text-sm text-gray-400">Lightning Address:</div>
+          <div class="flex items-center gap-2">
+            <code class="bg-gray-800 px-3 py-2 rounded text-yellow-400 text-sm flex-grow text-center">
+              {{ zapModal.lightningAddress }}
+            </code>
+            <button 
+              @click="copyLightningAddress"
+              class="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded"
+              title="Copy Lightning Address"
+            >
+              📋
+            </button>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-3 mt-6">
+          <button 
+            @click="zapOnNostr"
+            class="flex-1 text-white px-4 py-2 rounded transition-colors text-sm"
+            style="background-color: #8e30eb;"
+            onmouseover="this.style.backgroundColor='#7a2bc7'"
+            onmouseout="this.style.backgroundColor='#8e30eb'"
+          >
+            Zap on Nostr
+          </button>
+          <button 
+            @click="closeZapModal"
+            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded transition-colors text-sm"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -184,7 +265,12 @@ export default {
       posting: false,
       posted: false,
       copied: false,
-      developerNpub: 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h'
+      developerNpub: 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h',
+      zapModal: {
+        show: false,
+        lightningAddress: 'plebsvszombies@rizful.com',
+        qrCode: ''
+      }
     };
   },
   computed: {
@@ -212,6 +298,42 @@ https://plebs-vs-zombies.vercel.app`;
 
       return message;
     },
+    scoreBarSquares() {
+      // Create HTML-based colored squares for the UI display
+      const squares = [];
+      const totalSquares = 14;
+      
+      if (!this.prePurgeStats) {
+        const healthySquares = Math.floor((100 - this.zombieScore) / 100 * totalSquares);
+        const zombieSquares = totalSquares - healthySquares;
+        
+        for (let i = 0; i < healthySquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
+        for (let i = 0; i < zombieSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-red-500"></span>');
+        
+        return squares.slice(0, totalSquares);
+      }
+      
+      const totalFollows = this.prePurgeStats.totalFollows;
+      const activeCount = this.prePurgeStats.activeCount || (totalFollows - this.prePurgeStats.totalZombies);
+      const burnedCount = this.prePurgeStats.burnedCount || 0;
+      const freshCount = this.prePurgeStats.freshCount || 0;
+      const rottingCount = this.prePurgeStats.rottingCount || 0;
+      const ancientCount = this.prePurgeStats.ancientCount || 0;
+      
+      const activeSquares = Math.round((activeCount / totalFollows) * totalSquares);
+      const freshSquares = Math.round((freshCount / totalFollows) * totalSquares);
+      const rottingSquares = Math.round((rottingCount / totalFollows) * totalSquares);
+      const ancientSquares = Math.round((ancientCount / totalFollows) * totalSquares);
+      const burnedSquares = totalSquares - activeSquares - freshSquares - rottingSquares - ancientSquares;
+
+      for (let i = 0; i < activeSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
+      for (let i = 0; i < freshSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span>');
+      for (let i = 0; i < rottingSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-orange-500"></span>');
+      for (let i = 0; i < ancientSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-red-500"></span>');
+      for (let i = 0; i < Math.max(0, burnedSquares); i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #92400e;"></span>');
+
+      return squares.slice(0, totalSquares);
+    },
     scoreBarEmojis() {
       // Create visual score bar matching the UI display
       const bars = [];
@@ -223,7 +345,7 @@ https://plebs-vs-zombies.vercel.app`;
         const healthyBars = Math.floor((100 - this.zombieScore) / 100 * totalBars);
         const zombieBars = totalBars - healthyBars;
         
-        for (let i = 0; i < healthyBars; i++) bars.push('🟦');
+        for (let i = 0; i < healthyBars; i++) bars.push('🟪');
         for (let i = 0; i < zombieBars; i++) bars.push('🟥');
         
         return bars.slice(0, totalBars);
@@ -247,8 +369,8 @@ https://plebs-vs-zombies.vercel.app`;
       const ancientBars = Math.round((ancientCount / totalFollows) * totalBars);
       const burnedBars = totalBars - activeBars - freshBars - rottingBars - ancientBars;
 
-      // Add bars in order: active (blue), fresh (yellow), rotting (orange), ancient (red), burned (dark red-brown)
-      for (let i = 0; i < activeBars; i++) bars.push('🟦');
+      // Add bars in order: active (purple), fresh (yellow), rotting (orange), ancient (red), burned (dark red-brown)
+      for (let i = 0; i < activeBars; i++) bars.push('🟪');
       for (let i = 0; i < freshBars; i++) bars.push('🟨');
       for (let i = 0; i < rottingBars; i++) bars.push('🟧');
       for (let i = 0; i < ancientBars; i++) bars.push('🟥');
@@ -272,6 +394,7 @@ https://plebs-vs-zombies.vercel.app`;
           kind: 1, // Note
           created_at: Math.floor(Date.now() / 1000),
           tags: [
+            ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
             ['t', 'PlebsVsZombies'],
             ['t', 'nostr'],
             ['t', 'zombiehunting']
@@ -282,8 +405,14 @@ https://plebs-vs-zombies.vercel.app`;
         // Sign and publish the event
         const signedEvent = await window.nostr.signEvent(event);
         
-        // Publish via our service
+        // Publish via our service using user's preferred relays
         await nostrService.initialize();
+        
+        // Ensure user's relay list is loaded for optimal publishing
+        if (!nostrService.userRelayList) {
+          await nostrService.fetchUserRelayList();
+        }
+        
         const publishResults = await nostrService.publishEventToRelays(signedEvent);
         
         if (publishResults.successful > 0) {
@@ -339,6 +468,45 @@ https://plebs-vs-zombies.vercel.app`;
       // Open GitHub repository in new tab
       const githubUrl = 'https://github.com/dmnyc/plebs-vs-zombies';
       window.open(githubUrl, '_blank');
+    },
+
+    showZapModal() {
+      // Generate QR code for the Lightning address
+      this.generateQRCode();
+      this.zapModal.show = true;
+    },
+
+    closeZapModal() {
+      this.zapModal.show = false;
+    },
+
+    generateQRCode() {
+      // Generate QR code URL using a QR service
+      const lightningAddress = this.zapModal.lightningAddress;
+      this.zapModal.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('lightning:' + lightningAddress)}`;
+    },
+
+    copyLightningAddress() {
+      navigator.clipboard.writeText(this.zapModal.lightningAddress)
+        .then(() => {
+          // Show brief success feedback
+          const button = event.target;
+          const originalText = button.innerHTML;
+          button.innerHTML = '✅';
+          setTimeout(() => {
+            button.innerHTML = originalText;
+          }, 1500);
+        })
+        .catch(err => {
+          console.error('Failed to copy Lightning address:', err);
+        });
+    },
+
+    zapOnNostr() {
+      const creatorNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
+      
+      // Use jumble.social consistently
+      window.open(`https://jumble.social/users/${creatorNpub}`, '_blank');
     }
   },
   emits: ['close']
