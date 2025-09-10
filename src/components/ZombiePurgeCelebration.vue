@@ -235,14 +235,29 @@
         </div>
       </div>
     </div>
+
+    <!-- Status Modal -->
+    <ConfirmModal
+      :show="statusModal.show"
+      :title="statusModal.title"
+      :message="statusModal.message"
+      :type="statusModal.type"
+      confirmText="OK"
+      @confirm="closeStatusModal"
+      @cancel="closeStatusModal"
+    />
   </div>
 </template>
 
 <script>
 import nostrService from '../services/nostrService';
+import ConfirmModal from './ConfirmModal.vue';
 
 export default {
   name: 'ZombiePurgeCelebration',
+  components: {
+    ConfirmModal
+  },
   props: {
     purgeResult: {
       type: Object,
@@ -273,6 +288,12 @@ export default {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
         qrCode: ''
+      },
+      statusModal: {
+        show: false,
+        title: '',
+        message: '',
+        type: 'success'
       }
     };
   },
@@ -420,7 +441,7 @@ https://plebs-vs-zombies.vercel.app`;
         
         if (publishResults.successful > 0) {
           this.posted = true;
-          alert(`🎉 Posted successfully to ${publishResults.successful} relays! Your zombie hunting victory is now public!`);
+          this.showStatusModal('Success!', `🎉 Posted successfully to ${publishResults.successful} relays! Your zombie hunting victory is now public!`, 'success');
         } else {
           throw new Error('Failed to publish to any relays');
         }
@@ -435,7 +456,7 @@ https://plebs-vs-zombies.vercel.app`;
           errorMessage = 'Posting timed out. Please try again or copy the message to post manually.';
         }
         
-        alert(errorMessage);
+        this.showStatusModal('Error', errorMessage, 'error');
       } finally {
         this.posting = false;
       }
@@ -461,7 +482,7 @@ https://plebs-vs-zombies.vercel.app`;
           this.copied = true;
           setTimeout(() => { this.copied = false; }, 3000);
         } catch (e) {
-          alert('Unable to copy to clipboard. Please copy the message manually.');
+          this.showStatusModal('Error', 'Unable to copy to clipboard. Please copy the message manually.', 'error');
         }
         document.body.removeChild(textArea);
       }
@@ -510,6 +531,17 @@ https://plebs-vs-zombies.vercel.app`;
       
       // Use jumble.social consistently
       window.open(`https://jumble.social/users/${creatorNpub}`, '_blank');
+    },
+
+    showStatusModal(title, message, type = 'info') {
+      this.statusModal.title = title;
+      this.statusModal.message = message;
+      this.statusModal.type = type;
+      this.statusModal.show = true;
+    },
+
+    closeStatusModal() {
+      this.statusModal.show = false;
     }
   },
   emits: ['close']
