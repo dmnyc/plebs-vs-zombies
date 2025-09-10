@@ -195,16 +195,99 @@
     </header>
 
     <main class="container mx-auto px-4 py-8 flex-grow">
-      <div v-if="!isConnected" class="card max-w-xl mx-auto my-12 text-center">
-        <h2 class="text-2xl mb-6">Connect to start hunting zombies!</h2>
-        <p class="mb-8">Connect your Nostr extension to manage your dormant follows and clean up your follow list.</p>
-        <button @click="connectNostr" class="btn-primary text-lg">Connect to Nostr</button>
+      <div v-if="!isConnected" class="card max-w-2xl mx-auto my-12">
+        <div class="text-center mb-8">
+          <div class="text-6xl mb-6">🧟‍♂️</div>
+          <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
+          <p class="text-gray-300">Choose your signing method to connect and manage your dormant follows.</p>
+        </div>
+        
+        <!-- Signing Method Selection -->
+        <div class="space-y-4 mb-8">
+          <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
+          
+          <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+            <input 
+              type="radio" 
+              value="nip07" 
+              v-model="loginSigningMethod" 
+              class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
+            />
+            <div class="flex-grow">
+              <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
+              <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
+                <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
+              </div>
+            </div>
+          </label>
+          
+          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg opacity-50 cursor-not-allowed transition-colors">
+            <input 
+              type="radio" 
+              value="nip46" 
+              v-model="loginSigningMethod" 
+              disabled
+              class="w-5 h-5 text-gray-500 mt-0.5 cursor-not-allowed"
+            />
+            <div class="flex-grow">
+              <span class="text-lg font-medium text-gray-400">Remote Signer (NIP-46)</span>
+              <p class="text-sm text-gray-500 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <span class="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded">🚧 Coming Soon</span>
+                <span class="text-xs bg-purple-900 text-purple-400 px-2 py-1 rounded opacity-60">📱 Mobile friendly</span>
+                <span class="text-xs bg-yellow-900 text-yellow-400 px-2 py-1 rounded opacity-60">🔒 Enhanced security</span>
+              </div>
+            </div>
+          </label>
+        </div>
+        
+        <div class="text-center">
+          <button @click="connectNostr" :disabled="!loginSigningMethod" class="btn-primary text-lg px-8 py-3">
+            {{ getConnectButtonText() }}
+          </button>
+          
+          <p class="text-xs text-gray-500 mt-4">
+            You can change your signing method later in Settings
+          </p>
+        </div>
       </div>
 
       <div v-else>
         <component :is="currentView"></component>
       </div>
     </main>
+
+    <!-- NIP-46 Setup Modal -->
+    <div 
+      v-if="showNip46Setup" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+      @click="closeNip46Setup"
+    >
+      <div class="bg-zombie-dark border border-gray-700 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="text-2xl font-bold text-gray-100">Setup Remote Signer</h2>
+              <p class="text-gray-400 mt-1">Connect to your NIP-46 bunker to continue</p>
+            </div>
+            <button 
+              @click="closeNip46Setup"
+              class="text-gray-400 hover:text-gray-200 text-2xl leading-none"
+            >
+              ×
+            </button>
+          </div>
+          
+          <!-- Use the existing Nip46Connection component -->
+          <Nip46Connection 
+            @connected="onNip46Connected"
+            @disconnected="closeNip46Setup"
+          />
+        </div>
+      </div>
+    </div>
 
     <footer class="mt-auto py-6 bg-zombie-dark border-t border-gray-700">
       <div class="container mx-auto px-4 text-center text-gray-400">
@@ -222,6 +305,7 @@ import BackupsView from './views/BackupsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import CopyButton from './components/CopyButton.vue';
+import Nip46Connection from './components/Nip46Connection.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -235,7 +319,8 @@ export default {
     BackupsView,
     SettingsView,
     FollowsManagerView,
-    CopyButton
+    CopyButton,
+    Nip46Connection
   },
   data() {
     return {
@@ -244,6 +329,8 @@ export default {
       mobileMenuOpen: false,
       userDropdownOpen: false,
       userProfile: null,
+      loginSigningMethod: 'nip07', // Default to NIP-07 for login
+      showNip46Setup: false, // Show NIP-46 setup modal
       views: {
         dashboard: markRaw(DashboardView),
         hunting: markRaw(ZombieHuntingView),
@@ -267,20 +354,33 @@ export default {
     },
     async connectNostr() {
       try {
-        console.log('🚀 Starting Nostr connection...');
+        console.log(`🚀 Starting Nostr connection with ${this.loginSigningMethod}...`);
         
-        // Use the new proper connection flow
-        const connectionResult = await nostrService.connectExtension();
-        console.log('✅ Extension connected successfully:', connectionResult);
+        // Only set the signing method if it's different to avoid resetting NDK
+        if (nostrService.getSigningMethod() !== this.loginSigningMethod) {
+          nostrService.setSigningMethod(this.loginSigningMethod);
+        }
         
-        this.isConnected = true;
-        this.userProfile = nostrService.userProfile;
-        
-        // Initialize other services (NDK is already initialized by connectExtension)
-        backupService.init();
-        await immunityService.init();
-        
-        console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
+        if (this.loginSigningMethod === 'nip07') {
+          // Use NIP-07 connection flow
+          const connectionResult = await nostrService.connectExtension();
+          console.log('✅ Extension connected successfully:', connectionResult);
+          
+          this.isConnected = true;
+          this.userProfile = nostrService.userProfile;
+          
+          // Initialize other services (NDK is already initialized by connectExtension)
+          backupService.init();
+          await immunityService.init();
+          
+          console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
+          
+        } else if (this.loginSigningMethod === 'nip46') {
+          // For NIP-46, show the setup modal
+          console.log('📱 Opening NIP-46 setup modal...');
+          this.showNip46Setup = true;
+          return; // Don't mark as connected yet
+        }
         
       } catch (error) {
         console.error('❌ Failed to connect to Nostr:', error);
@@ -297,6 +397,18 @@ export default {
         
         alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
       }
+    },
+    
+    getConnectButtonText() {
+      if (!this.loginSigningMethod) return 'Select a method';
+      
+      if (this.loginSigningMethod === 'nip07') {
+        return 'Connect Browser Extension';
+      } else if (this.loginSigningMethod === 'nip46') {
+        return 'Setup Remote Signer';
+      }
+      
+      return 'Connect to Nostr';
     },
     
     logout() {
@@ -320,24 +432,51 @@ export default {
     
     handleAvatarError(event) {
       event.target.src = '/default-avatar.svg';
+    },
+    
+    onNip46Connected(event) {
+      console.log('✅ NIP-46 connected from setup modal:', event.detail);
+      this.isConnected = true;
+      this.userProfile = {
+        pubkey: event.detail.pubkey,
+        // NIP-46 doesn't provide profile initially, will be loaded later
+        display_name: event.detail.pubkey.substring(0, 8) + '...',
+        name: 'NIP-46 User'
+      };
+      
+      // Initialize other services
+      backupService.init();
+      immunityService.init();
+      
+      // Close the setup modal and navigate to dashboard
+      this.showNip46Setup = false;
+      this.activeView = 'dashboard';
+    },
+    
+    closeNip46Setup() {
+      this.showNip46Setup = false;
+      this.loginSigningMethod = 'nip07'; // Reset to default
     }
   },
   async mounted() {
     // Try to restore session from localStorage
     const sessionRestored = await nostrService.restoreSession();
-    if (sessionRestored && nostrService.isExtensionReady()) {
+    if (sessionRestored && (nostrService.isExtensionReady() || nostrService.isBunkerReady())) {
       this.isConnected = true;
       this.userProfile = nostrService.userProfile;
       console.log('✅ Session restored successfully');
     } else if (sessionRestored) {
-      // Session data exists but extension not ready - clear it
-      console.log('⚠️ Session data found but extension not ready - clearing session');
+      // Session data exists but no signing method ready - clear it
+      console.log('⚠️ Session data found but no signing method ready - clearing session');
       nostrService.logout();
     }
     
     // Initialize services
     backupService.init();
     immunityService.init();
+    
+    // Listen for NIP-46 connection events from SettingsView
+    window.addEventListener('nip46-connected', this.onNip46Connected);
     
     // Close menus when clicking outside
     document.addEventListener('click', (e) => {
@@ -348,6 +487,10 @@ export default {
         this.userDropdownOpen = false;
       }
     });
+  },
+  
+  beforeUnmount() {
+    window.removeEventListener('nip46-connected', this.onNip46Connected);
   }
 }
 </script>

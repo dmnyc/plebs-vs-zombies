@@ -6,6 +6,47 @@
       <div class="card">
         <h3 class="text-xl mb-4">Nostr Settings</h3>
         
+        <!-- Signing Method Selection -->
+        <div class="mb-6">
+          <h4 class="text-lg mb-3">Signing Method</h4>
+          <div class="space-y-3">
+            <label class="flex items-center gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+              <input 
+                type="radio" 
+                value="nip07" 
+                v-model="signingMethod" 
+                class="w-4 h-4 text-zombie-green focus:ring-zombie-green"
+                @change="onSigningMethodChange"
+              />
+              <div class="flex-grow">
+                <span class="text-gray-200 font-medium">Browser Extension (NIP-07)</span>
+                <p class="text-sm text-gray-400">Use Alby, nos2x, or other browser extensions</p>
+              </div>
+              <div v-if="signingMethod === 'nip07' && isConnected" class="text-zombie-green">
+                <span class="w-2 h-2 bg-zombie-green rounded-full inline-block"></span>
+              </div>
+            </label>
+            
+            <label class="flex items-center gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+              <input 
+                type="radio" 
+                value="nip46" 
+                v-model="signingMethod" 
+                class="w-4 h-4 text-zombie-green focus:ring-zombie-green"
+                @change="onSigningMethodChange"
+              />
+              <div class="flex-grow">
+                <span class="text-gray-200 font-medium">Remote Signer (NIP-46)</span>
+                <p class="text-sm text-gray-400">Connect to nsec.app, nsecBunker, or other remote signers</p>
+              </div>
+              <div v-if="signingMethod === 'nip46' && isBunkerConnected" class="text-zombie-green">
+                <span class="w-2 h-2 bg-zombie-green rounded-full inline-block"></span>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Connection Status -->
         <div class="mb-6">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300">Connection status:</span>
@@ -32,20 +73,28 @@
           
           <div class="flex gap-3">
             <button 
-              v-if="!isConnected" 
+              v-if="!isConnected && signingMethod === 'nip07'" 
               @click="connectNostr" 
               class="btn-primary"
             >
-              Connect to Nostr
+              Connect Extension
             </button>
             <button 
-              v-else 
+              v-else-if="isConnected" 
               @click="disconnectNostr" 
               class="btn-danger"
             >
               Disconnect
             </button>
           </div>
+        </div>
+        
+        <!-- NIP-46 Connection Component -->
+        <div v-if="signingMethod === 'nip46'" class="mb-6">
+          <Nip46Connection 
+            @connected="onBunkerConnected"
+            @disconnected="onBunkerDisconnected"
+          />
         </div>
         
         <div class="border-t border-gray-700 pt-4">
@@ -504,9 +553,13 @@ import immunityService from '../services/immunityService';
 import { format } from 'date-fns';
 import { nip19 } from 'nostr-tools';
 import { getVersionSync } from '../utils/version';
+import Nip46Connection from '../components/Nip46Connection.vue';
 
 export default {
   name: 'SettingsView',
+  components: {
+    Nip46Connection
+  },
   data() {
     return {
       isConnected: false,
@@ -525,6 +578,8 @@ export default {
       loading: false,
       immunityRecords: [],
       userRelayList: null,
+      signingMethod: 'nip07', // Track current signing method
+      isBunkerConnected: false, // Track NIP-46 connection status
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
@@ -548,6 +603,47 @@ export default {
     }
   },
   methods: {
+    onSigningMethodChange() {
+      console.log('Signing method changed to:', this.signingMethod);
+      nostrService.setSigningMethod(this.signingMethod);
+      
+      // Save the signing method preference
+      localStorage.setItem('signingMethod', this.signingMethod);
+      
+      this.updateConnectionStatus();
+    },
+
+    onBunkerConnected(result) {
+      console.log('Bunker connected:', result);
+      this.isBunkerConnected = true;
+      this.pubkey = result.pubkey;
+      this.npub = nostrService.hexToNpub(result.pubkey);
+      this.isConnected = true;
+      
+      // Emit event to notify App.vue about successful connection
+      window.dispatchEvent(new CustomEvent('nip46-connected', {
+        detail: result
+      }));
+    },
+
+    onBunkerDisconnected() {
+      console.log('Bunker disconnected');
+      this.isBunkerConnected = false;
+      this.pubkey = null;
+      this.npub = null;
+      this.isConnected = false;
+    },
+
+    updateConnectionStatus() {
+      if (this.signingMethod === 'nip07') {
+        this.isConnected = nostrService.isExtensionReady();
+        this.isBunkerConnected = false;
+      } else if (this.signingMethod === 'nip46') {
+        this.isBunkerConnected = nostrService.isBunkerReady();
+        this.isConnected = this.isBunkerConnected;
+      }
+    },
+
     async connectNostr() {
       try {
         const pubkey = await nostrService.getPublicKey();
@@ -807,6 +903,35 @@ export default {
   async mounted() {
     this.loadSettings();
     await this.loadImmunityRecords();
+    
+    // Initialize signing method from localStorage
+    const savedSigningMethod = localStorage.getItem('signingMethod');
+    if (savedSigningMethod && ['nip07', 'nip46'].includes(savedSigningMethod)) {
+      this.signingMethod = savedSigningMethod;
+      nostrService.setSigningMethod(this.signingMethod);
+    }
+    
+    // Update connection status for current signing method
+    this.updateConnectionStatus();
+    
+    // If NIP-46 was previously selected, try to restore connection
+    if (this.signingMethod === 'nip46') {
+      try {
+        const restored = await nostrService.nip46Service.restoreConnection();
+        if (restored) {
+          console.log('✅ NIP-46 connection restored from previous session');
+          this.updateConnectionStatus();
+          if (this.isBunkerConnected) {
+            const pubkey = await nostrService.nip46Service.getPublicKey();
+            this.pubkey = pubkey;
+            this.npub = nostrService.hexToNpub(pubkey);
+            this.isConnected = true;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore NIP-46 connection:', error.message);
+      }
+    }
   }
 };
 </script>
