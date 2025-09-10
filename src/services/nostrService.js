@@ -1,5 +1,6 @@
 import NDK, { NDKEvent, NDKNip07Signer } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
+import nip46Service from './nip46Service.js';
 
 class NostrService {
   constructor() {
@@ -15,6 +16,12 @@ class NostrService {
       'wss://nostr.wine'
       // Removed problematic relays: relay.nostrich.de, relay.current.fyi, nostr.mutinywallet.com, relay.snort.social
     ];
+    
+    // Signing method management
+    this.signingMethod = 'nip07'; // 'nip07' | 'nip46'
+    this.nip46Service = nip46Service;
+    
+    // NIP-07 specific state
     this.extensionConnected = false;
     this.extensionAuthorized = false;
     this.connectionPromise = null; // Prevent multiple simultaneous connections
@@ -22,14 +29,20 @@ class NostrService {
     // NIP-65 relay lists
     this.userRelayList = null; // User's own relay preferences
     this.followsRelayLists = new Map(); // Map of pubkey -> relay list
+    
+    // Restore signing method preference and connections
+    this.restoreSigningMethod();
   }
 
   async initialize() {
     if (!this.ndk) {
-      // Create NDK with NIP-07 signer if available
+      // Create NDK with appropriate signer based on signing method
       let signer = null;
-      if (typeof window.nostr !== 'undefined') {
+      
+      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
         signer = new NDKNip07Signer();
+      } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
+        signer = this.nip46Service.getSigner();
       }
       
       this.ndk = new NDK({
@@ -130,22 +143,100 @@ class NostrService {
   }
 
   /**
+   * Set the signing method to use
+   */
+  setSigningMethod(method) {
+    if (!['nip07', 'nip46'].includes(method)) {
+      throw new Error('Invalid signing method. Must be "nip07" or "nip46"');
+    }
+    
+    // Only change if it's different
+    if (this.signingMethod === method) {
+      console.log(`ℹ️ Signing method already set to ${method}`);
+      return;
+    }
+    
+    console.log(`🔄 Switching signing method from ${this.signingMethod} to ${method}`);
+    this.signingMethod = method;
+    
+    // Reset NDK to force recreation with new signer
+    this.ndk = null;
+    
+    // Save preference
+    localStorage.setItem('signing_method', method);
+  }
+
+  /**
+   * Get the current signing method
+   */
+  getSigningMethod() {
+    return this.signingMethod;
+  }
+
+  /**
+   * Restore signing method preference
+   */
+  restoreSigningMethod() {
+    try {
+      const savedMethod = localStorage.getItem('signing_method');
+      if (savedMethod && ['nip07', 'nip46'].includes(savedMethod)) {
+        this.signingMethod = savedMethod;
+        console.log(`📋 Restored signing method: ${savedMethod}`);
+      }
+    } catch (error) {
+      console.warn('Failed to restore signing method preference:', error);
+    }
+  }
+
+  /**
    * Check if extension is properly connected and authorized
    */
   isExtensionReady() {
-    return this.extensionConnected && 
+    return this.signingMethod === 'nip07' && 
+           this.extensionConnected && 
            this.extensionAuthorized && 
            this.pubkey && 
            typeof window.nostr !== 'undefined';
   }
 
+  /**
+   * Check if NIP-46 bunker is connected and ready
+   */
+  isBunkerReady() {
+    return this.signingMethod === 'nip46' && 
+           this.nip46Service.isConnected();
+  }
+
+  /**
+   * Check if any signing method is ready
+   */
+  isSigningReady() {
+    return this.isExtensionReady() || this.isBunkerReady();
+  }
+
   async getPublicKey() {
-    // Use the proper connection flow instead of direct access
-    if (!this.isExtensionReady()) {
-      await this.connectExtension();
+    // Return pubkey if already set
+    if (this.pubkey) {
+      return this.pubkey;
     }
-    
-    return this.pubkey;
+
+    // Get public key based on signing method
+    if (this.signingMethod === 'nip07') {
+      if (!this.isExtensionReady()) {
+        await this.connectExtension();
+      }
+      return this.pubkey;
+    } else if (this.signingMethod === 'nip46') {
+      if (!this.isBunkerReady()) {
+        throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
+      }
+      if (!this.pubkey) {
+        this.pubkey = await this.nip46Service.getPublicKey();
+      }
+      return this.pubkey;
+    } else {
+      throw new Error('No signing method available');
+    }
   }
 
   async loadUserProfile() {
@@ -814,28 +905,56 @@ class NostrService {
       throw new Error('No pubkeys to remove');
     }
 
-    // Get current follow list
-    const currentFollows = await this.getFollowList();
-    console.log('Current follows count:', currentFollows.length);
-    console.log('Pubkeys to remove count:', pubkeysToRemove.length);
+    // Get the complete current contacts event (not just the pubkeys)
+    await this.initialize();
     
-    // Remove the specified pubkeys
-    const newFollows = currentFollows.filter(pubkey => !pubkeysToRemove.includes(pubkey));
-    console.log('New follows count after removal:', newFollows.length);
+    const followListFilter = {
+      kinds: [3],
+      authors: [this.pubkey],
+      limit: 5
+    };
+    
+    const events = await this.ndk.fetchEvents(followListFilter);
+    
+    if (!events || events.size === 0) {
+      throw new Error('No follow list events found');
+    }
+
+    // Get the most recent contacts event
+    const eventArray = Array.from(events).sort((a, b) => b.created_at - a.created_at);
+    const mostRecentEvent = eventArray[0];
+    
+    console.log(`Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`);
+    
+    // Separate user follows ('p' tags) from all other tags (including 't' tags)
+    const userFollowTags = mostRecentEvent.tags.filter(tag => tag[0] === 'p' && tag[1]);
+    const nonUserTags = mostRecentEvent.tags.filter(tag => tag[0] !== 'p');
+    
+    console.log(`Current tags: ${userFollowTags.length} user follows, ${nonUserTags.length} other tags (topics, relays, etc.)`);
+    console.log('Non-user tags:', nonUserTags.map(tag => `${tag[0]}:${tag[1] || ''}`).join(', '));
+    
+    // Remove the specified pubkeys from user follow tags only
+    const newUserFollowTags = userFollowTags.filter(tag => !pubkeysToRemove.includes(tag[1]));
+    console.log(`Filtered user follows: ${userFollowTags.length} -> ${newUserFollowTags.length} (removed ${userFollowTags.length - newUserFollowTags.length})`);
+    
+    // Combine the preserved non-user tags with the filtered user follow tags
+    const tags = [...nonUserTags, ...newUserFollowTags];
+    
+    console.log(`Final tag count: ${tags.length} (${newUserFollowTags.length} user follows + ${nonUserTags.length} preserved tags)`);
     
     // Check if the event would be too large
-    if (newFollows.length > 1000) {
-      console.warn('⚠️ Large follow list detected:', newFollows.length, 'follows');
+    if (newUserFollowTags.length > 1000) {
+      console.warn('⚠️ Large follow list detected:', newUserFollowTags.length, 'follows');
       console.warn('⚠️ Some Nostr extensions may have trouble with very large follow lists');
       console.warn('⚠️ If signing fails, you may need to unfollow users in smaller batches');
     }
     
-    // Estimate event size
+    // Estimate event size with all tags
     const estimatedSize = JSON.stringify({
       kind: 3,
       created_at: Math.floor(Date.now() / 1000),
-      tags: newFollows.map(pubkey => ['p', pubkey]),
-      content: ''
+      tags: tags,
+      content: mostRecentEvent.content || ''
     }).length;
     
     console.log('📏 Estimated event size:', Math.round(estimatedSize / 1024), 'KB');
@@ -844,27 +963,29 @@ class NostrService {
       throw new Error(`Follow list too large (${Math.round(estimatedSize / 1024)} KB). Please unfollow users in smaller batches.`);
     }
     
-    // Create new tags for the contacts event
-    const tags = newFollows.map(pubkey => ['p', pubkey]);
-    console.log('Created', tags.length, 'tags for event');
+    console.log('Preserved all non-user tags and filtered user follows only');
     
-    // Create the event
+    // Create the event with preserved content and all tags
     const event = {
       kind: 3,
       created_at: Math.floor(Date.now() / 1000),
       tags: tags,
-      content: ''
+      content: mostRecentEvent.content || ''
     };
     
-    // Ensure extension is properly connected and authorized
-    if (!this.isExtensionReady()) {
-      console.log('🔄 Extension not ready, attempting connection...');
-      await this.connectExtension();
+    // Ensure appropriate signing method is ready
+    if (!this.isSigningReady()) {
+      if (this.signingMethod === 'nip07') {
+        console.log('🔄 Extension not ready, attempting connection...');
+        await this.connectExtension();
+      } else if (this.signingMethod === 'nip46') {
+        throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
+      }
     }
     
     // Double-check connection is still valid
-    if (!this.isExtensionReady()) {
-      throw new Error('Unable to establish connection with Nostr extension. Please check your extension settings.');
+    if (!this.isSigningReady()) {
+      throw new Error(`Unable to establish connection with signing method: ${this.signingMethod}`);
     }
     
     console.log('🔐 Starting signing process...');
@@ -875,21 +996,34 @@ class NostrService {
       content: event.content.length
     });
     
-    // Check extension type for better error messages
-    const extensionType = window.nostr.constructor?.name || 'unknown';
-    console.log('🔌 Using extension:', extensionType);
+    // Log signing method being used
+    console.log('🔌 Using signing method:', this.signingMethod);
+    if (this.signingMethod === 'nip07' && window.nostr) {
+      const extensionType = window.nostr.constructor?.name || 'unknown';
+      console.log('🔌 Extension type:', extensionType);
+    }
     
-    // First, try direct manual signing (often more reliable)
+    // Sign event using appropriate method
+    let signedEvent;
     try {
-      console.log('Attempting direct manual signing...');
-      console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-      
-      const signedEvent = await Promise.race([
-        window.nostr.signEvent(event),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
-        )
-      ]);
+      if (this.signingMethod === 'nip07') {
+        console.log('Attempting NIP-07 signing...');
+        console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
+        
+        signedEvent = await Promise.race([
+          window.nostr.signEvent(event),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
+          )
+        ]);
+      } else if (this.signingMethod === 'nip46') {
+        console.log('Attempting NIP-46 signing...');
+        console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
+        
+        signedEvent = await this.nip46Service.signEvent(event);
+      } else {
+        throw new Error(`Invalid signing method: ${this.signingMethod}`);
+      }
       
       console.log('✅ Event signed successfully:', signedEvent.id);
       
@@ -905,72 +1039,36 @@ class NostrService {
       return {
         success: true,
         removedCount: pubkeysToRemove.length,
-        newFollowCount: newFollows.length,
+        newFollowCount: newUserFollowTags.length,
         publishedToRelays: publishResults.successful
       };
       
-    } catch (directSignError) {
-      console.warn('❌ Direct signing failed:', directSignError);
-      console.warn('Error type:', typeof directSignError);
-      console.warn('Error message:', directSignError.message);
-      console.warn('Error stack:', directSignError.stack);
+    } catch (signingError) {
+      console.error('❌ Signing failed:', signingError);
       
-      // Check for specific signing issues
-      if (directSignError.message && directSignError.message.toLowerCase().includes('user rejected')) {
-        throw new Error('You rejected the signing request. Please try again and approve the signing prompt to update your follow list.');
-      }
-      
-      if (directSignError.message && directSignError.message.toLowerCase().includes('timeout')) {
-        throw new Error('Signing request timed out. Your extension may not be responding. Please check if your extension is unlocked and try again.');
-      }
-      
-      // Fallback to NDK if direct signing fails
-      try {
-        console.log('🔄 Trying NDK fallback...');
-        
-        await this.initialize();
-        
-        if (!this.ndk.signer) {
-          throw new Error('NDK signer not available');
-        }
-        
-        const ndkEvent = new NDKEvent(this.ndk);
-        ndkEvent.kind = event.kind;
-        ndkEvent.content = event.content;
-        ndkEvent.created_at = event.created_at;
-        ndkEvent.tags = event.tags;
-        
-        const relays = await Promise.race([
-          ndkEvent.publish(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('NDK publish timeout')), 45000)
-          )
-        ]);
-        
-        console.log('✅ NDK signing and publishing successful to', relays.size, 'relays');
-        
-        return {
-          success: true,
-          removedCount: pubkeysToRemove.length,
-          newFollowCount: newFollows.length,
-          publishedToRelays: relays.size
-        };
-        
-      } catch (ndkError) {
-        console.error('❌ Both signing methods failed');
-        console.error('Direct signing error:', directSignError.message);
-        console.error('NDK signing error:', ndkError.message);
-        
-        // Provide specific error messages based on the failure type
-        if (directSignError.message.includes('timeout') || ndkError.message.includes('timeout')) {
-          throw new Error('Signing request timed out. Please try again and approve the signing prompt quickly in your Nostr extension.');
-        } else if (directSignError.message.includes('User rejected') || directSignError.message.includes('denied')) {
-          throw new Error('Signing was rejected. Please approve the signing request to update your follow list.');
-        } else if (directSignError.message.includes('not authorized') || directSignError.message.includes('permission')) {
+      // Handle signing errors based on method
+      if (this.signingMethod === 'nip07') {
+        // NIP-07 specific error handling
+        if (signingError.message && signingError.message.toLowerCase().includes('user rejected')) {
+          throw new Error('You rejected the signing request. Please try again and approve the signing prompt to update your follow list.');
+        } else if (signingError.message && signingError.message.toLowerCase().includes('timeout')) {
+          throw new Error('Signing request timed out. Your extension may not be responding. Please check if your extension is unlocked and try again.');
+        } else if (signingError.message.includes('not authorized') || signingError.message.includes('permission')) {
           throw new Error('Extension permissions not granted. Please check your Nostr extension settings for this site.');
         } else {
-          throw new Error(`Failed to sign follow list update: ${directSignError.message}. Check your Nostr extension is unlocked and permissions are granted.`);
+          throw new Error(`Failed to sign follow list update: ${signingError.message}. Check your Nostr extension is unlocked and permissions are granted.`);
         }
+      } else if (this.signingMethod === 'nip46') {
+        // NIP-46 specific error handling
+        if (signingError.message && signingError.message.toLowerCase().includes('rejected')) {
+          throw new Error('Signing was rejected in your bunker app. Please approve the signing request to update your follow list.');
+        } else if (signingError.message && signingError.message.toLowerCase().includes('timeout')) {
+          throw new Error('Signing request timed out. Please check your bunker app is responding.');
+        } else {
+          throw new Error(`Failed to sign follow list update: ${signingError.message}. Check your bunker connection.`);
+        }
+      } else {
+        throw new Error(`Failed to sign follow list update: ${signingError.message}`);
       }
     }
   }
@@ -1056,20 +1154,34 @@ class NostrService {
   }
 
   logout() {
+    // Clear common state
     this.pubkey = null;
     this.userProfile = null;
     this.follows.clear();
+    this.userRelayList = null;
+    this.followsRelayLists.clear();
+    
+    // Clear NIP-07 specific state
     this.extensionConnected = false;
     this.extensionAuthorized = false;
     this.connectionPromise = null;
     
-    // Clear session from localStorage
+    // Disconnect NIP-46 if connected
+    if (this.signingMethod === 'nip46') {
+      this.nip46Service.disconnect();
+    }
+    
+    // Clear sessions from localStorage
     localStorage.removeItem('nostr_session');
+    localStorage.removeItem('signing_method');
     
     // Disconnect from relays
     if (this.ndk) {
       this.ndk = null;
     }
+    
+    // Reset to default signing method
+    this.signingMethod = 'nip07';
     
     console.log('✅ User logged out - all connection state cleared');
   }
@@ -1086,6 +1198,21 @@ class NostrService {
   }
 
   async restoreSession() {
+    try {
+      // Try to restore based on signing method
+      if (this.signingMethod === 'nip07') {
+        return await this.restoreNip07Session();
+      } else if (this.signingMethod === 'nip46') {
+        return await this.restoreNip46Session();
+      }
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+    }
+    
+    return false;
+  }
+
+  async restoreNip07Session() {
     try {
       const sessionData = localStorage.getItem('nostr_session');
       
@@ -1118,7 +1245,7 @@ class NostrService {
                 // Initialize NDK connection
                 await this.initialize();
                 
-                console.log('✅ Session restored successfully');
+                console.log('✅ NIP-07 session restored successfully');
                 return true;
               } else {
                 console.log('⚠️ Different user detected - clearing session');
@@ -1134,13 +1261,36 @@ class NostrService {
           }
         } else {
           // Session expired, clear it
-          console.log('⚠️ Session expired - clearing');
+          console.log('⚠️ NIP-07 session expired - clearing');
           localStorage.removeItem('nostr_session');
         }
       }
     } catch (error) {
-      console.error('Failed to restore session:', error);
+      console.error('Failed to restore NIP-07 session:', error);
       localStorage.removeItem('nostr_session');
+    }
+    
+    return false;
+  }
+
+  async restoreNip46Session() {
+    try {
+      const restored = await this.nip46Service.restoreConnection();
+      if (restored) {
+        // Get pubkey from restored connection
+        this.pubkey = await this.nip46Service.getPublicKey();
+        
+        // Load user profile
+        await this.loadUserProfile();
+        
+        // Initialize NDK with NIP-46 signer
+        await this.initialize();
+        
+        console.log('✅ NIP-46 session restored successfully');
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to restore NIP-46 session:', error);
     }
     
     return false;
