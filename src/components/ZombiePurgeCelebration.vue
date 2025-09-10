@@ -86,8 +86,11 @@
             <button 
               @click="postToNostr"
               :disabled="posting || posted"
-              :class="posted ? 'btn-success' : 'btn-primary'"
+              :class="posted ? 'btn-success' : ''"
               class="flex-1 flex items-center justify-center gap-2"
+              :style="!posted ? 'background-color: #8e30eb; color: white;' : ''"
+              :onmouseover="!posted ? 'this.style.backgroundColor=\'#7a2bc7\'' : ''"
+              :onmouseout="!posted ? 'this.style.backgroundColor=\'#8e30eb\'' : ''"
             >
               <span v-if="posting">⏳</span>
               <span v-else-if="posted">✅</span>
@@ -121,19 +124,13 @@
             Follow the Plebs vs Zombies updates and join other zombie hunters:
           </p>
           <div class="flex flex-wrap gap-2">
-            <button 
-              @click="followDeveloper"
-              class="text-xs px-3 py-1 rounded-full transition-colors"
-              style="background-color: #8e30eb;"
-              onmouseover="this.style.backgroundColor='#7a2bc7'"
-              onmouseout="this.style.backgroundColor='#8e30eb'"
-            >
-              View on GitHub 👨‍💻
-            </button>
             <a 
               href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h" 
               target="_blank"
-              class="text-xs px-3 py-1 bg-orange-700 hover:bg-orange-600 rounded-full transition-colors inline-flex items-center gap-1"
+              class="text-xs px-3 py-1 rounded-full transition-colors inline-flex items-center gap-1"
+              style="background-color: #8e30eb;"
+              onmouseover="this.style.backgroundColor='#7a2bc7'"
+              onmouseout="this.style.backgroundColor='#8e30eb'"
             >
               Follow on Nostr 🟣
             </a>
@@ -142,6 +139,12 @@
               class="text-xs px-3 py-1 bg-yellow-600 hover:bg-yellow-500 rounded-full transition-colors inline-flex items-center gap-1"
             >
               ⚡ Zap Creator
+            </button>
+            <button 
+              @click="followDeveloper"
+              class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded-full transition-colors"
+            >
+              View on GitHub 👨‍💻
             </button>
           </div>
         </div>
@@ -308,7 +311,7 @@ https://plebs-vs-zombies.vercel.app`;
         const zombieSquares = totalSquares - healthySquares;
         
         for (let i = 0; i < healthySquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
-        for (let i = 0; i < zombieSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-red-500"></span>');
+        for (let i = 0; i < zombieSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-zombie-green"></span>');
         
         return squares.slice(0, totalSquares);
       }
@@ -329,7 +332,7 @@ https://plebs-vs-zombies.vercel.app`;
       for (let i = 0; i < activeSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
       for (let i = 0; i < freshSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span>');
       for (let i = 0; i < rottingSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-orange-500"></span>');
-      for (let i = 0; i < ancientSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-red-500"></span>');
+      for (let i = 0; i < ancientSquares; i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-zombie-green"></span>');
       for (let i = 0; i < Math.max(0, burnedSquares); i++) squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #92400e;"></span>');
 
       return squares.slice(0, totalSquares);
@@ -346,7 +349,7 @@ https://plebs-vs-zombies.vercel.app`;
         const zombieBars = totalBars - healthyBars;
         
         for (let i = 0; i < healthyBars; i++) bars.push('🟪');
-        for (let i = 0; i < zombieBars; i++) bars.push('🟥');
+        for (let i = 0; i < zombieBars; i++) bars.push('🟩');
         
         return bars.slice(0, totalBars);
       }
@@ -373,7 +376,7 @@ https://plebs-vs-zombies.vercel.app`;
       for (let i = 0; i < activeBars; i++) bars.push('🟪');
       for (let i = 0; i < freshBars; i++) bars.push('🟨');
       for (let i = 0; i < rottingBars; i++) bars.push('🟧');
-      for (let i = 0; i < ancientBars; i++) bars.push('🟥');
+      for (let i = 0; i < ancientBars; i++) bars.push('🟩');
       for (let i = 0; i < Math.max(0, burnedBars); i++) bars.push('🟫'); // Dark red-brown for burned
 
       return bars.slice(0, totalBars); // Ensure exact length
