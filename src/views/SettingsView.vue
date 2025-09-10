@@ -27,20 +27,18 @@
               </div>
             </label>
             
-            <label class="flex items-center gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
+            <label class="flex items-center gap-3 p-3 border border-gray-600 rounded-lg opacity-50 cursor-not-allowed">
               <input 
                 type="radio" 
                 value="nip46" 
                 v-model="signingMethod" 
-                class="w-4 h-4 text-zombie-green focus:ring-zombie-green"
-                @change="onSigningMethodChange"
+                class="w-4 h-4 text-gray-500 focus:ring-gray-500"
+                disabled
               />
               <div class="flex-grow">
-                <span class="text-gray-200 font-medium">Remote Signer (NIP-46)</span>
-                <p class="text-sm text-gray-400">Connect to nsec.app, nsecBunker, or other remote signers</p>
-              </div>
-              <div v-if="signingMethod === 'nip46' && isBunkerConnected" class="text-zombie-green">
-                <span class="w-2 h-2 bg-zombie-green rounded-full inline-block"></span>
+                <span class="text-gray-400 font-medium">Remote Signer (NIP-46)</span>
+                <p class="text-sm text-gray-500">Connect to nsec.app, nsecBunker, or other remote signers</p>
+                <p class="text-xs text-yellow-400 font-medium">Coming Soon</p>
               </div>
             </label>
           </div>
