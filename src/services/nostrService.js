@@ -297,7 +297,7 @@ class NostrService {
     console.log(`=== END DEBUG ===`);
   }
 
-  async getProfileMetadata(pubkeys) {
+  async getProfileMetadata(pubkeys, progressCallback = null) {
     if (!pubkeys || pubkeys.length === 0) {
       return new Map();
     }
@@ -338,7 +338,19 @@ class NostrService {
       const batch = validPubkeys.slice(i, i + batchSize);
       
       try {
-        console.log(`Fetching profiles for batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(validPubkeys.length/batchSize)}...`);
+        const batchNumber = Math.floor(i/batchSize) + 1;
+        const totalBatches = Math.ceil(validPubkeys.length/batchSize);
+        console.log(`Fetching profiles for batch ${batchNumber}/${totalBatches}...`);
+        
+        // Report batch progress to UI
+        if (progressCallback) {
+          progressCallback({
+            total: validPubkeys.length,
+            processed: i,
+            stage: `Fetching profiles for batch ${batchNumber}/${totalBatches}`,
+            currentNpub: ''
+          });
+        }
         
         // Get kind 0 (profile) events - fetch more to track deletion history
         const profileFilter = {
@@ -457,6 +469,16 @@ class NostrService {
     }
     
     console.log(`Profile fetch complete. Found metadata for ${Array.from(profileMap.values()).filter(p => p.name || p.display_name).length} out of ${pubkeys.length} profiles.`);
+    
+    // Final progress update
+    if (progressCallback) {
+      progressCallback({
+        total: validPubkeys.length,
+        processed: validPubkeys.length,
+        stage: 'Profile fetching complete',
+        currentNpub: ''
+      });
+    }
     
     return profileMap;
   }

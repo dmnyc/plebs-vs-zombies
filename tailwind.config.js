@@ -11,6 +11,7 @@ export default {
         'zombie-dark': '#2c3531',
         'pleb-gold': '#ffd700',
         'pleb-blue': '#1e90ff',
+        'pleb-purple': '#8e30eb',
       },
       fontFamily: {
         'horror': ['"Creepster"', 'cursive'],

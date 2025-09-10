@@ -9,7 +9,7 @@
       
       <div class="flex justify-between items-center">
         <span class="text-gray-300">Active:</span>
-        <span class="font-bold text-pleb-blue">{{ stats.active }}</span>
+        <span class="font-bold text-pleb-purple">{{ stats.active }}</span>
       </div>
       
       <div v-if="stats.burned > 0" class="flex justify-between items-center">
@@ -55,7 +55,7 @@
           </div>
         </div>
         <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-700">
-          <div :style="{ width: `${activePercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-pleb-blue"></div>
+          <div :style="{ width: `${activePercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-pleb-purple"></div>
           <div :style="{ width: `${freshPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-400"></div>
           <div :style="{ width: `${rottingPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-orange-500"></div>
           <div :style="{ width: `${ancientPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500"></div>

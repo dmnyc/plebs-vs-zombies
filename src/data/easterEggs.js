@@ -29,15 +29,25 @@ export default {
     "You're the reason we built this app."
   ],
   zombie: [
+    "The stench is becoming unbearable.",
+    "It feels good to get rid of dead weight.",
+    "This is nothing to lose your mind over.",
+    "Zombies make rotten friends.",
+    "Your follow list is a regular zombie apocalypse!",
+    "They haven't posted since the dawn of the dead.",
+    "Someday this pain will be useful to you.",
+    "You might be the sole survivor of your follow list."
+  ],
+  aggressive: [
     "This is looking pretty ugly.",
-    "Uh oh, finding some digital rot...",
-    "Searching for any signs of life...",
+    "Uh oh, finding some digital decay.",
+    "Searching for any signs of life.",
+    "I'm feeling kind of dead inside.",
     "Houston, we have a zombie problem.",
     "Not a lot of brains in this bunch.",
     "The horde is bigger than we thought.",
-    "The stench is becoming unbearable...",
-    "They haven't posted since the dawn of the dead.",
-    "Your follow list is a regular zombie apocalypse!",
-    "You might be the sole survivor of your follow list."
+    "Go to the Winchester, have a pint.",
+    "This is a grave situation.",
+    "It will all be worth it in the end...of the world!"
   ]
 };

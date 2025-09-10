@@ -265,7 +265,8 @@ export default {
       // Easter egg arrays - loaded from external JSON file
       firstPassEasterEggs: [],
       phase2EasterEggs: [],
-      zombieEasterEggs: []
+      zombieEasterEggs: [],
+      aggressiveEasterEggs: []
     };
   },
   computed: {
@@ -278,21 +279,6 @@ export default {
       const zombieCount = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
       return Math.round((zombieCount / this.zombieStats.total) * 100);
     }
-  },
-  mounted() {
-    // Load easter egg messages from external JSON file
-    console.log('DEBUG: Loading easter egg data:', easterEggData);
-    this.firstPassEasterEggs = easterEggData.firstPass;
-    this.phase2EasterEggs = easterEggData.phase2;
-    this.zombieEasterEggs = easterEggData.zombie;
-    
-    console.log('DEBUG: Loaded arrays:', {
-      firstPass: this.firstPassEasterEggs.length,
-      phase2: this.phase2EasterEggs.length,
-      zombie: this.zombieEasterEggs.length
-    });
-    
-    this.loadData();
   },
   methods: {
     // Simple Easter Egg Methods
@@ -319,7 +305,13 @@ export default {
         interval = 50;
       }
       // Smart retry / enhanced verification phase
-      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification') || currentStage.includes('AGGRESSIVE RETRY')) {
+      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification')) {
+        messages = this.aggressiveEasterEggs;
+        threshold = 50;
+        interval = 80;
+      }
+      // Aggressive retry phase
+      else if (currentStage.includes('Aggressive retry')) {
         messages = this.zombieEasterEggs;
         threshold = 50;
         interval = 50;
@@ -639,6 +631,12 @@ export default {
     }
   },
   async mounted() {
+    // Load easter egg messages from external file
+    this.firstPassEasterEggs = easterEggData.firstPass;
+    this.phase2EasterEggs = easterEggData.phase2;
+    this.zombieEasterEggs = easterEggData.zombie;
+    this.aggressiveEasterEggs = easterEggData.aggressive;
+    
     // Check if first-time user before loading dashboard data
     await this.checkFirstTimeUser();
     await this.loadDashboardData();

@@ -29,7 +29,7 @@
             </div>
             
             <div class="mb-4">
-              <label class="block text-gray-300 mb-2">Batch Size</label>
+              <label class="block text-gray-300 mb-2">Unfollow Batch Size</label>
               <div class="flex items-center">
                 <input 
                   type="range" 
@@ -42,7 +42,7 @@
                 <span class="text-zombie-green font-bold">{{ batchSize }}</span>
               </div>
               <p class="text-sm text-gray-400 mt-1">
-                Recommended: 30 zombies per batch
+                How many zombies to unfollow at once (recommended: 30)
               </p>
             </div>
             
@@ -339,6 +339,7 @@ export default {
       firstPassEasterEggs: [],
       phase2EasterEggs: [],
       zombieEasterEggs: [],
+      aggressiveEasterEggs: [],
       lastEasterEggIndex: -1,
       confirmModal: {
         show: false,
@@ -432,7 +433,13 @@ export default {
         interval = 50;
       }
       // Smart retry / enhanced verification phase
-      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification') || currentStage.includes('AGGRESSIVE RETRY')) {
+      else if (currentStage.includes('Smart retry') || currentStage.includes('Enhanced verification')) {
+        messages = this.aggressiveEasterEggs;
+        threshold = 50;
+        interval = 80;
+      }
+      // Aggressive retry phase
+      else if (currentStage.includes('Aggressive retry')) {
         messages = this.zombieEasterEggs;
         threshold = 50;
         interval = 50;
@@ -971,6 +978,7 @@ export default {
     this.firstPassEasterEggs = easterEggData.firstPass;
     this.phase2EasterEggs = easterEggData.phase2;
     this.zombieEasterEggs = easterEggData.zombie;
+    this.aggressiveEasterEggs = easterEggData.aggressive;
     
     this.loadInitialData();
   }

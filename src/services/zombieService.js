@@ -777,7 +777,7 @@ class ZombieService {
           });
         }
         console.log('Fetching profile metadata for deleted account detection...');
-        profileData = await nostrService.getProfileMetadata(followList);
+        profileData = await nostrService.getProfileMetadata(followList, progressCallback);
       }
       
       // Classify zombies

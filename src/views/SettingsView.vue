@@ -236,7 +236,7 @@
           <h4 class="text-lg mb-3">Batch Settings</h4>
           
           <div>
-            <label class="block text-gray-300 mb-2">Default batch size for zombie purging</label>
+            <label class="block text-gray-300 mb-2">Unfollow batch size</label>
             <div class="flex items-center">
               <input 
                 type="range" 
@@ -249,7 +249,7 @@
               <span class="text-zombie-green font-bold min-w-8 text-center">{{ batchSize }}</span>
             </div>
             <p class="text-sm text-gray-400 mt-1">
-              Recommended: 30 zombies per batch
+              How many zombies to unfollow at once during purging (recommended: 30)
             </p>
           </div>
         </div>
