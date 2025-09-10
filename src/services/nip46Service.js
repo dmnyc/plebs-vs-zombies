@@ -18,6 +18,8 @@ class Nip46Service {
    */
   parseBunkerUrl(bunkerUrl) {
     try {
+      console.log('🔍 Parsing bunker URL:', bunkerUrl);
+      
       if (!bunkerUrl.startsWith('bunker://')) {
         throw new Error('Invalid bunker URL format. Must start with bunker://');
       }
@@ -27,23 +29,32 @@ class Nip46Service {
       const relay = url.searchParams.get('relay');
       const secret = url.searchParams.get('secret');
       const name = url.searchParams.get('name');
+      
+      console.log('📋 Parsed URL components:');
+      console.log('  - pubkey:', pubkey, '(length:', pubkey?.length, ')');
+      console.log('  - relay:', relay);
+      console.log('  - secret:', secret ? '[REDACTED]' : 'null');
+      console.log('  - name:', name);
 
       if (!pubkey || pubkey.length !== 64) {
-        throw new Error('Invalid pubkey in bunker URL');
+        throw new Error(`Invalid pubkey in bunker URL. Expected 64 hex chars, got: ${pubkey?.length || 0}`);
       }
 
       if (!relay || !relay.startsWith('wss://')) {
-        throw new Error('Invalid or missing relay in bunker URL');
+        throw new Error(`Invalid or missing relay in bunker URL. Got: ${relay}`);
       }
 
-      return {
+      const result = {
         pubkey,
         relay,
         secret,
         name: name || this.appName
       };
+      
+      console.log('✅ Successfully parsed bunker URL');
+      return result;
     } catch (error) {
-      console.error('Failed to parse bunker URL:', error);
+      console.error('❌ Failed to parse bunker URL:', error);
       throw new Error(`Invalid bunker URL: ${error.message}`);
     }
   }
@@ -67,38 +78,83 @@ class Nip46Service {
       if (!localPrivateKey) {
         const { generateSecretKey } = await import('nostr-tools/pure');
         localPrivateKey = generateSecretKey();
+        console.log('✅ Generated local private key for session');
       }
 
+      console.log('📋 Setting connection details:');
+      console.log('  - bunkerPubkey:', bunkerDetails.pubkey);
+      console.log('  - bunkerRelay:', bunkerDetails.relay);
+      console.log('  - hasSecret:', !!bunkerDetails.secret);
+      
       this.localPrivateKey = localPrivateKey;
       this.bunkerPubkey = bunkerDetails.pubkey;
       this.bunkerRelays = [bunkerDetails.relay];
       this.connectionSecret = bunkerDetails.secret;
 
       // Create NDK instance for bunker communication
+      console.log('🌐 Creating NDK instance with relays:', this.bunkerRelays);
       const bunkerNdk = new NDK({
         explicitRelayUrls: this.bunkerRelays
       });
 
+      console.log('🔌 Connecting to bunker relays...');
       await bunkerNdk.connect();
       console.log('✅ Connected to bunker relays');
 
       // Create NIP-46 signer
-      this.signer = new NDKNip46Signer(
-        bunkerNdk,
-        this.bunkerPubkey,
-        localPrivateKey
-      );
+      console.log('🔐 Creating NDKNip46Signer with:');
+      console.log('  - bunkerPubkey:', this.bunkerPubkey);
+      console.log('  - localPrivateKey length:', localPrivateKey?.length);
+      
+      try {
+        // Create the signer with the remote bunker pubkey
+        this.signer = new NDKNip46Signer(
+          bunkerNdk,
+          this.bunkerPubkey,
+          localPrivateKey
+        );
+        
+        // Set the remote pubkey directly to avoid NIP-05 lookup
+        if (this.signer.remotePubkey !== this.bunkerPubkey) {
+          console.log('🔄 Setting remote pubkey directly to avoid NIP-05 lookup');
+          this.signer.remotePubkey = this.bunkerPubkey;
+        }
+        
+        console.log('✅ NDKNip46Signer created successfully');
+      } catch (signerError) {
+        console.error('❌ Failed to create NDKNip46Signer:', signerError);
+        throw signerError;
+      }
 
       // Test connection by getting public key
       console.log('🔐 Testing bunker connection...');
-      const testPubkey = await this.signer.user().then(user => user.pubkey);
-      
-      if (!testPubkey) {
-        throw new Error('Failed to get public key from bunker');
-      }
+      try {
+        const user = await this.signer.user();
+        console.log('👤 Got user object from signer:', !!user);
+        
+        if (!user) {
+          throw new Error('Signer returned null user');
+        }
+        
+        const testPubkey = user.pubkey;
+        console.log('🔑 Extracted pubkey from user:', testPubkey);
+        
+        if (!testPubkey) {
+          throw new Error('Failed to get public key from bunker');
+        }
 
-      console.log('✅ NIP-46 connection established');
-      console.log('👤 Remote pubkey:', testPubkey.substring(0, 8) + '...');
+        console.log('✅ NIP-46 connection established');
+        console.log('👤 Remote pubkey:', testPubkey.substring(0, 8) + '...');
+        
+        // Store the test result
+        const testResult = testPubkey;
+      } catch (testError) {
+        console.error('❌ Bunker connection test failed:', testError);
+        throw new Error(`Bunker connection test failed: ${testError.message}`);
+      }
+      
+      // Get the pubkey again for return value
+      const testPubkey = await this.signer.user().then(user => user.pubkey);
 
       this.connected = true;
       this.connecting = false;
