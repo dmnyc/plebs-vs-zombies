@@ -144,7 +144,7 @@
               @click="followDeveloper"
               class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded-full transition-colors"
             >
-              View on GitHub 👨‍💻
+              View on GitHub 🤓
             </button>
           </div>
         </div>

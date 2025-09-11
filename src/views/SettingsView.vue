@@ -337,6 +337,20 @@
             {{ immunityRecords.length }} account{{ immunityRecords.length !== 1 ? 's' : '' }} with immunity
           </div>
           
+          <!-- Profile Loading Progress -->
+          <div v-if="profilesLoading" class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-300">Loading profile data...</span>
+              <span class="text-xs text-gray-400">{{ immunityRecords.length }} profiles</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-2">
+              <div class="bg-zombie-green h-2 rounded-full transition-all duration-300 w-1/3"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">
+              Fetching names and avatars...
+            </div>
+          </div>
+          
           <div class="space-y-2 max-h-96 overflow-y-auto pr-2">
             <div 
               v-for="record in immunityRecords" 
@@ -344,14 +358,25 @@
               class="flex items-center justify-between p-3 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
             >
               <div class="flex items-center flex-grow">
-                <div class="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-white text-xs mr-3">
-                  🛡️
+                <div class="relative mr-3">
+                  <img 
+                    :src="getProfilePicture(record.pubkey)" 
+                    :alt="getDisplayName(record.pubkey)"
+                    class="w-10 h-10 rounded-full object-cover bg-gray-700"
+                    @error="handleAvatarError"
+                  />
+                  <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-700 flex items-center justify-center text-white text-xs border-2 border-gray-900">
+                    🛡️
+                  </div>
                 </div>
-                <div>
-                  <div class="font-mono text-sm">
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-gray-200 truncate">
+                    {{ getDisplayName(record.pubkey) }}
+                  </div>
+                  <div class="text-xs text-gray-400 font-mono">
                     {{ formatPubkey(record.pubkey) }}
                   </div>
-                  <div class="text-xs text-gray-400">
+                  <div class="text-xs text-gray-400 mt-1">
                     {{ record.reason }}
                   </div>
                   <div v-if="record.timestamp" class="text-xs text-gray-500">
@@ -461,7 +486,7 @@
               target="_blank"
               class="flex items-center gap-2 text-sm px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             >
-              👨‍💻 View on GitHub
+              🤓 View on GitHub
             </a>
           </div>
           <p class="text-xs text-gray-500 mt-2">
@@ -575,6 +600,8 @@ export default {
       useEnhancedScanning: false,
       loading: false,
       immunityRecords: [],
+      profilesLoading: false,
+      profileData: new Map(),
       userRelayList: null,
       signingMethod: 'nip07', // Track current signing method
       isBunkerConnected: false, // Track NIP-46 connection status
@@ -761,15 +788,62 @@ export default {
       try {
         await immunityService.init();
         this.immunityRecords = await immunityService.getAllImmunityRecords();
+        
+        // Fetch profile data for immunity records
+        if (this.immunityRecords.length > 0) {
+          this.fetchImmunityProfiles();
+        }
       } catch (error) {
         console.error('Failed to load immunity records:', error);
       } finally {
         this.loading = false;
       }
     },
+    
+    async fetchImmunityProfiles() {
+      if (this.immunityRecords.length === 0) return;
+      
+      this.profilesLoading = true;
+      try {
+        const pubkeys = this.immunityRecords.map(record => record.pubkey);
+        console.log(`Fetching profiles for ${pubkeys.length} immunity records...`);
+        
+        this.profileData = await nostrService.getProfileMetadata(pubkeys, (progress) => {
+          // Optional: could add progress callback here
+          console.log('Profile loading progress:', progress);
+        });
+        
+        console.log(`Loaded ${this.profileData.size} profiles for immunity records`);
+      } catch (error) {
+        console.error('Failed to fetch immunity profiles:', error);
+      } finally {
+        this.profilesLoading = false;
+      }
+    },
     formatPubkey(pubkey) {
       if (!pubkey) return '';
       return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
+    },
+    
+    getProfileForPubkey(pubkey) {
+      return this.profileData.get(pubkey) || null;
+    },
+    
+    getDisplayName(pubkey) {
+      const profile = this.getProfileForPubkey(pubkey);
+      if (profile && (profile.display_name || profile.name)) {
+        return profile.display_name || profile.name;
+      }
+      return this.formatPubkey(pubkey);
+    },
+    
+    getProfilePicture(pubkey) {
+      const profile = this.getProfileForPubkey(pubkey);
+      return profile?.picture || '/default-avatar.svg';
+    },
+    
+    handleAvatarError(event) {
+      event.target.src = '/default-avatar.svg';
     },
     formatDate(timestamp) {
       if (!timestamp) return '';
