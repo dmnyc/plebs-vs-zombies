@@ -45,6 +45,39 @@
 
     <!-- Connection Form -->
     <div v-else class="space-y-4">
+      <!-- Reconnect Saved Connection -->
+      <div v-if="hasSavedConnection" class="bg-green-900 border border-green-700 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-green-400 font-medium mb-1">Saved Connection Available</h4>
+            <p class="text-sm text-green-300">You have a previously authorized bunker connection</p>
+          </div>
+          <div class="flex gap-2">
+            <button 
+              @click="deleteSavedConnection"
+              :disabled="reconnecting || deleting"
+              class="btn-secondary text-sm"
+            >
+              {{ deleting ? 'Deleting...' : '🗑️ Delete' }}
+            </button>
+            <button 
+              @click="reconnectSavedConnection"
+              :disabled="reconnecting || deleting"
+              class="btn-primary"
+            >
+              {{ reconnecting ? 'Reconnecting...' : '🔄 Reconnect' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Separator -->
+      <div v-if="hasSavedConnection" class="flex items-center justify-center text-gray-500 text-sm">
+        <div class="border-t border-gray-600 flex-grow"></div>
+        <span class="px-3 bg-zombie-dark">or connect manually</span>
+        <div class="border-t border-gray-600 flex-grow"></div>
+      </div>
+
       <div v-if="connecting" class="bg-blue-900 rounded-lg p-4 text-center">
         <div class="flex items-center justify-center gap-2">
           <div class="animate-spin w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"></div>
@@ -53,7 +86,30 @@
         <p class="text-sm text-gray-300 mt-2">This may take a few seconds</p>
       </div>
 
-      <div class="space-y-3">
+      <!-- Connection Method Selector -->
+      <div class="flex border border-gray-600 rounded-lg p-1 mb-4">
+        <button
+          @click="connectionMethod = 'bunker-url'"
+          :class="connectionMethod === 'bunker-url' 
+            ? 'bg-gray-700 text-gray-100' 
+            : 'text-gray-400 hover:text-gray-200'"
+          class="flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        >
+          Use Bunker URL
+        </button>
+        <button
+          @click="connectionMethod = 'generate-string'"
+          :class="connectionMethod === 'generate-string' 
+            ? 'bg-gray-700 text-gray-100' 
+            : 'text-gray-400 hover:text-gray-200'"
+          class="flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        >
+          Generate Connection String
+        </button>
+      </div>
+
+      <!-- Bunker URL Method (existing) -->
+      <div v-if="connectionMethod === 'bunker-url'" class="space-y-3">
         <div class="space-y-2">
           <label class="block text-sm font-medium text-gray-300">
             Bunker URL
@@ -87,6 +143,56 @@
         >
           {{ connecting ? 'Connecting...' : 'Connect to Bunker' }}
         </button>
+      </div>
+
+      <!-- Generate Connection String Method -->
+      <div v-if="connectionMethod === 'generate-string'" class="space-y-3">
+        <div class="text-center">
+          <p class="text-sm text-gray-300 mb-3">
+            Generate a connection string to paste into your signer app
+          </p>
+          
+          <button 
+            v-if="!generatedConnectionString"
+            @click="generateConnectionString"
+            :disabled="generatingString"
+            class="btn-primary"
+          >
+            {{ generatingString ? 'Generating...' : 'Generate Connection String' }}
+          </button>
+          
+          <!-- Generated Connection String Display -->
+          <div v-if="generatedConnectionString" class="space-y-3">
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
+              <p class="text-sm text-gray-300 mb-2">Copy this connection string:</p>
+              <div class="flex items-center gap-2">
+                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-green-400 flex-1 text-left font-mono break-all">
+                  {{ generatedConnectionString }}
+                </code>
+                <button 
+                  @click="copyConnectionString"
+                  class="bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs"
+                  :class="connectionStringCopied ? 'text-green-400' : 'text-gray-300'"
+                >
+                  {{ connectionStringCopied ? '✅' : '📋' }}
+                </button>
+              </div>
+            </div>
+            
+            <div class="text-xs text-gray-400">
+              <p>📱 Paste this string into your signer app (nsec.app, etc.)</p>
+              <p>🔄 Your signer will connect back to complete the setup</p>
+              <p class="text-blue-400 mt-2">👂 App is now listening for your signer to connect...</p>
+            </div>
+            
+            <button 
+              @click="resetConnectionString"
+              class="btn-secondary text-sm"
+            >
+              Generate New String
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Error Display -->
@@ -156,6 +262,12 @@ export default {
       connecting: false,
       disconnecting: false,
       error: null,
+      connectionMethod: 'bunker-url',
+      generatedConnectionString: '',
+      generatingString: false,
+      connectionStringCopied: false,
+      reconnecting: false,
+      deleting: false,
       connectionStatus: {
         connected: false,
         connecting: false,
@@ -167,6 +279,11 @@ export default {
   },
   mounted() {
     this.updateConnectionStatus();
+  },
+  computed: {
+    hasSavedConnection() {
+      return !this.connectionStatus.connected && nostrService.nip46Service.hasSavedConnection();
+    }
   },
   methods: {
     updateConnectionStatus() {
@@ -191,6 +308,10 @@ export default {
         // Switch nostrService to NIP-46 mode
         nostrService.setSigningMethod('nip46');
         
+        // Set the pubkey in nostrService
+        nostrService.pubkey = result.pubkey;
+        console.log('✅ Set nostrService.pubkey:', result.pubkey.substring(0, 8) + '...');
+        
         // Update connection status
         this.updateConnectionStatus();
         
@@ -211,7 +332,8 @@ export default {
       this.disconnecting = true;
       
       try {
-        await nostrService.nip46Service.disconnect();
+        // When user explicitly disconnects in settings, clear the saved connection
+        await nostrService.nip46Service.disconnect(true);
         
         // Switch back to NIP-07 mode
         nostrService.setSigningMethod('nip07');
@@ -226,6 +348,99 @@ export default {
         this.error = 'Failed to disconnect: ' + error.message;
       } finally {
         this.disconnecting = false;
+      }
+    },
+
+    async generateConnectionString() {
+      this.generatingString = true;
+      this.error = null;
+
+      try {
+        console.log('🔗 Generating connection string...');
+        const result = await nostrService.nip46Service.generateConnectionString();
+        this.generatedConnectionString = result.connectionString;
+        console.log('✅ Connection string generated:', result.connectionString);
+        
+        // Start listening for bunker connection
+        console.log('👂 Starting to listen for bunker connection...');
+        await nostrService.nip46Service.startListeningForConnection(result);
+        console.log('✅ Now listening for bunker connection');
+        
+      } catch (error) {
+        console.error('❌ Failed to generate connection string:', error);
+        this.error = 'Failed to generate connection string: ' + error.message;
+      } finally {
+        this.generatingString = false;
+      }
+    },
+
+    async copyConnectionString() {
+      try {
+        await navigator.clipboard.writeText(this.generatedConnectionString);
+        this.connectionStringCopied = true;
+        setTimeout(() => {
+          this.connectionStringCopied = false;
+        }, 2000);
+      } catch (error) {
+        console.error('❌ Failed to copy to clipboard:', error);
+        this.error = 'Failed to copy to clipboard';
+      }
+    },
+
+    resetConnectionString() {
+      this.generatedConnectionString = '';
+      this.connectionStringCopied = false;
+    },
+
+    async reconnectSavedConnection() {
+      this.reconnecting = true;
+      this.error = null;
+
+      try {
+        console.log('🔄 Attempting to reconnect with saved connection...');
+        const result = await nostrService.nip46Service.restoreConnection();
+        
+        if (result) {
+          console.log('✅ Reconnected successfully');
+          
+          // Switch nostrService to NIP-46 mode
+          nostrService.setSigningMethod('nip46');
+          
+          // Set the pubkey in nostrService
+          nostrService.pubkey = await nostrService.nip46Service.getPublicKey();
+          
+          // Update connection status
+          this.updateConnectionStatus();
+          
+          this.$emit('connected', { pubkey: nostrService.pubkey });
+        } else {
+          throw new Error('Failed to restore saved connection');
+        }
+        
+      } catch (error) {
+        console.error('❌ Reconnect failed:', error);
+        this.error = error.message;
+      } finally {
+        this.reconnecting = false;
+      }
+    },
+
+    async deleteSavedConnection() {
+      this.deleting = true;
+      this.error = null;
+
+      try {
+        console.log('🗑️ Deleting saved connection...');
+        nostrService.nip46Service.clearSavedConnection();
+        console.log('✅ Saved connection deleted');
+        
+        // Update the connection status to reflect the change
+        this.updateConnectionStatus();
+      } catch (error) {
+        console.error('❌ Failed to delete saved connection:', error);
+        this.error = 'Failed to delete saved connection: ' + error.message;
+      } finally {
+        this.deleting = false;
       }
     },
 
