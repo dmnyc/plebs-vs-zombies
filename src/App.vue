@@ -1,11 +1,12 @@
 <template>
   <div class="min-h-screen flex flex-col bg-gray-900">
-    <header class="bg-zombie-dark border-b border-gray-700 shadow-lg">
+    <header class="bg-zombie-dark border-b border-gray-700 shadow-lg" :key="forceUpdateKey">
       <div class="container mx-auto px-4 py-4">
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-3 cursor-pointer" @click="setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
             <h1 class="text-2xl sm:text-3xl hover:text-zombie-green transition-colors">Plebs vs. Zombies</h1>
+            
           </div>
           
           <div class="flex items-center gap-4">
@@ -60,18 +61,21 @@
               </ul>
             </nav>
             
-            <!-- User Avatar and Dropdown (Desktop) -->
-            <div v-if="isConnected && userProfile" class="relative hidden lg:block">
+            <!-- User Avatar and Dropdown (Desktop) -->  
+            <div v-if="isConnected && userProfile" class="relative block">
               <button 
                 @click="userDropdownOpen = !userDropdownOpen"
                 class="flex items-center gap-2 hover:bg-gray-800 rounded-lg p-2 transition-colors"
               >
                 <img 
-                  :src="userProfile.picture || '/default-avatar.svg'" 
-                  :alt="userProfile.name || userProfile.display_name || 'User'"
+                  :src="userProfile?.picture || '/default-avatar.svg'" 
+                  :alt="userProfile?.name || userProfile?.display_name || 'User'"
                   class="w-8 h-8 rounded-full object-cover bg-gray-700"
                   @error="handleAvatarError"
                 />
+                <span class="text-gray-200 font-medium truncate max-w-32">
+                  {{ userProfile?.display_name || userProfile?.name || 'User' }}
+                </span>
               </button>
               
               <!-- Dropdown Menu -->
@@ -80,10 +84,10 @@
                 class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50"
               >
                 <div class="p-3 border-b border-gray-700">
-                  <div class="font-medium text-white">{{ userProfile.display_name || userProfile.name || 'Anonymous' }}</div>
+                  <div class="font-medium text-white">{{ userProfile?.display_name || userProfile?.name || 'Anonymous' }}</div>
                   <div class="text-sm text-gray-400 flex items-center">
-                    <span class="truncate">{{ formatNpub(userProfile.pubkey) }}</span>
-                    <CopyButton :pubkey="userProfile.pubkey" />
+                    <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
+                    <CopyButton :pubkey="userProfile?.pubkey" />
                   </div>
                 </div>
                 <div class="p-1">
@@ -117,16 +121,16 @@
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center gap-3 mb-3">
               <img 
-                :src="userProfile.picture || '/default-avatar.svg'" 
-                :alt="userProfile.name || userProfile.display_name || 'User'"
+                :src="userProfile?.picture || '/default-avatar.svg'" 
+                :alt="userProfile?.name || userProfile?.display_name || 'User'"
                 class="w-10 h-10 rounded-full object-cover bg-gray-700"
                 @error="handleAvatarError"
               />
               <div class="flex-1 min-w-0">
-                <div class="font-medium text-white truncate">{{ userProfile.display_name || userProfile.name || 'Anonymous' }}</div>
+                <div class="font-medium text-white truncate">{{ userProfile?.display_name || userProfile?.name || 'Anonymous' }}</div>
                 <div class="text-sm text-gray-400 flex items-center">
-                  <span class="truncate">{{ formatNpub(userProfile.pubkey) }}</span>
-                  <CopyButton :pubkey="userProfile.pubkey" />
+                  <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
+                  <CopyButton :pubkey="userProfile?.pubkey" />
                 </div>
               </div>
             </div>
@@ -223,21 +227,20 @@
             </div>
           </label>
           
-          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg opacity-50 cursor-not-allowed transition-colors">
+          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
+                 :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
             <input 
               type="radio" 
               value="nip46" 
               v-model="loginSigningMethod" 
-              disabled
-              class="w-5 h-5 text-gray-500 mt-0.5 cursor-not-allowed"
+              class="w-5 h-5 text-purple-500 mt-0.5"
             />
             <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-400">Remote Signer (NIP-46)</span>
-              <p class="text-sm text-gray-500 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
+              <span class="text-lg font-medium text-gray-100">Remote Signer (NIP-46)</span>
+              <p class="text-sm text-gray-400 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
               <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-gray-800 text-gray-500 px-2 py-1 rounded">🚧 Coming Soon</span>
-                <span class="text-xs bg-purple-900 text-purple-400 px-2 py-1 rounded opacity-60">📱 Mobile friendly</span>
-                <span class="text-xs bg-yellow-900 text-yellow-400 px-2 py-1 rounded opacity-60">🔒 Enhanced security</span>
+                <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">📱 Mobile friendly</span>
+                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">🔒 Enhanced security</span>
               </div>
             </div>
           </label>
@@ -248,14 +251,11 @@
             {{ getConnectButtonText() }}
           </button>
           
-          <p class="text-xs text-gray-500 mt-4">
-            You can change your signing method later in Settings
-          </p>
         </div>
       </div>
 
       <div v-else>
-        <component :is="currentView"></component>
+        <component :is="currentView" ref="currentViewComponent" @logout="logout"></component>
       </div>
     </main>
 
@@ -397,6 +397,14 @@
       </div>
     </div>
   </div>
+
+  <!-- Client Authorization Modal -->
+  <ClientAuthorizationModal
+    :show="authorizationModal.show"
+    :appInfo="authorizationModal.appInfo"
+    @allow="handleAuthorizationAllow"
+    @deny="handleAuthorizationDeny"
+  />
 </template>
 
 <script>
@@ -408,6 +416,7 @@ import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
+import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -422,7 +431,8 @@ export default {
     SettingsView,
     FollowsManagerView,
     CopyButton,
-    Nip46Connection
+    Nip46Connection,
+    ClientAuthorizationModal
   },
   data() {
     return {
@@ -432,11 +442,22 @@ export default {
       userDropdownOpen: false,
       userProfile: null,
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
+      forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
         qrCode: ''
+      },
+      authorizationModal: {
+        show: false,
+        appInfo: {
+          name: 'Plebs vs Zombies',
+          pubkey: '',
+          logo: '/logo.svg',
+          url: window.location.origin
+        },
+        pendingConnection: null
       },
       views: {
         dashboard: markRaw(DashboardView),
@@ -524,6 +545,9 @@ export default {
       this.userProfile = null;
       this.userDropdownOpen = false;
       this.mobileMenuOpen = false;
+      // Reset to sign-in state
+      this.activeView = 'dashboard'; // Reset view state
+      console.log('✅ Logged out and returned to sign-in page');
     },
     
     formatNpub(pubkey) {
@@ -541,23 +565,83 @@ export default {
       event.target.src = '/default-avatar.svg';
     },
     
-    onNip46Connected(event) {
-      console.log('✅ NIP-46 connected from setup modal:', event.detail);
+    onNip46Connected(result) {
+      console.log('✅ NIP-46 connected from setup modal:', result);
+      
+      // Handle both direct result object and CustomEvent
+      const data = result?.detail || result;
+      
+      if (!data || !data.pubkey) {
+        console.error('❌ Invalid connection data:', result);
+        return;
+      }
+      
+      console.log('🔄 Setting isConnected = true and userProfile');
       this.isConnected = true;
-      this.userProfile = {
-        pubkey: event.detail.pubkey,
+      
+      // CRITICAL: Set pubkey in nostrService for other parts of the app
+      nostrService.pubkey = data.pubkey;
+      nostrService.setSigningMethod('nip46');
+      console.log('✅ Set nostrService.pubkey:', data.pubkey.substring(0, 8) + '...');
+      
+      // Check if we already have profile data in nostrService
+      const existingProfile = nostrService.userProfile;
+      
+      this.userProfile = existingProfile ? {
+        ...existingProfile,
+        picture: existingProfile.picture || '/default-avatar.svg' // Ensure we have a picture
+      } : {
+        pubkey: data.pubkey,
         // NIP-46 doesn't provide profile initially, will be loaded later
-        display_name: event.detail.pubkey.substring(0, 8) + '...',
-        name: 'NIP-46 User'
+        display_name: data.pubkey.substring(0, 8) + '...',
+        name: 'NIP-46 User',
+        picture: '/default-avatar.svg'
       };
+      
+      console.log('✅ State after setting:', {
+        isConnected: this.isConnected,
+        userProfile: this.userProfile,
+        showNip46Setup: this.showNip46Setup
+      });
+      console.log('📋 userProfile details:', JSON.stringify(this.userProfile, null, 2));
       
       // Initialize other services
       backupService.init();
       immunityService.init();
       
-      // Close the setup modal and navigate to dashboard
+      // Close the setup modal and navigate to dashboard immediately
+      console.log('🔄 Closing modal and navigating to dashboard');
       this.showNip46Setup = false;
       this.activeView = 'dashboard';
+      
+      console.log('✅ Final state:', {
+        isConnected: this.isConnected,
+        userProfile: this.userProfile,
+        showNip46Setup: this.showNip46Setup,
+        activeView: this.activeView
+      });
+      
+      // Force Vue reactivity update using key technique
+      this.forceUpdateKey += 1;
+      
+      // Load the user profile data which will dispatch user-profile-loaded event
+      console.log('🔄 Loading user profile data...');
+      // Use setTimeout to not block the UI update
+      setTimeout(() => {
+        nostrService.loadUserProfile().then(() => {
+          console.log('✅ User profile loading initiated');
+        }).catch(error => {
+          console.warn('⚠️ Failed to load user profile:', error);
+        });
+      }, 100); // Small delay to let UI update first
+      
+      // Force dashboard to refresh follow data after connection
+      this.$nextTick(() => {
+        if (this.activeView === 'dashboard' && this.$refs.currentViewComponent) {
+          console.log('🔄 Forcing dashboard refresh after NIP-46 connection');
+          this.$refs.currentViewComponent.loadDashboardData?.();
+        }
+      });
     },
     
     closeNip46Setup() {
@@ -600,6 +684,76 @@ export default {
     zapOnNostr() {
       const creatorNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
       window.open(`https://jumble.social/users/${creatorNpub}`, '_blank');
+    },
+    
+    onUserProfileLoaded(event) {
+      console.log('📡 Received user-profile-loaded event:', event.detail);
+      
+      if (event.detail && this.isConnected) {
+        // Update the user profile with the loaded data
+        this.userProfile = {
+          ...this.userProfile,
+          ...event.detail,
+          // Ensure we have a default picture if none provided
+          picture: event.detail.picture || '/default-avatar.svg'
+        };
+        
+        console.log('✅ Updated userProfile with loaded data:', this.userProfile);
+        
+        // Force Vue reactivity update
+        this.forceUpdateKey += 1;
+      }
+    },
+
+    handleAuthorizationAllow(options) {
+      console.log('✅ User allowed NIP-46 connection', options);
+      this.authorizationModal.show = false;
+      
+      // TODO: Store permission preferences if remember is true
+      if (options.remember) {
+        console.log('💾 User wants to remember this decision for future connections');
+        // Could store app permissions in localStorage
+      }
+      
+      // Complete the pending connection
+      if (this.authorizationModal.pendingConnection) {
+        this.completePendingConnection();
+      }
+    },
+
+    handleAuthorizationDeny(options) {
+      console.log('❌ User denied NIP-46 connection', options);
+      this.authorizationModal.show = false;
+      
+      // TODO: Store permission preferences if remember is true
+      if (options.remember) {
+        console.log('💾 User wants to remember this decision for future connections');
+        // Could store app permissions in localStorage to auto-deny
+      }
+      
+      // Cancel the pending connection
+      this.authorizationModal.pendingConnection = null;
+    },
+
+    completePendingConnection() {
+      if (this.authorizationModal.pendingConnection) {
+        // Handle the connection completion based on the pending connection data
+        console.log('🔗 Completing authorized connection');
+        // The connection logic would continue here
+        this.authorizationModal.pendingConnection = null;
+      }
+    },
+
+    showClientAuthorizationModal(appInfo, pendingConnection = null) {
+      console.log('🔐 Showing client authorization modal for:', appInfo.name);
+      this.authorizationModal.appInfo = {
+        name: appInfo.name || 'Unknown App',
+        pubkey: appInfo.pubkey ? (appInfo.pubkey.substring(0, 8) + '...' + appInfo.pubkey.substring(-4)) : '',
+        logo: appInfo.logo || '/logo.svg',
+        url: appInfo.url || ''
+      };
+      this.authorizationModal.pendingConnection = pendingConnection;
+      this.authorizationModal.show = true;
     }
   },
   async mounted() {
@@ -607,8 +761,26 @@ export default {
     const sessionRestored = await nostrService.restoreSession();
     if (sessionRestored && (nostrService.isExtensionReady() || nostrService.isBunkerReady())) {
       this.isConnected = true;
-      this.userProfile = nostrService.userProfile;
+      
+      // For NIP-46, create default profile if userProfile is not set or incomplete
+      if (nostrService.getSigningMethod() === 'nip46' && nostrService.pubkey) {
+        this.userProfile = nostrService.userProfile || {
+          pubkey: nostrService.pubkey,
+          display_name: nostrService.pubkey.substring(0, 8) + '...',
+          name: 'NIP-46 User',
+          picture: '/default-avatar.svg'
+        };
+        
+        // If userProfile exists but is missing picture, add default
+        if (this.userProfile && !this.userProfile.picture) {
+          this.userProfile.picture = '/default-avatar.svg';
+        }
+      } else {
+        this.userProfile = nostrService.userProfile;
+      }
+      
       console.log('✅ Session restored successfully');
+      console.log('📋 Final userProfile:', this.userProfile);
     } else if (sessionRestored) {
       // Session data exists but no signing method ready - clear it
       console.log('⚠️ Session data found but no signing method ready - clearing session');
@@ -621,6 +793,9 @@ export default {
     
     // Listen for NIP-46 connection events from SettingsView
     window.addEventListener('nip46-connected', this.onNip46Connected);
+    
+    // Listen for user profile loaded events
+    window.addEventListener('user-profile-loaded', this.onUserProfileLoaded);
     
     // Close menus when clicking outside
     document.addEventListener('click', (e) => {
@@ -635,6 +810,7 @@ export default {
   
   beforeUnmount() {
     window.removeEventListener('nip46-connected', this.onNip46Connected);
+    window.removeEventListener('user-profile-loaded', this.onUserProfileLoaded);
   }
 }
 </script>

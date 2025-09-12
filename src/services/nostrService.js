@@ -36,22 +36,60 @@ class NostrService {
 
   async initialize() {
     if (!this.ndk) {
+      console.log('🔧 Initializing NDK with relays:', this.relays);
+      console.log('🔍 NDK instance check - creating new NDK instance');
       // Create NDK with appropriate signer based on signing method
-      let signer = null;
-      
-      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
-        signer = new NDKNip07Signer();
-      } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
-        signer = this.nip46Service.getSigner();
-      }
-      
+      // Create NDK without signer first to avoid automatic user() calls
       this.ndk = new NDK({
-        explicitRelayUrls: this.relays,
-        signer: signer
+        explicitRelayUrls: this.relays
       });
+      
+      console.log('🔗 Connecting to NDK...');
       await this.ndk.connect();
+      
+      const initialStats = {
+        relaysCount: this.ndk?.pool?.relays?.size || 0,
+        connectedRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
+          .filter(r => r.connectivity.status === 1).length,
+        connectingRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
+          .filter(r => r.connectivity.status === 0).length,
+        relayStatuses: Array.from(this.ndk?.pool?.relays?.values() || [])
+          .map(r => ({ url: r.url, status: r.connectivity.status }))
+      };
+      
+      console.log('✅ NDK connected. Initial pool stats:', initialStats);
+      
+      // Wait a bit to see if connections establish
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const afterWaitStats = {
+        connectedRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
+          .filter(r => r.connectivity.status === 1).length,
+        relayStatuses: Array.from(this.ndk?.pool?.relays?.values() || [])
+          .map(r => ({ url: r.url, status: r.connectivity.status }))
+      };
+      
+      console.log('🔄 NDK pool stats after 1s wait:', afterWaitStats);
+      
+      // Set signer after NDK is connected (but avoid NIP-46 signer to prevent NIP-05 lookups)
+      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
+        this.ndk.signer = new NDKNip07Signer();
+      }
+      // For NIP-46, we'll set the signer only when needed for signing, not globally
     }
     return this.ndk;
+  }
+
+  /**
+   * Get the appropriate signer for the current signing method
+   */
+  getSigner() {
+    if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
+      return new NDKNip07Signer();
+    } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
+      return this.nip46Service.getSigner();
+    }
+    return null;
   }
 
   /**
@@ -245,13 +283,51 @@ class NostrService {
     try {
       await this.initialize();
       
+      // Check for cached profile data first
+      const cacheKey = `profile_${this.pubkey}`;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const cachedProfile = JSON.parse(cached);
+          // Use cached data if it's less than 1 hour old
+          if (Date.now() - cachedProfile.timestamp < 3600000) {
+            console.log('📋 Using cached profile data');
+            this.userProfile = {
+              pubkey: this.pubkey,
+              name: cachedProfile.name || null,
+              display_name: cachedProfile.display_name || cachedProfile.displayName || null,
+              about: cachedProfile.about || null,
+              picture: cachedProfile.picture || null,
+              nip05: cachedProfile.nip05 || null
+            };
+            
+            // Dispatch event immediately with cached data
+            if (this.userProfile && this.signingMethod === 'nip46') {
+              console.log('📡 Dispatching cached user-profile-loaded event for NIP-46');
+              const profileEvent = new CustomEvent('user-profile-loaded', {
+                detail: this.userProfile
+              });
+              window.dispatchEvent(profileEvent);
+            }
+          }
+        }
+      } catch (cacheError) {
+        console.warn('Failed to load cached profile:', cacheError);
+      }
+      
       const filter = {
         kinds: [0],
         authors: [this.pubkey],
         limit: 1
       };
       
-      const events = await this.ndk.fetchEvents(filter);
+      // Add timeout to prevent long delays
+      const events = await Promise.race([
+        this.ndk.fetchEvents(filter),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        )
+      ]);
       const eventArray = Array.from(events);
       
       if (eventArray.length > 0) {
@@ -292,6 +368,31 @@ class NostrService {
           picture: null,
           nip05: null
         };
+      }
+      
+      
+      // Cache the profile data if we successfully loaded it
+      if (this.userProfile && (this.userProfile.name || this.userProfile.display_name || this.userProfile.picture)) {
+        try {
+          const cacheKey = `profile_${this.pubkey}`;
+          const cacheData = {
+            ...this.userProfile,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+          console.log('💾 Cached profile data');
+        } catch (cacheError) {
+          console.warn('Failed to cache profile data:', cacheError);
+        }
+      }
+      
+      // Dispatch event to update UI with loaded profile data
+      if (this.userProfile && this.signingMethod === 'nip46') {
+        console.log('📡 Dispatching user-profile-loaded event for NIP-46');
+        const profileEvent = new CustomEvent('user-profile-loaded', {
+          detail: this.userProfile
+        });
+        window.dispatchEvent(profileEvent);
       }
       
       return this.userProfile;
@@ -1364,6 +1465,87 @@ class NostrService {
 
       console.log(`🔍 Fetching NIP-65 relay list for ${pubkey.substring(0, 8)}...`);
       
+      // Use fetchEvents approach directly (same as follow lists) - faster and more reliable
+      try {
+        const events = await this.ndk.fetchEvents({
+          kinds: [10002],
+          authors: [pubkey],
+          limit: 1
+        });
+        
+        if (events && events.size > 0) {
+          const eventArray = Array.from(events).sort((a, b) => b.created_at - a.created_at);
+          const relayList = this.parseRelayList(eventArray[0]);
+          console.log(`✅ Found relay list for ${pubkey.substring(0, 8)}...:`, relayList);
+          return relayList;
+        } else {
+          console.log(`❌ No relay list found for ${pubkey.substring(0, 8)}...`);
+        }
+      } catch (fastError) {
+        console.warn('⚠️ fetchEvents method failed, falling back to subscription:', fastError);
+      }
+      
+      // Fallback to subscription method only if fetchEvents fails
+      const connectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+        .filter(r => r.connectivity.status === 1);
+      
+      console.log('🔧 NDK state for fallback:', {
+        exists: !!this.ndk,
+        signingMethod: this.signingMethod,
+        relaysCount: this.ndk?.pool?.relays?.size || 0,
+        connectedRelays: connectedRelays.length,
+        relayUrls: connectedRelays.map(r => r.url)
+      });
+      
+      // If no relays are connected yet, wait briefly for connections to establish
+      if (connectedRelays.length === 0) {
+        console.log('⏳ No relays connected yet, waiting for connections...');
+        
+        // Wait up to 3 seconds for at least one relay to connect (fallback only)
+        let attempts = 0;
+        const maxAttempts = 6; // 6 x 500ms = 3 seconds max
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+          
+          const nowConnectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+            .filter(r => r.connectivity.status === 1);
+          
+          if (nowConnectedRelays.length > 0) {
+            console.log(`✅ Connected to ${nowConnectedRelays.length} relays after ${attempts * 500}ms`);
+            console.log(`📡 Connected relay URLs:`, nowConnectedRelays.map(r => r.url));
+            break;
+          }
+          
+          if (attempts % 6 === 0) { // Log every 3 seconds
+            console.log(`⏳ Still waiting for relay connections... (${attempts * 500}ms)`);
+            // Log relay statuses to debug connection issues
+            const allRelays = Array.from(this.ndk?.pool?.relays?.values() || []);
+            const relayStatuses = allRelays.map(r => ({ 
+              url: r.url, 
+              status: r.connectivity.status,
+              statusText: r.connectivity.status === 0 ? 'connecting' : 
+                         r.connectivity.status === 1 ? 'connected' : 'disconnected'
+            }));
+            console.log(`🔍 Current relay statuses:`, relayStatuses);
+            
+            // Log individual relay status for clarity
+            relayStatuses.forEach(relay => {
+              console.log(`  📡 ${relay.url}: ${relay.statusText} (${relay.status})`);
+            });
+          }
+        }
+        
+        const finalConnectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+          .filter(r => r.connectivity.status === 1);
+        
+        if (finalConnectedRelays.length === 0) {
+          console.warn('⚠️ No relays connected after 3 second fallback timeout');
+          return null; // Return null since primary method already tried fetchEvents
+        }
+      }
+      
       const events = [];
       const subscription = this.ndk.subscribe(filter);
       
@@ -1411,6 +1593,12 @@ class NostrService {
    * Fetch and cache the logged-in user's relay list
    */
   async fetchUserRelayList() {
+    console.log('📋 fetchUserRelayList called with:', {
+      hasPubkey: !!this.pubkey,
+      signingMethod: this.signingMethod,
+      pubkeyPreview: this.pubkey?.substring(0, 8) + '...'
+    });
+    
     if (!this.pubkey) {
       console.warn('❌ Cannot fetch user relay list - no pubkey available');
       return null;
@@ -1418,6 +1606,7 @@ class NostrService {
 
     const relayList = await this.fetchRelayList(this.pubkey);
     this.userRelayList = relayList;
+    console.log('📋 fetchUserRelayList result:', !!relayList);
     return relayList;
   }
 
@@ -1905,6 +2094,29 @@ class NostrService {
     // Fallback to default relays if no user relay list
     console.log(`📡 Using ${this.relays.length} default relays for publishing`);
     return this.relays;
+  }
+
+  async restoreNip46Session() {
+    try {
+      const restored = await this.nip46Service.restoreConnection();
+      if (restored) {
+        // Get pubkey from restored connection
+        this.pubkey = await this.nip46Service.getPublicKey();
+        
+        // Load user profile
+        await this.loadUserProfile();
+        
+        // Initialize NDK with NIP-46 signer
+        await this.initialize();
+        
+        console.log('✅ NIP-46 session restored successfully');
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to restore NIP-46 session:', error);
+    }
+    
+    return false;
   }
 }
 

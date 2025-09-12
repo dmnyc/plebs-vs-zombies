@@ -6,94 +6,57 @@
       <div class="card">
         <h3 class="text-xl mb-4">Nostr Settings</h3>
         
-        <!-- Signing Method Selection -->
+        <!-- Account Status -->
         <div class="mb-6">
-          <h4 class="text-lg mb-3">Signing Method</h4>
-          <div class="space-y-3">
-            <label class="flex items-center gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
-              <input 
-                type="radio" 
-                value="nip07" 
-                v-model="signingMethod" 
-                class="w-4 h-4 text-zombie-green focus:ring-zombie-green"
-                @change="onSigningMethodChange"
-              />
-              <div class="flex-grow">
-                <span class="text-gray-200 font-medium">Browser Extension (NIP-07)</span>
-                <p class="text-sm text-gray-400">Use Alby, nos2x, or other browser extensions</p>
-              </div>
-              <div v-if="signingMethod === 'nip07' && isConnected" class="text-zombie-green">
-                <span class="w-2 h-2 bg-zombie-green rounded-full inline-block"></span>
-              </div>
-            </label>
-            
-            <label class="flex items-center gap-3 p-3 border border-gray-600 rounded-lg opacity-50 cursor-not-allowed">
-              <input 
-                type="radio" 
-                value="nip46" 
-                v-model="signingMethod" 
-                class="w-4 h-4 text-gray-500 focus:ring-gray-500"
-                disabled
-              />
-              <div class="flex-grow">
-                <span class="text-gray-400 font-medium">Remote Signer (NIP-46)</span>
-                <p class="text-sm text-gray-500">Connect to nsec.app, nsecBunker, or other remote signers</p>
-                <p class="text-xs text-yellow-400 font-medium">Coming Soon</p>
-              </div>
-            </label>
-          </div>
-        </div>
-        
-        <!-- Connection Status -->
-        <div class="mb-6">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-gray-300">Connection status:</span>
-            <span class="font-bold" :class="isConnected ? 'text-zombie-green' : 'text-red-500'">
-              {{ isConnected ? 'Connected' : 'Disconnected' }}
-            </span>
-          </div>
+          <h4 class="text-lg mb-3">Account</h4>
           
-          <div v-if="isConnected" class="mb-4">
-            <div class="text-gray-300 mb-1">Your public key:</div>
-            <div class="flex items-center">
-              <span class="font-mono text-sm bg-gray-800 p-2 rounded-l border border-gray-700 truncate flex-grow">
-                {{ npub }}
-              </span>
-              <button 
-                @click="copyToClipboard(npub)" 
-                class="bg-gray-700 border border-l-0 border-gray-700 p-2 rounded-r hover:bg-gray-600"
-                title="Copy to clipboard"
-              >
-                📋
-              </button>
+          <div v-if="isConnected" class="space-y-4">
+            <!-- Current Connection Status -->
+            <div class="p-4 bg-gray-800 border border-gray-600 rounded-lg">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="text-zombie-green">
+                    <span class="w-3 h-3 bg-zombie-green rounded-full inline-block"></span>
+                  </div>
+                  <span class="text-gray-100 font-medium">Connected</span>
+                </div>
+                <span class="text-sm text-gray-400">
+                  {{ signingMethod === 'nip07' ? 'Browser Extension' : 'Remote Signer' }}
+                </span>
+              </div>
+              
+              <!-- Public Key -->
+              <div class="text-gray-300 mb-2">Your public key:</div>
+              <div class="flex items-center">
+                <span class="font-mono text-sm bg-gray-900 p-3 rounded-l border border-gray-700 truncate flex-grow">
+                  {{ npub }}
+                </span>
+                <button 
+                  @click="copyToClipboard(npub)" 
+                  class="bg-gray-700 border border-l-0 border-gray-700 p-3 rounded-r hover:bg-gray-600 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  📋
+                </button>
+              </div>
             </div>
+            
+            <!-- Logout Button -->
+            <button 
+              @click="logout" 
+              class="btn-danger w-full"
+            >
+              Logout
+            </button>
           </div>
           
-          <div class="flex gap-3">
-            <button 
-              v-if="!isConnected && signingMethod === 'nip07'" 
-              @click="connectNostr" 
-              class="btn-primary"
-            >
-              Connect Extension
-            </button>
-            <button 
-              v-else-if="isConnected" 
-              @click="disconnectNostr" 
-              class="btn-danger"
-            >
-              Disconnect
-            </button>
+          <!-- Not Connected State -->
+          <div v-else class="p-4 bg-gray-800 border border-gray-600 rounded-lg text-center">
+            <div class="text-gray-400 mb-2">Not connected</div>
+            <p class="text-sm text-gray-500">You need to be logged in to access settings</p>
           </div>
         </div>
         
-        <!-- NIP-46 Connection Component -->
-        <div v-if="signingMethod === 'nip46'" class="mb-6">
-          <Nip46Connection 
-            @connected="onBunkerConnected"
-            @disconnected="onBunkerDisconnected"
-          />
-        </div>
         
         <div class="border-t border-gray-700 pt-4">
           <h4 class="text-lg mb-3">Relay Configuration</h4>
@@ -603,7 +566,7 @@ export default {
       profilesLoading: false,
       profileData: new Map(),
       userRelayList: null,
-      signingMethod: 'nip07', // Track current signing method
+      signingMethod: nostrService.getSigningMethod() || 'nip07', // Track current signing method
       isBunkerConnected: false, // Track NIP-46 connection status
       zapModal: {
         show: false,
@@ -628,68 +591,65 @@ export default {
     }
   },
   methods: {
-    onSigningMethodChange() {
-      console.log('Signing method changed to:', this.signingMethod);
-      nostrService.setSigningMethod(this.signingMethod);
-      
-      // Save the signing method preference
-      localStorage.setItem('signingMethod', this.signingMethod);
-      
-      this.updateConnectionStatus();
-    },
-
-    onBunkerConnected(result) {
-      console.log('Bunker connected:', result);
-      this.isBunkerConnected = true;
-      this.pubkey = result.pubkey;
-      this.npub = nostrService.hexToNpub(result.pubkey);
-      this.isConnected = true;
-      
-      // Emit event to notify App.vue about successful connection
-      window.dispatchEvent(new CustomEvent('nip46-connected', {
-        detail: result
-      }));
-    },
-
-    onBunkerDisconnected() {
-      console.log('Bunker disconnected');
-      this.isBunkerConnected = false;
-      this.pubkey = null;
-      this.npub = null;
-      this.isConnected = false;
-    },
 
     updateConnectionStatus() {
+      // Get the current signing method from nostrService (source of truth)
+      this.signingMethod = nostrService.getSigningMethod();
+      
+      console.log('🔍 Settings updateConnectionStatus:', {
+        signingMethod: this.signingMethod,
+        hasPubkey: !!nostrService.pubkey,
+        extensionConnected: nostrService.extensionConnected,
+        nip46Connected: nostrService.nip46Service?.isConnected()
+      });
+      
+      // Get connection status from nostrService
+      this.isConnected = !!(nostrService.pubkey && 
+        ((nostrService.getSigningMethod() === 'nip07' && nostrService.extensionConnected) ||
+         (nostrService.getSigningMethod() === 'nip46' && nostrService.nip46Service.isConnected())));
+      
+      console.log('✅ Settings connection status result:', this.isConnected);
+      
+      // Get pubkey and npub from nostrService if connected
+      if (this.isConnected && nostrService.pubkey) {
+        this.pubkey = nostrService.pubkey;
+        this.npub = nostrService.hexToNpub(this.pubkey);
+      } else {
+        this.pubkey = null;
+        this.npub = null;
+      }
+      
+      // Update bunker connection status
       if (this.signingMethod === 'nip07') {
-        this.isConnected = nostrService.isExtensionReady();
         this.isBunkerConnected = false;
       } else if (this.signingMethod === 'nip46') {
         this.isBunkerConnected = nostrService.isBunkerReady();
-        this.isConnected = this.isBunkerConnected;
       }
+      
+      console.log('🔄 Settings connection status updated:', {
+        signingMethod: this.signingMethod,
+        isConnected: this.isConnected,
+        hasPubkey: !!this.pubkey
+      });
     },
 
-    async connectNostr() {
-      try {
-        const pubkey = await nostrService.getPublicKey();
-        this.pubkey = pubkey;
-        this.npub = nostrService.hexToNpub(pubkey);
-        this.isConnected = true;
-        
-        // Load relays
-        this.relays = [...nostrService.relays];
-        
-        // Load user's NIP-65 relay list
-        this.userRelayList = nostrService.userRelayList;
-      } catch (error) {
-        console.error('Failed to connect to Nostr:', error);
-        alert('Failed to connect to Nostr. Please check your extension is installed and working.');
-      }
-    },
-    disconnectNostr() {
+    logout() {
+      // Call the proper logout function from nostrService
+      nostrService.logout();
+      
+      // Update local state
       this.isConnected = false;
       this.pubkey = null;
       this.npub = null;
+      this.isBunkerConnected = false;
+      
+      // Update connection status to reflect logout
+      this.updateConnectionStatus();
+      
+      // Emit logout event to parent App component to handle navigation
+      this.$emit('logout');
+      
+      console.log('✅ Logged out completely from Settings');
     },
     copyToClipboard(text) {
       navigator.clipboard.writeText(text)
@@ -976,32 +936,41 @@ export default {
     this.loadSettings();
     await this.loadImmunityRecords();
     
-    // Initialize signing method from localStorage
-    const savedSigningMethod = localStorage.getItem('signingMethod');
-    if (savedSigningMethod && ['nip07', 'nip46'].includes(savedSigningMethod)) {
-      this.signingMethod = savedSigningMethod;
-      nostrService.setSigningMethod(this.signingMethod);
-    }
-    
-    // Update connection status for current signing method
+    // Update connection status from nostrService (single source of truth)
     this.updateConnectionStatus();
     
-    // If NIP-46 was previously selected, try to restore connection
-    if (this.signingMethod === 'nip46') {
+    // Load additional data if connected
+    if (this.isConnected) {
       try {
-        const restored = await nostrService.nip46Service.restoreConnection();
-        if (restored) {
-          console.log('✅ NIP-46 connection restored from previous session');
-          this.updateConnectionStatus();
-          if (this.isBunkerConnected) {
-            const pubkey = await nostrService.nip46Service.getPublicKey();
-            this.pubkey = pubkey;
-            this.npub = nostrService.hexToNpub(pubkey);
-            this.isConnected = true;
+        // Load relays
+        this.relays = [...nostrService.relays];
+        
+        // Load user's NIP-65 relay list if available
+        this.userRelayList = nostrService.userRelayList;
+        console.log('📋 Initial userRelayList from nostrService:', !!this.userRelayList);
+        
+        // If we don't have relay list yet, try to fetch it
+        if (!this.userRelayList && nostrService.pubkey) {
+          try {
+            console.log('🔄 Settings: Fetching user relay list for pubkey:', nostrService.pubkey.substring(0, 8) + '...');
+            console.log('📋 Settings: Before fetch - userRelayList:', !!this.userRelayList);
+            await nostrService.fetchUserRelayList();
+            this.userRelayList = nostrService.userRelayList;
+            console.log('✅ Settings: After fetch - userRelayList:', !!this.userRelayList);
+            if (this.userRelayList) {
+              console.log('📋 Relay list details:', {
+                readRelays: Object.keys(this.userRelayList).filter(url => this.userRelayList[url].read).length,
+                writeRelays: Object.keys(this.userRelayList).filter(url => this.userRelayList[url].write).length
+              });
+            }
+          } catch (relayError) {
+            console.warn('⚠️ Could not load user relay list:', relayError);
           }
+        } else if (!nostrService.pubkey) {
+          console.warn('⚠️ Cannot fetch relay list - nostrService.pubkey not available');
         }
       } catch (error) {
-        console.warn('Failed to restore NIP-46 connection:', error.message);
+        console.warn('Could not load settings data:', error);
       }
     }
   }
