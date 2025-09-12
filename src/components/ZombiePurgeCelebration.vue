@@ -304,15 +304,34 @@ export default {
     shareMessage() {
       // Simple total count description
       const zombieDescription = this.totalPurged === 1 ? '1 Nostr zombie' : `${this.totalPurged} Nostr zombies`;
+      
+      // Fun variation based on number purged with multiple options per tier
+      let actionOptions = ['slaughtered'];
+      if (this.totalPurged >= 50) actionOptions = ['massacred', 'obliterated', 'annihilated'];
+      else if (this.totalPurged >= 20) actionOptions = ['eliminated', 'eradicated', 'demolished'];
+      else if (this.totalPurged >= 10) actionOptions = ['purged', 'destroyed', 'terminated'];
+      else if (this.totalPurged >= 5) actionOptions = ['hunted down', 'slaughtered'];
+      
+      // Randomly select action from the tier
+      const action = actionOptions[Math.floor(Math.random() * actionOptions.length)];
+      
+      // Randomize weapon side and zombie positions
+      const leftWeapons = ['🔪', '🏹', '⚔️'];
+      const rightWeapons = ['🗡️', '🪓', '🔨'];
+      const zombies = ['🧟‍♂️', '🧟‍♀️'];
+      
+      // Randomly choose left or right side
+      const useLeftSide = Math.random() < 0.5;
+      const weapon = useLeftSide 
+        ? leftWeapons[Math.floor(Math.random() * leftWeapons.length)]
+        : rightWeapons[Math.floor(Math.random() * rightWeapons.length)];
+      
+      const zombie1 = zombies[Math.floor(Math.random() * zombies.length)];
+      const zombie2 = zombies[Math.floor(Math.random() * zombies.length)];
 
-      // Fun variation based on number purged
-      let action = 'slaughtered';
-      if (this.totalPurged >= 50) action = 'massacred';
-      else if (this.totalPurged >= 20) action = 'eliminated';
-      else if (this.totalPurged >= 10) action = 'purged';
-      else if (this.totalPurged >= 5) action = 'hunted down';
-
-      const message = `I just ${action} ${zombieDescription} using #PlebsVsZombies! 🔪🧟‍♂️🧟‍♀️
+      const message = useLeftSide 
+        ? `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${weapon}${zombie1}${zombie2}`
+        : `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${zombie1}${zombie2}${weapon}
 
 My Zombie Score was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}

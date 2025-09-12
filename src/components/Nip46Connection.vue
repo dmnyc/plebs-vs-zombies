@@ -149,7 +149,7 @@
       <div v-if="connectionMethod === 'generate-string'" class="space-y-3">
         <div class="text-center">
           <p class="text-sm text-gray-300 mb-3">
-            Generate a connection string to paste into your signer app
+            Generate a connection string to use with your signer app
           </p>
           
           <button 
