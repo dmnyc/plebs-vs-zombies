@@ -468,19 +468,22 @@ class Nip46Service {
       console.log('📋 Local pubkey:', localPubkey);
       console.log('🔗 Relay URLs:', relayUrls);
       
-      // Create metadata for the app
-      const metadata = {
-        name: "Plebs vs Zombies",
-        url: window.location.origin,
-        description: "A Nostr utility for managing dormant follows (zombies)",
-        icons: [`${window.location.origin}/logo.svg`]
-      };
+      // Use production URL for logo so external signers can access it
+      const logoUrl = window.location.hostname === 'localhost' 
+        ? 'https://plebs-vs-zombies.vercel.app/logo.svg'
+        : `${window.location.origin}/logo.svg`;
       
-      // Build the nostrconnect:// URL
+      console.log('🖼️ Using logo URL:', logoUrl);
+      
+      // Build the nostrconnect:// URL with metadata as URL parameters
       const params = new URLSearchParams();
       relayUrls.forEach(relay => params.append('relay', relay));
-      params.set('metadata', JSON.stringify(metadata));
       params.set('secret', this.connectionSecret);
+      
+      // Add metadata as direct URL parameters per NIP-46 spec
+      params.set('name', 'Plebs vs Zombies');
+      params.set('url', window.location.origin);
+      params.set('image', logoUrl);
       
       const connectionString = `nostrconnect://${localPubkey}?${params.toString()}`;
       

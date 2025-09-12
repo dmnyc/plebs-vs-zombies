@@ -397,6 +397,14 @@
       </div>
     </div>
   </div>
+
+  <!-- Client Authorization Modal -->
+  <ClientAuthorizationModal
+    :show="authorizationModal.show"
+    :appInfo="authorizationModal.appInfo"
+    @allow="handleAuthorizationAllow"
+    @deny="handleAuthorizationDeny"
+  />
 </template>
 
 <script>
@@ -408,6 +416,7 @@ import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
+import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -422,7 +431,8 @@ export default {
     SettingsView,
     FollowsManagerView,
     CopyButton,
-    Nip46Connection
+    Nip46Connection,
+    ClientAuthorizationModal
   },
   data() {
     return {
@@ -438,6 +448,16 @@ export default {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
         qrCode: ''
+      },
+      authorizationModal: {
+        show: false,
+        appInfo: {
+          name: 'Plebs vs Zombies',
+          pubkey: '',
+          logo: '/logo.svg',
+          url: window.location.origin
+        },
+        pendingConnection: null
       },
       views: {
         dashboard: markRaw(DashboardView),
@@ -683,6 +703,57 @@ export default {
         // Force Vue reactivity update
         this.forceUpdateKey += 1;
       }
+    },
+
+    handleAuthorizationAllow(options) {
+      console.log('✅ User allowed NIP-46 connection', options);
+      this.authorizationModal.show = false;
+      
+      // TODO: Store permission preferences if remember is true
+      if (options.remember) {
+        console.log('💾 User wants to remember this decision for future connections');
+        // Could store app permissions in localStorage
+      }
+      
+      // Complete the pending connection
+      if (this.authorizationModal.pendingConnection) {
+        this.completePendingConnection();
+      }
+    },
+
+    handleAuthorizationDeny(options) {
+      console.log('❌ User denied NIP-46 connection', options);
+      this.authorizationModal.show = false;
+      
+      // TODO: Store permission preferences if remember is true
+      if (options.remember) {
+        console.log('💾 User wants to remember this decision for future connections');
+        // Could store app permissions in localStorage to auto-deny
+      }
+      
+      // Cancel the pending connection
+      this.authorizationModal.pendingConnection = null;
+    },
+
+    completePendingConnection() {
+      if (this.authorizationModal.pendingConnection) {
+        // Handle the connection completion based on the pending connection data
+        console.log('🔗 Completing authorized connection');
+        // The connection logic would continue here
+        this.authorizationModal.pendingConnection = null;
+      }
+    },
+
+    showClientAuthorizationModal(appInfo, pendingConnection = null) {
+      console.log('🔐 Showing client authorization modal for:', appInfo.name);
+      this.authorizationModal.appInfo = {
+        name: appInfo.name || 'Unknown App',
+        pubkey: appInfo.pubkey ? (appInfo.pubkey.substring(0, 8) + '...' + appInfo.pubkey.substring(-4)) : '',
+        logo: appInfo.logo || '/logo.svg',
+        url: appInfo.url || ''
+      };
+      this.authorizationModal.pendingConnection = pendingConnection;
+      this.authorizationModal.show = true;
     }
   },
   async mounted() {

@@ -162,32 +162,64 @@
           </button>
           
           <!-- Generated Connection String Display -->
-          <div v-if="generatedConnectionString" class="space-y-3">
-            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
-              <p class="text-sm text-gray-300 mb-2">Copy this connection string:</p>
-              <div class="flex items-center gap-2">
-                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-green-400 flex-1 text-left font-mono break-all">
-                  {{ generatedConnectionString }}
-                </code>
-                <button 
-                  @click="copyConnectionString"
-                  class="bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-xs"
-                  :class="connectionStringCopied ? 'text-green-400' : 'text-gray-300'"
+          <div v-if="generatedConnectionString" class="space-y-4">
+            <!-- QR Code Display -->
+            <div class="flex justify-center">
+              <div class="bg-white p-4 rounded-lg shadow-lg">
+                <div 
+                  ref="qrCode" 
+                  class="w-64 h-64 flex items-center justify-center"
                 >
-                  {{ connectionStringCopied ? '✅' : '📋' }}
-                </button>
+                  <!-- QR code will be inserted here -->
+                </div>
               </div>
             </div>
             
-            <div class="text-xs text-gray-400">
-              <p>📱 Paste this string into your signer app (nsec.app, etc.)</p>
+            <!-- Connection String -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-sm text-gray-300">Or copy connection string:</p>
+                <div class="flex items-center gap-2">
+                  <button 
+                    @click="copyConnectionString"
+                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                    :class="connectionStringCopied 
+                      ? 'bg-green-600 hover:bg-green-500 text-white' 
+                      : 'bg-zombie-green hover:bg-green-400 text-zombie-dark'"
+                  >
+                    {{ connectionStringCopied ? '✅ Copied!' : '📋 Copy' }}
+                  </button>
+                  <button 
+                    @click="showFullConnectionString = !showFullConnectionString"
+                    class="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+                  >
+                    {{ showFullConnectionString ? '▼ Hide' : '▶ Show' }}
+                  </button>
+                </div>
+              </div>
+              
+              <div v-if="showFullConnectionString" class="transition-all duration-200">
+                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-green-400 block font-mono break-all">
+                  {{ generatedConnectionString }}
+                </code>
+              </div>
+              
+              <div v-else class="text-center">
+                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-gray-500 font-mono">
+                  nostrconnect://••••••••••••••••••
+                </code>
+              </div>
+            </div>
+            
+            <div class="text-xs text-gray-400 text-center">
+              <p>📱 Scan the QR code or paste the string into your signer app</p>
               <p>🔄 Your signer will connect back to complete the setup</p>
               <p class="text-blue-400 mt-2">👂 App is now listening for your signer to connect...</p>
             </div>
             
             <button 
               @click="resetConnectionString"
-              class="btn-secondary text-sm"
+              class="btn-secondary text-sm w-full"
             >
               Generate New String
             </button>
@@ -253,6 +285,7 @@
 
 <script>
 import nostrService from '../services/nostrService';
+import qr from 'qrcode-generator';
 
 export default {
   name: 'Nip46Connection',
@@ -266,6 +299,7 @@ export default {
       generatedConnectionString: '',
       generatingString: false,
       connectionStringCopied: false,
+      showFullConnectionString: false,
       reconnecting: false,
       deleting: false,
       connectionStatus: {
@@ -361,6 +395,9 @@ export default {
         this.generatedConnectionString = result.connectionString;
         console.log('✅ Connection string generated:', result.connectionString);
         
+        // Generate QR code
+        this.generateQRCode(result.connectionString);
+        
         // Start listening for bunker connection
         console.log('👂 Starting to listen for bunker connection...');
         await nostrService.nip46Service.startListeningForConnection(result);
@@ -371,6 +408,39 @@ export default {
         this.error = 'Failed to generate connection string: ' + error.message;
       } finally {
         this.generatingString = false;
+      }
+    },
+
+    generateQRCode(text) {
+      try {
+        this.$nextTick(() => {
+          if (!this.$refs.qrCode) {
+            console.warn('QR code ref not available');
+            return;
+          }
+
+          // Clear existing content
+          this.$refs.qrCode.innerHTML = '';
+          
+          // Create QR code
+          const qrCode = qr(0, 'M');
+          qrCode.addData(text);
+          qrCode.make();
+          
+          // Generate SVG
+          const svg = qrCode.createSvgTag({
+            cellSize: 4,
+            margin: 0,
+            scalable: true
+          });
+          
+          // Insert into DOM
+          this.$refs.qrCode.innerHTML = svg;
+          
+          console.log('✅ QR code generated successfully');
+        });
+      } catch (error) {
+        console.error('❌ Failed to generate QR code:', error);
       }
     },
 
@@ -390,6 +460,7 @@ export default {
     resetConnectionString() {
       this.generatedConnectionString = '';
       this.connectionStringCopied = false;
+      this.showFullConnectionString = false;
     },
 
     async reconnectSavedConnection() {
