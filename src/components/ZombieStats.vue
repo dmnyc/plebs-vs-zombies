@@ -29,7 +29,7 @@
       
       <div class="flex justify-between items-center">
         <span class="text-gray-300">Ancient Zombies:</span>
-        <span class="font-bold text-zombie-green">{{ stats.ancient }}</span>
+        <span class="font-bold text-red-500">{{ stats.ancient }}</span>
       </div>
       
       <div class="pt-3 border-t border-gray-700">
@@ -58,7 +58,7 @@
           <div :style="{ width: `${activePercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-pleb-purple"></div>
           <div :style="{ width: `${freshPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-400"></div>
           <div :style="{ width: `${rottingPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-orange-500"></div>
-          <div :style="{ width: `${ancientPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-zombie-green"></div>
+          <div :style="{ width: `${ancientPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500"></div>
           <div v-if="stats.burned > 0" :style="{ width: `${burnedPercentage}%` }" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-amber-900"></div>
         </div>
       </div>

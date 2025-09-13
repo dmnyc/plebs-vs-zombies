@@ -9,7 +9,7 @@
             
           </div>
           
-          <div class="flex items-center gap-4">
+          <div class="flex items-center">
             <!-- Desktop Navigation -->
             <nav v-if="isConnected" class="hidden lg:block">
               <ul class="flex gap-6">
@@ -61,22 +61,21 @@
               </ul>
             </nav>
             
-            <!-- User Avatar and Dropdown (Desktop) -->  
-            <div v-if="isConnected && userProfile" class="relative block">
-              <button 
-                @click="userDropdownOpen = !userDropdownOpen"
-                class="flex items-center gap-2 hover:bg-gray-800 rounded-lg p-2 transition-colors"
-              >
-                <img 
-                  :src="userProfile?.picture || '/default-avatar.svg'" 
-                  :alt="userProfile?.name || userProfile?.display_name || 'User'"
-                  class="w-8 h-8 rounded-full object-cover bg-gray-700"
-                  @error="handleAvatarError"
-                />
-                <span class="text-gray-200 font-medium truncate max-w-32">
-                  {{ userProfile?.display_name || userProfile?.name || 'User' }}
-                </span>
-              </button>
+            <!-- User Avatar and Mobile Menu Container -->
+            <div class="flex items-center ml-auto">
+              <!-- User Avatar and Dropdown -->  
+              <div v-if="isConnected && userProfile" class="relative">
+                <button 
+                  @click="userDropdownOpen = !userDropdownOpen"
+                  class="hover:bg-gray-800 rounded-lg transition-colors lg:ml-4"
+                >
+                  <img 
+                    :src="userProfile?.picture || '/default-avatar.svg'" 
+                    :alt="userProfile?.name || userProfile?.display_name || 'User'"
+                    class="w-8 h-8 rounded-full object-cover bg-gray-700"
+                    @error="handleAvatarError"
+                  />
+                </button>
               
               <!-- Dropdown Menu -->
               <div 
@@ -99,20 +98,21 @@
                   </button>
                 </div>
               </div>
+              </div>
+              
+              <!-- Mobile/Tablet Hamburger Button -->
+              <button 
+                v-if="isConnected"
+                @click="mobileMenuOpen = !mobileMenuOpen"
+                class="lg:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors ml-2"
+                :class="{'bg-gray-800': mobileMenuOpen}"
+              >
+                <span class="w-5 h-0.5 bg-white transition-all" :class="mobileMenuOpen ? 'rotate-45 translate-y-1' : ''"></span>
+                <span class="w-5 h-0.5 bg-white mt-1 transition-all" :class="mobileMenuOpen ? 'opacity-0' : ''"></span>
+                <span class="w-5 h-0.5 bg-white mt-1 transition-all" :class="mobileMenuOpen ? '-rotate-45 -translate-y-1' : ''"></span>
+              </button>
             </div>
           </div>
-          
-          <!-- Mobile/Tablet Hamburger Button -->
-          <button 
-            v-if="isConnected"
-            @click="mobileMenuOpen = !mobileMenuOpen"
-            class="lg:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
-            :class="{'bg-gray-800': mobileMenuOpen}"
-          >
-            <span class="w-5 h-0.5 bg-white transition-all" :class="mobileMenuOpen ? 'rotate-45 translate-y-1' : ''"></span>
-            <span class="w-5 h-0.5 bg-white mt-1 transition-all" :class="mobileMenuOpen ? 'opacity-0' : ''"></span>
-            <span class="w-5 h-0.5 bg-white mt-1 transition-all" :class="mobileMenuOpen ? '-rotate-45 -translate-y-1' : ''"></span>
-          </button>
         </div>
         
         <!-- Mobile/Tablet Navigation Menu -->
