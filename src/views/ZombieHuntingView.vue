@@ -192,12 +192,26 @@
         </div>
         
         <div v-else-if="purgeSuccess" class="card mb-6 p-8 text-center">
-          <h3 class="text-xl mb-4 text-zombie-green">Zombies Successfully Purged!</h3>
-          <div class="text-6xl mb-4">🎯</div>
-          <p class="text-gray-300">{{ lastPurgeResult.removedCount }} zombies have been removed from your follow list.</p>
+          <h3 v-if="isNuclearPurge" class="text-xl mb-4 text-yellow-400">☢️ NUCLEAR STRIKE COMPLETE! ☢️</h3>
+          <h3 v-else class="text-xl mb-4 text-zombie-green">Zombies Successfully Purged!</h3>
+          
+          <div v-if="isNuclearPurge" class="text-6xl mb-4">☢️</div>
+          <div v-else class="text-6xl mb-4">🎯</div>
+          
+          <p v-if="isNuclearPurge" class="text-gray-300">
+            <strong>💀 MAXIMUM CARNAGE ACHIEVED! 💀</strong><br>
+            I just nuked {{ lastPurgeResult.removedCount }} Nostr zombies from orbit!
+          </p>
+          <p v-else class="text-gray-300">{{ lastPurgeResult.removedCount }} zombies have been removed from your follow list.</p>
+          
           <p class="text-gray-400 mt-2">Your new follow count: {{ lastPurgeResult.newFollowCount }}</p>
-          <button @click="purgeSuccess = false" class="btn-primary mt-6">
-            Continue Hunting
+          
+          <p v-if="isNuclearPurge" class="text-yellow-300 mt-3 text-sm">
+            🚨 Collateral damage assessment: COMPLETE ANNIHILATION 🚨
+          </p>
+          
+          <button @click="purgeSuccess = false; isNuclearPurge = false" class="btn-primary mt-6">
+            {{ isNuclearPurge ? 'Survey the Wasteland' : 'Continue Hunting' }}
           </button>
         </div>
         
@@ -221,6 +235,7 @@
             @purge="purgeZombies"
             @confirm-purge="handleConfirmPurge"
             @immunity-granted="handleImmunityGranted"
+            @nuclear-option="handleNuclearOption"
           />
         </div>
         
@@ -250,6 +265,7 @@
       :purgeResult="lastPurgeResult"
       :zombieScore="prePurgeStats.zombieScore"
       :purgeStats="purgeTypeBreakdown"
+      :isNuclearPurge="isNuclearPurge"
       @close="closeCelebration"
     />
 
@@ -261,6 +277,7 @@
       :type="confirmModal.type"
       :confirmText="confirmModal.confirmText"
       :cancelText="confirmModal.cancelText"
+      :hideIcon="confirmModal.type === 'nuclear'"
       @confirm="handleConfirm"
       @cancel="handleCancel"
     />
@@ -355,7 +372,8 @@ export default {
         title: '',
         message: '',
         type: 'info'
-      }
+      },
+      isNuclearPurge: false
     };
   },
   computed: {
@@ -491,6 +509,19 @@ export default {
         };
       });
     },
+    showNuclearConfirm(title, message, confirmText = 'OK', cancelText = 'Cancel') {
+      return new Promise((resolve) => {
+        this.confirmModal = {
+          show: true,
+          title,
+          message,
+          type: 'nuclear',
+          confirmText,
+          cancelText,
+          resolve
+        };
+      });
+    },
     handleConfirm() {
       this.confirmModal.show = false;
       if (this.confirmModal.resolve) {
@@ -525,6 +556,25 @@ export default {
       
       if (confirmed) {
         this.purgeZombies(confirmData.zombies);
+      }
+    },
+    async handleNuclearOption(nuclearData) {
+      const { totalTargets, allZombies } = nuclearData;
+      
+      const confirmed = await this.showNuclearConfirm(
+        '☢️ THE NUCLEAR OPTION ☢️',
+        `⚠️ WARNING: You are about to launch a NUCLEAR STRIKE against ALL ${totalTargets} possible zombie targets!\n\n🚨 THERE MAY BE COLLATERAL DAMAGE 🚨\n\nThis will remove EVERY suspected zombie found in the current scan. While we've excluded any users you've granted immunity to, some false positives may get wasted.\n\nAre you absolutely sure you want to nuke all ${totalTargets} targets?\n\n💾 Remember: You can restore from backup if necessary!`,
+        `☢️ NUKE ${totalTargets} TARGETS`,
+        'Cancel'
+      );
+      
+      if (confirmed) {
+        // Extract all pubkeys from all zombies for nuclear purge
+        const allPubkeys = allZombies.map(zombie => zombie.pubkey);
+        this.isNuclearPurge = true;
+        
+        // Skip backup confirmation for nuclear option - it's already dramatic enough!
+        this.purgeZombiesDirectly(allPubkeys);
       }
     },
 
@@ -686,6 +736,56 @@ export default {
     updateThreshold() {
       // No need to do anything here, the computed property will handle filtering
       console.log('Threshold updated to:', this.selectedThreshold);
+    },
+    async purgeZombiesDirectly(selectedPubkeys) {
+      // Direct purge method for nuclear option - skips backup confirmation
+      if (!selectedPubkeys || selectedPubkeys.length === 0) {
+        this.showAlert('No Selection', 'No zombies selected for purging', 'warning');
+        return;
+      }
+
+      // Capture stats before purging for celebration
+      this.capturePrePurgeStats(selectedPubkeys);
+      
+      this.purging = true;
+      
+      try {
+        const result = await zombieService.unfollowZombieBatch(selectedPubkeys);
+        
+        if (result.success) {
+          this.lastPurgeResult = result;
+          
+          // Update stats
+          this.stats.zombiesPurged += result.removedCount;
+          
+          // Show celebration modal
+          this.showCelebration = true;
+          
+          // Remove purged zombies from current data
+          this.updateZombieDataAfterPurge(result.removedPubkeys);
+        } else {
+          this.showAlert('Nuclear Strike Failed', `Failed to complete nuclear strike: ${result.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('Failed to execute nuclear option:', error);
+        
+        // Provide nuclear-themed error messages
+        let errorMessage = 'Nuclear strike failed.';
+        
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Nuclear strike timed out. Please check your Nostr extension and try a smaller tactical strike.';
+        } else if (error.message.includes('rejected')) {
+          errorMessage = 'Nuclear launch was aborted. Please authorize the strike in your Nostr extension.';
+        } else if (error.message.includes('too large') || error.message.includes('smaller batches')) {
+          errorMessage = 'Nuclear payload too large for delivery. Consider conventional warfare with smaller batches.';
+        } else {
+          errorMessage = error.message || 'Nuclear strike encountered unknown resistance. Check console for details.';
+        }
+        
+        this.showAlert('Nuclear Strike Error', errorMessage, 'error');
+      } finally {
+        this.purging = false;
+      }
     },
     async purgeZombies(selectedPubkeys) {
       if (!selectedPubkeys || selectedPubkeys.length === 0) {
@@ -898,6 +998,7 @@ export default {
     closeCelebration() {
       this.showCelebration = false;
       this.purgeSuccess = false;
+      this.isNuclearPurge = false;
     },
     async checkBackupBeforePurge(zombieCount) {
       try {

@@ -3,18 +3,21 @@
     <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
       <div class="flex items-center mb-4">
         <div 
+          v-if="!hideIcon"
           class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
           :class="{
             'bg-blue-600': type === 'info',
             'bg-red-600': type === 'error',
             'bg-zombie-green': type === 'success',
-            'bg-yellow-600': type === 'warning'
+            'bg-yellow-600': type === 'warning',
+            'bg-yellow-500': type === 'nuclear'
           }"
         >
           <span v-if="type === 'info'">ℹ️</span>
           <span v-else-if="type === 'error'">❌</span>
           <span v-else-if="type === 'success'">✅</span>
           <span v-else-if="type === 'warning'">⚠️</span>
+          <span v-else-if="type === 'nuclear'">☢️</span>
         </div>
         <h3 
           class="text-lg font-medium"
@@ -22,7 +25,8 @@
             'text-blue-400': type === 'info',
             'text-red-400': type === 'error',
             'text-zombie-green': type === 'success',
-            'text-yellow-400': type === 'warning'
+            'text-yellow-400': type === 'warning',
+            'text-yellow-300': type === 'nuclear'
           }"
         >
           {{ title }}
@@ -46,7 +50,8 @@
             'bg-blue-600 hover:bg-blue-500 text-white': type === 'info',
             'bg-red-600 hover:bg-red-500 text-white': type === 'error',
             'bg-zombie-green hover:bg-green-500 text-zombie-dark': type === 'success',
-            'bg-yellow-600 hover:bg-yellow-500 text-black': type === 'warning'
+            'bg-yellow-600 hover:bg-yellow-500 text-black': type === 'warning',
+            'bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 text-black font-bold border-2 border-yellow-600 shadow-lg': type === 'nuclear'
           }"
         >
           {{ confirmText }}
@@ -75,7 +80,7 @@ export default {
     type: {
       type: String,
       default: 'warning',
-      validator: value => ['info', 'success', 'warning', 'error'].includes(value)
+      validator: value => ['info', 'success', 'warning', 'error', 'nuclear'].includes(value)
     },
     confirmText: {
       type: String,
@@ -84,6 +89,10 @@ export default {
     cancelText: {
       type: String,
       default: 'Cancel'
+    },
+    hideIcon: {
+      type: Boolean,
+      default: false
     }
   },
   methods: {
