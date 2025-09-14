@@ -309,11 +309,23 @@
       
       <button 
         @click="confirmPurge" 
-        class="btn-danger w-full flex justify-center items-center gap-2"
+        class="btn-danger w-full flex justify-center items-center gap-2 py-3"
         :disabled="totalSelectedCount === 0"
       >
         <span>Purge Selected Zombies</span>
-        <span>({{ totalSelectedCount }})</span>
+        <span>({{ totalSelectedCount }} {{ totalSelectedCount === 1 ? 'target' : 'targets' }})</span>
+      </button>
+      
+      <!-- Nuclear Option Button -->
+      <button 
+        @click="confirmNuclearOption" 
+        class="btn-danger w-full flex justify-center items-center gap-2 text-black bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 border-2 border-yellow-600 shadow-lg transition-all duration-200 transform hover:scale-105 mt-3"
+        :disabled="availableZombies.length === 0"
+        title="Nuclear Option: Remove ALL possible zombies at once"
+      >
+        <span class="text-2xl">☢️</span>
+        <span class="font-bold">THE NUCLEAR OPTION</span>
+        <span class="text-sm font-bold">({{ availableZombies.length }} {{ availableZombies.length === 1 ? 'target' : 'targets' }})</span>
       </button>
     </div>
 
@@ -592,6 +604,13 @@ export default {
       }
       
       this.$emit('purge', this.selectedZombies);
+    },
+    confirmNuclearOption() {
+      // Emit nuclear option event to parent to handle the confirmation
+      this.$emit('nuclear-option', {
+        totalTargets: this.availableZombies.length,
+        allZombies: this.availableZombies
+      });
     }
   },
   watch: {
@@ -621,7 +640,7 @@ export default {
       }
     }
   },
-  emits: ['purge', 'immunity-granted']
+  emits: ['purge', 'immunity-granted', 'nuclear-option']
 };
 </script>
 

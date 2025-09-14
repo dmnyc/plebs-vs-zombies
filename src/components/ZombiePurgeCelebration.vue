@@ -4,7 +4,10 @@
       <!-- Header -->
       <div class="p-6 border-b border-gray-700">
         <div class="flex items-center justify-between">
-          <h2 class="text-2xl font-bold text-zombie-green flex items-center gap-2">
+          <h2 v-if="isNuclearPurge" class="text-2xl font-bold text-yellow-400 flex items-center gap-2">
+            ☢️ NUCLEAR STRIKE COMPLETE! 
+          </h2>
+          <h2 v-else class="text-2xl font-bold text-zombie-green flex items-center gap-2">
             🎉 Zombie Purge Complete! 
           </h2>
           <button 
@@ -20,11 +23,20 @@
       <div class="p-6 space-y-4">
         <!-- Victory Message -->
         <div class="text-center space-y-2">
-          <div class="text-4xl">🔪🧟‍♂️🧟‍♀️</div>
-          <h3 class="text-xl font-bold text-gray-100">
+          <div v-if="isNuclearPurge" class="text-4xl">☢️</div>
+          <div v-else class="text-4xl">🔪🧟‍♂️🧟‍♀️</div>
+          
+          <h3 v-if="isNuclearPurge" class="text-xl font-bold text-gray-100">
+            💀 MAXIMUM CARNAGE ACHIEVED! 💀
+          </h3>
+          <h3 v-else class="text-xl font-bold text-gray-100">
             Successfully purged {{ totalPurged }} {{ totalPurged === 1 ? 'zombie' : 'zombies' }}!
           </h3>
-          <p class="text-gray-400">
+          
+          <p v-if="isNuclearPurge" class="text-yellow-300">
+            🚨 Collateral damage assessment: COMPLETE ANNIHILATION 🚨
+          </p>
+          <p v-else class="text-gray-400">
             Your follow list is now cleaner and more efficient
           </p>
         </div>
@@ -54,7 +66,7 @@
           <!-- Zombie Score -->
           <div class="mt-4 pt-4 border-t border-gray-700">
             <div class="flex justify-between items-center mb-2">
-              <span class="text-gray-300">Previous Zombie Score:</span>
+              <span class="text-gray-300">Zombie Score:</span>
               <span class="text-lg font-bold text-zombie-green">{{ zombieScore }}%</span>
             </div>
             <!-- Visual Zombie Score bar -->
@@ -276,6 +288,10 @@ export default {
         rotting: 0,
         ancient: 0
       })
+    },
+    isNuclearPurge: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -305,6 +321,25 @@ export default {
       // Simple total count description
       const zombieDescription = this.totalPurged === 1 ? '1 Nostr zombie' : `${this.totalPurged} Nostr zombies`;
       
+      // Nuclear purge gets special messaging
+      if (this.isNuclearPurge) {
+        const nuclearActions = ['nuked', 'obliterated', 'vaporized', 'annihilated'];
+        const action = nuclearActions[Math.floor(Math.random() * nuclearActions.length)];
+        
+        const message = `I just ${action} ${zombieDescription} from orbit using the NUCLEAR OPTION in #PlebsVsZombies! ☢️🧟‍♂️🧟‍♀️
+
+💀 MAXIMUM CARNAGE ACHIEVED! 💀
+
+My Zombie Score was ${this.zombieScore}%! What's yours?
+${this.scoreBarEmojis.join('')}
+
+Follow nostr:${this.developerNpub} and join the hunt at: 🏹
+https://plebs-vs-zombies.vercel.app`;
+
+        return message;
+      }
+      
+      // Regular purge messaging
       // Fun variation based on number purged with multiple options per tier
       let actionOptions = ['slaughtered'];
       if (this.totalPurged >= 50) actionOptions = ['massacred', 'obliterated', 'annihilated'];
@@ -331,15 +366,15 @@ export default {
 
       const message = useLeftSide 
         ? `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${weapon}${zombie1}${zombie2}`
-        : `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${zombie1}${zombie2}${weapon}
+        : `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${zombie1}${zombie2}${weapon}`;
+
+      return `${message}
 
 My Zombie Score was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
 https://plebs-vs-zombies.vercel.app`;
-
-      return message;
     },
     scoreBarSquares() {
       // Create HTML-based colored squares for the UI display
