@@ -1,0 +1,771 @@
+<template>
+  <div>
+    <!-- Scout Mode Header -->
+    <div class="card mb-6 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border-yellow-600/30">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="text-3xl">🔍</div>
+          <div>
+            <h2 class="text-2xl text-yellow-400">Scout Mode</h2>
+            <div class="flex items-center gap-3 mt-1">
+              <!-- Target User Avatar -->
+              <div class="flex-shrink-0">
+                <img 
+                  v-if="scoutTarget.picture" 
+                  :src="scoutTarget.picture" 
+                  :alt="targetUsername"
+                  class="w-8 h-8 rounded-full object-cover"
+                  @error="$event.target.style.display='none'"
+                >
+                <div 
+                  v-else 
+                  class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-xs font-medium"
+                >
+                  {{ (targetUsername || 'U').charAt(0).toUpperCase() }}
+                </div>
+              </div>
+              <!-- Analyzing text with username and link -->
+              <div class="flex items-center gap-2 text-gray-400">
+                <span>Analyzing</span>
+                <span class="font-bold text-white">{{ targetUsername || targetDisplay }}</span>
+                <a 
+                  :href="getNostrProfileUrl(scoutTarget.pubkey)" 
+                  target="_blank" 
+                  class="text-purple-400 hover:text-purple-300 text-sm"
+                >
+                  profile ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button 
+            @click="showScoutNewUser" 
+            class="btn-secondary text-sm"
+            :disabled="scanning"
+          >
+            Scout Different User
+          </button>
+          <button 
+            @click="exitScoutMode" 
+            class="text-red-400 hover:text-red-300 text-2xl"
+            title="Exit Scout Mode"
+          >
+            ❌
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scout New User Modal -->
+    <div 
+      v-if="showNewUserModal" 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+      @click="showNewUserModal = false"
+    >
+      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+        <h3 class="text-lg font-medium text-yellow-400 mb-4">🔍 Scout New User</h3>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              Enter npub to scout:
+            </label>
+            <input
+              v-model="newScoutNpub"
+              type="text"
+              placeholder="npub1..."
+              class="input w-full text-center"
+              :class="{'border-red-500': newScoutError, 'border-green-500': newScoutValid}"
+            />
+            <div v-if="newScoutError" class="text-red-400 text-xs mt-1">
+              {{ newScoutError }}
+            </div>
+          </div>
+          
+          <div class="flex gap-2">
+            <button 
+              @click="showNewUserModal = false" 
+              class="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="scoutNewUser" 
+              :disabled="!newScoutValid"
+              class="btn-primary flex-1"
+              :class="{'opacity-50 cursor-not-allowed': !newScoutValid}"
+            >
+              Start Scouting
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scanning Progress -->
+    <div v-if="scanning" class="card mb-6 p-6">
+      <div class="flex flex-col">
+        <h3 class="text-xl mb-4 text-center text-yellow-400">🔍 Scouting {{ targetDisplay }}...</h3>
+        
+        <!-- Progress Bar -->
+        <div class="mb-6">
+          <div class="flex justify-between text-sm text-gray-400 mb-2">
+            <span class="truncate">{{ scanProgress.stage || 'Initializing scout...' }}</span>
+            <span class="flex-shrink-0 ml-2">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
+          </div>
+          <div class="w-full bg-gray-700 rounded-full h-3">
+            <div 
+              class="bg-yellow-400 h-3 rounded-full transition-all duration-300"
+              :style="{ width: scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total * 100) + '%' : '0%' }"
+            ></div>
+          </div>
+        </div>
+        
+        <!-- Current Processing Info -->
+        <div class="flex flex-col justify-center space-y-4 mb-6">
+          <div class="text-sm text-gray-300 break-all text-center h-10 flex items-center justify-center">
+            <span v-if="scanProgress.currentNpub">
+              <span class="text-gray-400">Processing: </span>
+              <span class="font-mono text-xs sm:text-sm">{{ formatPubkeyForProgress(scanProgress.currentNpub) }}</span>
+            </span>
+            <span v-else>&nbsp;</span>
+          </div>
+          
+          <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400"></div>
+          </div>
+        </div>
+        
+        <div class="text-center">
+          <button 
+            @click="stopScan" 
+            class="btn-danger px-6 py-2"
+          >
+            Stop Scout
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scout Results -->
+    <div v-else-if="scoutComplete && scoutResults">
+      <!-- Results Summary -->
+      <div class="card mb-6">
+        <h3 class="text-xl mb-4 text-yellow-400">🎯 Scout Report</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-gray-800 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-blue-400">{{ scoutResults.totalFollows }}</div>
+            <div class="text-sm text-gray-400">Total Follows</div>
+          </div>
+          <div class="bg-gray-800 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-red-400">{{ scoutResults.totalZombies }}</div>
+            <div class="text-sm text-gray-400">Zombie Follows</div>
+          </div>
+          <div class="bg-gray-800 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-yellow-400">{{ scoutResults.zombieScore }}%</div>
+            <div class="text-sm text-gray-400">Zombie Score</div>
+          </div>
+        </div>
+
+        <!-- Zombie Score Visualization -->
+        <div class="mb-6">
+          <h4 class="text-lg font-semibold mb-3">Zombie Score Breakdown</h4>
+          <div class="flex gap-1 mb-2">
+            <span 
+              v-for="(square, index) in scoreBarSquares" 
+              :key="index" 
+              class="text-sm"
+              v-html="square"
+            >
+            </span>
+          </div>
+          <div class="flex justify-between text-xs text-gray-400">
+            <span>Healthy Follows</span>
+            <span>Zombie Follows</span>
+          </div>
+        </div>
+
+        <!-- Social Share -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+            📢 Share Scout Report
+          </h4>
+          
+          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap">{{ shareMessage }}</div>
+          
+          <div class="flex flex-col sm:flex-row gap-2">
+            <!-- Post to Nostr button (only for authenticated users) -->
+            <button 
+              v-if="isLoggedIn"
+              @click="postToNostr"
+              :disabled="posting || posted"
+              :class="posted ? 'btn-success' : 'btn-primary'"
+              class="flex-1 flex items-center justify-center gap-2"
+            >
+              <span v-if="posting">⏳</span>
+              <span v-else-if="posted">✅</span>
+              <span v-else>📡</span>
+              {{ posting ? 'Posting...' : posted ? 'Posted!' : 'Post to Nostr' }}
+            </button>
+            
+            <!-- Copy button -->
+            <button 
+              @click="copyShareMessage"
+              :class="[
+                copied ? 'btn-success' : 'btn-secondary',
+                isLoggedIn ? 'flex-1' : 'w-full'
+              ]"
+              class="flex items-center justify-center gap-2"
+            >
+              <span v-if="copied">✅</span>
+              <span v-else>📋</span>
+              {{ copied ? 'Copied!' : 'Copy Share Message' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed Breakdown -->
+      <div class="card">
+        <h3 class="text-xl mb-4">Zombie Breakdown</h3>
+        
+        <div class="space-y-3">
+          <!-- Active Users section removed since they don't count as zombies -->
+
+          <!-- Fresh Zombies -->
+          <div v-if="scoutResults.breakdown.fresh > 0" class="border border-gray-600 rounded-lg">
+            <button 
+              @click="toggleSection('fresh')" 
+              class="w-full flex justify-between items-center p-3 bg-yellow-800/20 rounded-lg hover:bg-yellow-800/30 transition-colors"
+            >
+              <span class="text-yellow-400">🧟‍♀️ Fresh (120+ days inactive)</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-lg">{{ scoutResults.breakdown.fresh }}</span>
+                <span class="text-sm">{{ expandedSections.fresh ? '▼' : '▶' }}</span>
+              </div>
+            </button>
+            <div v-if="expandedSections.fresh" class="p-3 border-t border-gray-600 bg-gray-800/30">
+              <div class="text-sm text-gray-400 mb-2">Sample fresh zombie accounts:</div>
+              <div class="space-y-2">
+                <div v-for="user in scoutResults.analysisResults.fresh.slice(0, 10)" :key="user.pubkey" class="bg-gray-700 p-3 rounded-lg">
+                  <div class="flex items-start gap-3">
+                    <!-- Avatar -->
+                    <div class="flex-shrink-0">
+                      <img 
+                        v-if="getUserAvatar(user)" 
+                        :src="getUserAvatar(user)" 
+                        :alt="getUserDisplayName(user)"
+                        class="w-10 h-10 rounded-full object-cover"
+                        @error="$event.target.style.display='none'"
+                      >
+                      <div 
+                        v-else 
+                        class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-sm font-medium"
+                      >
+                        {{ getUserDisplayName(user).charAt(0).toUpperCase() }}
+                      </div>
+                    </div>
+                    <!-- User Info -->
+                    <div class="flex-grow min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <div class="font-medium text-white truncate">
+                          {{ getUserDisplayName(user) }}
+                        </div>
+                        <a :href="getNostrProfileUrl(user.pubkey)" target="_blank" class="text-purple-400 hover:text-purple-300 text-xs">
+                          profile ↗
+                        </a>
+                      </div>
+                      <div class="font-mono text-xs text-gray-400 truncate">
+                        {{ formatPubkeyForDisplay(user.pubkey) }}
+                      </div>
+                      <div v-if="user.lastActivity" class="text-xs text-yellow-400 mt-1">
+                        Last active: {{ formatLastActivity(user.lastActivity) }} ({{ Math.round(user.daysSinceActivity) }} days ago)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="scoutResults.analysisResults.fresh.length > 10" class="text-xs text-gray-500 text-center py-2">
+                  ... and {{ scoutResults.analysisResults.fresh.length - 10 }} more
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rotting Zombies -->
+          <div v-if="scoutResults.breakdown.rotting > 0" class="border border-gray-600 rounded-lg">
+            <button 
+              @click="toggleSection('rotting')" 
+              class="w-full flex justify-between items-center p-3 bg-orange-800/20 rounded-lg hover:bg-orange-800/30 transition-colors"
+            >
+              <span class="text-orange-400">🧟‍♂️ Rotting (180+ days inactive)</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-lg">{{ scoutResults.breakdown.rotting }}</span>
+                <span class="text-sm">{{ expandedSections.rotting ? '▼' : '▶' }}</span>
+              </div>
+            </button>
+            <div v-if="expandedSections.rotting" class="p-3 border-t border-gray-600 bg-gray-800/30">
+              <div class="text-sm text-gray-400 mb-2">Sample rotting zombie accounts:</div>
+              <div class="space-y-2">
+                <div v-for="user in scoutResults.analysisResults.rotting.slice(0, 10)" :key="user.pubkey" class="bg-gray-700 p-3 rounded-lg">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-grow min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <div class="font-medium text-white truncate">
+                          {{ getUserDisplayName(user) }}
+                        </div>
+                        <a :href="getNostrProfileUrl(user.pubkey)" target="_blank" class="text-purple-400 hover:text-purple-300 text-xs">
+                          profile ↗
+                        </a>
+                      </div>
+                      <div class="font-mono text-xs text-gray-400 truncate">
+                        {{ formatPubkeyForDisplay(user.pubkey) }}
+                      </div>
+                      <div v-if="user.lastActivity" class="text-xs text-orange-400 mt-1">
+                        Last active: {{ formatLastActivity(user.lastActivity) }} ({{ Math.round(user.daysSinceActivity) }} days ago)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="scoutResults.analysisResults.rotting.length > 10" class="text-xs text-gray-500 text-center py-2">
+                  ... and {{ scoutResults.analysisResults.rotting.length - 10 }} more
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ancient Zombies -->
+          <div v-if="scoutResults.breakdown.ancient > 0" class="border border-gray-600 rounded-lg">
+            <button 
+              @click="toggleSection('ancient')" 
+              class="w-full flex justify-between items-center p-3 bg-red-800/20 rounded-lg hover:bg-red-800/30 transition-colors"
+            >
+              <span class="text-red-400">💀 Ancient (365+ days inactive)</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-lg">{{ scoutResults.breakdown.ancient }}</span>
+                <span class="text-sm">{{ expandedSections.ancient ? '▼' : '▶' }}</span>
+              </div>
+            </button>
+            <div v-if="expandedSections.ancient" class="p-3 border-t border-gray-600 bg-gray-800/30">
+              <div class="text-sm text-gray-400 mb-2">Sample ancient zombie accounts:</div>
+              <div class="space-y-2">
+                <div v-for="user in scoutResults.analysisResults.ancient.slice(0, 10)" :key="user.pubkey" class="bg-gray-700 p-3 rounded-lg">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-grow min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <div class="font-medium text-white truncate">
+                          {{ getUserDisplayName(user) }}
+                        </div>
+                        <a :href="getNostrProfileUrl(user.pubkey)" target="_blank" class="text-purple-400 hover:text-purple-300 text-xs">
+                          profile ↗
+                        </a>
+                      </div>
+                      <div class="font-mono text-xs text-gray-400 truncate">
+                        {{ formatPubkeyForDisplay(user.pubkey) }}
+                      </div>
+                      <div v-if="user.lastActivity" class="text-xs text-red-400 mt-1">
+                        Last active: {{ formatLastActivity(user.lastActivity) }} ({{ Math.round(user.daysSinceActivity) }} days ago)
+                      </div>
+                      <div v-else class="text-xs text-red-400 mt-1">
+                        No activity found in last 90 days
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="scoutResults.analysisResults.ancient.length > 10" class="text-xs text-gray-500 text-center py-2">
+                  ... and {{ scoutResults.analysisResults.ancient.length - 10 }} more
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Burned Zombies -->
+          <div v-if="scoutResults.breakdown.burned > 0" class="border border-gray-600 rounded-lg">
+            <button 
+              @click="toggleSection('burned')" 
+              class="w-full flex justify-between items-center p-3 bg-red-900/20 rounded-lg hover:bg-red-900/30 transition-colors"
+            >
+              <span class="text-red-300">🔥 Burned (deleted accounts)</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-lg">{{ scoutResults.breakdown.burned }}</span>
+                <span class="text-sm">{{ expandedSections.burned ? '▼' : '▶' }}</span>
+              </div>
+            </button>
+            <div v-if="expandedSections.burned" class="p-3 border-t border-gray-600 bg-gray-800/30">
+              <div class="text-sm text-gray-400 mb-2">Sample burned zombie accounts:</div>
+              <div class="space-y-2">
+                <div v-for="user in scoutResults.analysisResults.burned.slice(0, 10)" :key="user.pubkey" class="bg-gray-700 p-3 rounded-lg">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-grow min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <div class="font-medium text-white truncate">
+                          {{ getUserDisplayName(user) }}
+                        </div>
+                        <a :href="getNostrProfileUrl(user.pubkey)" target="_blank" class="text-purple-400 hover:text-purple-300 text-xs">
+                          profile ↗
+                        </a>
+                      </div>
+                      <div class="font-mono text-xs text-gray-400 truncate">
+                        {{ formatPubkeyForDisplay(user.pubkey) }}
+                      </div>
+                      <div class="text-xs text-red-300 mt-1">
+                        🔥 Account deleted (found deletion event)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="scoutResults.analysisResults.burned.length > 10" class="text-xs text-gray-500 text-center py-2">
+                  ... and {{ scoutResults.analysisResults.burned.length - 10 }} more
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Results State -->
+    <div v-else-if="scoutComplete && !scoutResults" class="card p-8 text-center">
+      <div class="text-6xl mb-4">🤔</div>
+      <h3 class="text-xl mb-4">Unable to Scout User</h3>
+      <p class="text-gray-400 mb-6">
+        Could not analyze this user's follows. They may have a private profile or no follows to analyze.
+      </p>
+      <button @click="showScoutNewUser" class="btn-secondary">
+        Try Different User
+      </button>
+    </div>
+
+    <!-- Initial State -->
+    <div v-else class="card p-8 text-center">
+      <div class="text-6xl mb-4">🔍</div>
+      <h3 class="text-xl mb-4">Ready to Scout</h3>
+      <p class="text-gray-400 mb-6">
+        Scout mode will analyze {{ targetDisplay }}'s zombie follows.
+      </p>
+      <button @click="startScout" class="btn-primary">
+        🏹 Begin Scouting
+      </button>
+    </div>
+  </div>
+</template>
+
+<script>
+import scoutService from '../services/scoutService';
+import nostrService from '../services/nostrService';
+import { nip19 } from 'nostr-tools';
+
+export default {
+  name: 'ScoutModeView',
+  props: {
+    scoutTarget: {
+      type: Object,
+      required: true
+    },
+    isLoggedIn: {
+      type: Boolean,
+      default: false
+    }
+  },
+  data() {
+    return {
+      scanning: false,
+      scoutComplete: false,
+      scoutResults: null,
+      scanProgress: {
+        total: 0,
+        processed: 0,
+        currentNpub: '',
+        stage: 'initializing'
+      },
+      showNewUserModal: false,
+      newScoutNpub: '',
+      newScoutError: '',
+      copied: false,
+      posting: false,
+      posted: false,
+      expandedSections: {
+        active: false,
+        fresh: false,
+        rotting: false,
+        ancient: false,
+        burned: false
+      }
+    }
+  },
+  computed: {
+    targetDisplay() {
+      // Try to show a readable name if available, otherwise truncated npub
+      return this.scoutTarget.name || 
+             this.scoutTarget.display_name || 
+             (this.scoutTarget.npub.substring(0, 12) + '...');
+    },
+    targetUsername() {
+      // Return just the username (name or display_name) without falling back to npub
+      return this.scoutTarget.name || this.scoutTarget.display_name;
+    },
+    newScoutValid() {
+      if (!this.newScoutNpub.trim()) {
+        this.newScoutError = '';
+        return false;
+      }
+      
+      try {
+        if (!this.newScoutNpub.startsWith('npub1') || this.newScoutNpub.length !== 63) {
+          this.newScoutError = 'Invalid npub format';
+          return false;
+        }
+        
+        nip19.decode(this.newScoutNpub.trim());
+        this.newScoutError = '';
+        return true;
+      } catch (error) {
+        this.newScoutError = 'Invalid npub format';
+        return false;
+      }
+    },
+    shareMessage() {
+      if (!this.scoutResults) return '';
+      
+      const targetNpub = this.scoutTarget.npub;
+      const zombieCount = this.scoutResults.totalZombies;
+      const zombieScore = this.scoutResults.zombieScore;
+      
+      return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
+
+Your Zombie Count is: ${zombieCount}
+
+Your Zombie Score is ${zombieScore}%!
+${this.scoreBarEmojis.join('')}
+
+Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
+https://plebs-vs-zombies.vercel.app`;
+    },
+    scoreBarSquares() {
+      if (!this.scoutResults) return [];
+      
+      const squares = [];
+      const totalSquares = 14;
+      const zombiePercentage = this.scoutResults.zombieScore;
+      const healthySquares = Math.floor((100 - zombiePercentage) / 100 * totalSquares);
+      const zombieSquares = totalSquares - healthySquares;
+      
+      for (let i = 0; i < healthySquares; i++) {
+        squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
+      }
+      for (let i = 0; i < zombieSquares; i++) {
+        squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span>');
+      }
+      
+      return squares;
+    },
+    scoreBarEmojis() {
+      if (!this.scoutResults) return [];
+      
+      const bars = [];
+      const totalBars = 14;
+      const zombiePercentage = this.scoutResults.zombieScore;
+      const healthyBars = Math.floor((100 - zombiePercentage) / 100 * totalBars);
+      const zombieBars = totalBars - healthyBars;
+      
+      for (let i = 0; i < healthyBars; i++) bars.push('🟪');
+      for (let i = 0; i < zombieBars; i++) bars.push('🟩');
+      
+      return bars;
+    }
+  },
+  methods: {
+    async startScout() {
+      this.scanning = true;
+      this.scoutComplete = false;
+      this.scoutResults = null;
+      
+      this.scanProgress = {
+        total: 0,
+        processed: 0,
+        currentNpub: '',
+        stage: 'Starting scout analysis...'
+      };
+      
+      try {
+        console.log('🔍 Starting scout for:', this.scoutTarget);
+        
+        const results = await scoutService.scoutUser(this.scoutTarget.pubkey, (progress) => {
+          this.scanProgress = {
+            ...this.scanProgress,
+            ...progress
+          };
+        });
+        
+        if (results.success) {
+          this.scoutResults = results;
+          this.scoutComplete = true;
+          console.log('✅ Scout completed successfully:', results);
+        } else {
+          console.error('❌ Scout failed:', results.message);
+          this.scoutComplete = true;
+          this.scoutResults = null;
+        }
+        
+      } catch (error) {
+        console.error('❌ Scout error:', error);
+        this.scoutComplete = true;
+        this.scoutResults = null;
+      } finally {
+        this.scanning = false;
+      }
+    },
+    stopScan() {
+      // TODO: Implement scan cancellation
+      this.scanning = false;
+      console.log('🛑 Scout scan stopped by user');
+    },
+    showScoutNewUser() {
+      this.showNewUserModal = true;
+      this.newScoutNpub = '';
+      this.newScoutError = '';
+    },
+    async scoutNewUser() {
+      if (!this.newScoutValid) return;
+      
+      try {
+        const decoded = nip19.decode(this.newScoutNpub.trim());
+        const newTarget = {
+          npub: this.newScoutNpub.trim(),
+          pubkey: decoded.data
+        };
+        
+        // Update the target and restart
+        this.$emit('update-target', newTarget);
+        this.showNewUserModal = false;
+        
+        // Reset state and start new scout
+        this.scoutComplete = false;
+        this.scoutResults = null;
+        await this.startScout();
+        
+      } catch (error) {
+        this.newScoutError = 'Failed to process npub';
+      }
+    },
+    exitScoutMode() {
+      this.$emit('exit-scout');
+    },
+    formatPubkeyForProgress(pubkey) {
+      if (!pubkey) return '';
+      if (pubkey.length <= 16) return pubkey;
+      return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
+    },
+    formatPubkeyForDisplay(pubkey) {
+      if (!pubkey) return '';
+      // Convert hex pubkey to npub format
+      try {
+        const npub = nip19.npubEncode(pubkey);
+        return npub.substring(0, 12) + '...' + npub.substring(npub.length - 8);
+      } catch (error) {
+        // Fallback to hex if conversion fails
+        return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
+      }
+    },
+    toggleSection(section) {
+      this.expandedSections[section] = !this.expandedSections[section];
+    },
+    getUserDisplayName(user) {
+      if (user.display_name) return user.display_name;
+      if (user.name) return user.name;
+      return `${user.pubkey.substring(0, 8)}...${user.pubkey.substring(-8)}`;
+    },
+    getUserAvatar(user) {
+      return user.profile?.picture || user.picture || '';
+    },
+    formatLastActivity(timestamp) {
+      if (!timestamp) return 'Unknown';
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    },
+    getNostrProfileUrl(pubkey) {
+      // Use Jumble for profile viewing
+      const npub = nip19.npubEncode(pubkey);
+      return `https://jumble.social/${npub}`;
+    },
+    async copyShareMessage() {
+      try {
+        await navigator.clipboard.writeText(this.shareMessage);
+        this.copied = true;
+        
+        setTimeout(() => {
+          this.copied = false;
+        }, 3000);
+      } catch (error) {
+        console.error('Failed to copy share message:', error);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = this.shareMessage;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          this.copied = true;
+          setTimeout(() => { this.copied = false; }, 3000);
+        } catch (e) {
+          console.error('Copy fallback failed:', e);
+        }
+        document.body.removeChild(textArea);
+      }
+    },
+    async postToNostr() {
+      if (!this.isLoggedIn) return;
+      
+      this.posting = true;
+      
+      try {
+        console.log('📡 Posting scout report to Nostr...');
+        
+        // Create a note event
+        const eventContent = this.shareMessage;
+        const eventKind = 1; // Text note
+        const tags = [['t', 'PlebsVsZombies']]; // Add hashtag
+        
+        // Create and sign the event
+        const signedEvent = await nostrService.createAndSignEvent(eventKind, eventContent, tags);
+        
+        if (!signedEvent) {
+          throw new Error('Failed to create or sign event');
+        }
+        
+        console.log('✅ Event signed successfully:', signedEvent.id);
+        
+        // Ensure relay list is fresh for posting
+        if (!nostrService.isConnected) {
+          await nostrService.fetchUserRelayList();
+        }
+        
+        const publishResults = await nostrService.publishEventToRelays(signedEvent);
+        
+        if (publishResults.successful > 0) {
+          this.posted = true;
+          console.log(`✅ Scout report posted to ${publishResults.successful}/${nostrService.getPublishRelays().length} relays`);
+        } else {
+          throw new Error('Failed to publish to any relays');
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to post scout report:', error);
+        // Show user-friendly error message but don't throw
+      } finally {
+        this.posting = false;
+      }
+    }
+  },
+  async mounted() {
+    // Auto-start scouting when component mounts
+    await this.startScout();
+  }
+}
+</script>

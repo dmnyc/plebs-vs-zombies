@@ -3,10 +3,13 @@
     <header class="bg-zombie-dark border-b border-gray-700 shadow-lg" :key="forceUpdateKey">
       <div class="container mx-auto px-4 py-4">
         <div class="flex justify-between items-center">
-          <div class="flex items-center gap-3 cursor-pointer" @click="setActiveView('dashboard')">
+          <div class="flex items-center gap-3" :class="isScoutMode ? '' : 'cursor-pointer'" @click="!isScoutMode && setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
-            <h1 class="text-2xl sm:text-3xl hover:text-zombie-green transition-colors">Plebs vs. Zombies</h1>
-            
+            <div class="flex flex-col">
+              <h1 class="text-2xl sm:text-3xl transition-colors" :class="isScoutMode ? '' : 'hover:text-zombie-green'">
+                Plebs vs. Zombies
+              </h1>
+            </div>
           </div>
           
           <div class="flex items-center">
@@ -17,7 +20,7 @@
                   <a 
                     href="#" 
                     @click.prevent="setActiveView('dashboard')" 
-                    :class="{'text-zombie-green': activeView === 'dashboard', 'hover:text-zombie-green transition-colors': activeView !== 'dashboard'}"
+                    :class="{'text-zombie-green': activeView === 'dashboard' && !isScoutMode, 'hover:text-zombie-green transition-colors': activeView !== 'dashboard' || isScoutMode}"
                   >
                     Dashboard
                   </a>
@@ -56,6 +59,15 @@
                     :class="{'text-zombie-green': activeView === 'settings', 'hover:text-zombie-green transition-colors': activeView !== 'settings'}"
                   >
                     Settings
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#" 
+                    @click.prevent="showScoutModeMenu" 
+                    :class="{'text-zombie-green': isScoutMode, 'hover:text-zombie-green transition-colors': !isScoutMode}"
+                  >
+                    Scout Mode
                   </a>
                 </li>
               </ul>
@@ -147,7 +159,7 @@
               <a 
                 href="#" 
                 @click.prevent="setActiveView('dashboard'); mobileMenuOpen = false" 
-                :class="{'text-zombie-green bg-gray-800': activeView === 'dashboard'}"
+                :class="{'text-zombie-green bg-gray-800': activeView === 'dashboard' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Dashboard
@@ -193,13 +205,34 @@
                 Settings
               </a>
             </li>
+            <li>
+              <a 
+                href="#" 
+                @click.prevent="showScoutModeMenu(); mobileMenuOpen = false" 
+                :class="{'text-zombie-green bg-gray-800': isScoutMode}"
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Scout Mode
+              </a>
+            </li>
           </ul>
         </nav>
       </div>
     </header>
 
     <main class="container mx-auto px-4 py-8 flex-grow">
-      <div v-if="!isConnected" class="card max-w-2xl mx-auto my-12">
+      <!-- Scout Mode View -->
+      <div v-if="isScoutMode">
+        <ScoutModeView 
+          :scout-target="scoutTarget" 
+          :is-logged-in="isConnected"
+          @update-target="updateScoutTarget"
+          @exit-scout="exitScoutMode"
+        />
+      </div>
+      
+      <!-- Login Screen -->
+      <div v-else-if="!isConnected" class="card max-w-2xl mx-auto my-12">
         <div class="text-center mb-8">
           <div class="text-6xl mb-6">🧟‍♂️</div>
           <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
@@ -276,10 +309,67 @@
           <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
             Connect with Browser Extension
           </button>
+        </div>
+        
+        <!-- Scout Mode Section -->
+        <div class="mt-8 pt-6 border-t border-gray-700">
+          <div class="text-center mb-6">
+            <div class="text-4xl mb-3">👁️🔍</div>
+            <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
+            <p class="text-gray-400 text-sm">
+              Analyze any Nostr user's zombie follows without signing in
+            </p>
+          </div>
           
+          <div class="space-y-4">
+            <div>
+              <label for="scout-npub" class="block text-sm font-medium text-gray-300 mb-2">
+                Enter an npub to scout:
+              </label>
+              <input
+                id="scout-npub"
+                v-model="scoutNpub"
+                type="text"
+                placeholder="npub1..."
+                class="input w-full text-center"
+                :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
+              />
+              <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
+                {{ scoutNpubError }}
+              </div>
+              <div v-if="scoutNpubValid" class="text-green-400 text-xs mt-1">
+                ✅ Valid npub format
+              </div>
+            </div>
+            
+            <button 
+              @click="startScoutMode" 
+              :disabled="!scoutNpubValid || scoutModeLoading"
+              class="btn-secondary w-full flex items-center justify-center gap-2"
+              :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid || scoutModeLoading}"
+            >
+              <span v-if="scoutModeLoading">🔍</span>
+              <span v-else>🏹</span>
+              {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
+            </button>
+          </div>
+          
+          <div class="mt-4 p-3 bg-gray-800 rounded-lg">
+            <div class="flex items-start gap-2">
+              <span class="text-yellow-400 text-sm">⚠️</span>
+              <div class="text-xs text-gray-400">
+                <strong class="text-yellow-400">Scout Mode features:</strong><br>
+                • Read-only analysis of any user's follows<br>
+                • Zombie count and score calculation<br>
+                • Social sharing capabilities<br>
+                • No account creation or purging abilities
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- Main App Views -->
       <div v-else>
         <component :is="currentView" ref="currentViewComponent" @logout="logout"></component>
       </div>
@@ -431,6 +521,54 @@
     @allow="handleAuthorizationAllow"
     @deny="handleAuthorizationDeny"
   />
+
+  <!-- Scout Mode Modal for Signed-in Users -->
+  <div 
+    v-if="showScoutModal" 
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    @click="closeScoutModal"
+  >
+    <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <h3 class="text-lg font-medium text-yellow-400 mb-4">👁️🔍 Start Scout Mode</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">
+            Enter npub to scout:
+          </label>
+          <input
+            v-model="scoutNpub"
+            type="text"
+            placeholder="npub1..."
+            class="input w-full text-center"
+            :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
+            @keyup.enter="startScoutFromModal"
+            autofocus
+          />
+          <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
+            {{ scoutNpubError }}
+          </div>
+        </div>
+        
+        <div class="flex gap-2">
+          <button 
+            @click="closeScoutModal" 
+            class="btn-secondary flex-1"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="startScoutFromModal" 
+            :disabled="!scoutNpubValid"
+            class="btn-primary flex-1"
+            :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid}"
+          >
+            Start Scouting
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -440,6 +578,7 @@ import ZombieHuntingView from './views/ZombieHuntingView.vue';
 import BackupsView from './views/BackupsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
+import ScoutModeView from './views/ScoutModeView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
@@ -456,6 +595,7 @@ export default {
     BackupsView,
     SettingsView,
     FollowsManagerView,
+    ScoutModeView,
     CopyButton,
     Nip46Connection,
     ClientAuthorizationModal
@@ -490,13 +630,48 @@ export default {
         hunting: markRaw(ZombieHuntingView),
         backups: markRaw(BackupsView),
         settings: markRaw(SettingsView),
-        follows: markRaw(FollowsManagerView)
-      }
+        follows: markRaw(FollowsManagerView),
+        scout: markRaw(ScoutModeView)
+      },
+      // Scout Mode state
+      isScoutMode: false,
+      scoutNpub: '',
+      scoutNpubError: '',
+      scoutModeLoading: false,
+      scoutTarget: null,
+      showScoutModal: false
     }
   },
   computed: {
     currentView() {
       return this.views[this.activeView];
+    },
+    scoutNpubValid() {
+      if (!this.scoutNpub.trim()) {
+        this.scoutNpubError = '';
+        return false;
+      }
+      
+      try {
+        // Validate npub format
+        if (!this.scoutNpub.startsWith('npub1')) {
+          this.scoutNpubError = 'Must start with "npub1"';
+          return false;
+        }
+        
+        if (this.scoutNpub.length !== 63) {
+          this.scoutNpubError = 'Invalid npub length';
+          return false;
+        }
+        
+        // Try to decode the npub
+        nip19.decode(this.scoutNpub.trim());
+        this.scoutNpubError = '';
+        return true;
+      } catch (error) {
+        this.scoutNpubError = 'Invalid npub format';
+        return false;
+      }
     }
   },
   methods: {
@@ -505,6 +680,88 @@ export default {
         this.activeView = view;
         this.mobileMenuOpen = false; // Close mobile menu when view changes
       }
+    },
+    showScoutModeMenu() {
+      // For signed-in users, show Scout Mode modal
+      this.showScoutModal = true;
+      this.scoutNpub = '';
+      this.scoutNpubError = '';
+    },
+    closeScoutModal() {
+      this.showScoutModal = false;
+      this.scoutNpub = '';
+      this.scoutNpubError = '';
+    },
+    startScoutFromModal() {
+      if (this.scoutNpubValid) {
+        this.showScoutModal = false;
+        this.startScoutMode();
+      }
+    },
+    async startScoutMode() {
+      console.log('🔍 Start Scout Mode clicked!');
+      console.log('Scout npub valid:', this.scoutNpubValid);
+      console.log('Scout npub:', this.scoutNpub);
+      
+      if (!this.scoutNpubValid) {
+        console.log('❌ Npub not valid, returning');
+        return;
+      }
+      
+      this.scoutModeLoading = true;
+      
+      try {
+        // Decode the npub to get the pubkey
+        const decoded = nip19.decode(this.scoutNpub.trim());
+        const targetPubkey = decoded.data;
+        
+        console.log('✅ Decoded pubkey:', targetPubkey);
+        
+        // Fetch user profile to get name/display_name
+        try {
+          const profileData = await nostrService.getProfileMetadata([targetPubkey]);
+          const profile = profileData.get(targetPubkey);
+          
+          // Store scout target info with profile data
+          this.scoutTarget = {
+            npub: this.scoutNpub.trim(),
+            pubkey: targetPubkey,
+            name: profile?.name,
+            display_name: profile?.display_name,
+            picture: profile?.picture
+          };
+        } catch (error) {
+          console.warn('Could not fetch profile data:', error);
+          // Fallback without profile data
+          this.scoutTarget = {
+            npub: this.scoutNpub.trim(),
+            pubkey: targetPubkey
+          };
+        }
+        
+        // Switch to scout mode
+        this.isScoutMode = true;
+        
+        console.log('🔍 Starting Scout Mode for:', this.scoutTarget);
+        console.log('isScoutMode:', this.isScoutMode);
+        
+      } catch (error) {
+        console.error('Failed to start Scout Mode:', error);
+        this.scoutNpubError = 'Failed to process npub';
+      } finally {
+        this.scoutModeLoading = false;
+      }
+    },
+    exitScoutMode() {
+      this.isScoutMode = false;
+      this.scoutTarget = null;
+      this.scoutNpub = '';
+      this.scoutNpubError = '';
+      this.activeView = 'dashboard';
+    },
+    updateScoutTarget(newTarget) {
+      this.scoutTarget = newTarget;
+      console.log('🔄 Updated scout target:', newTarget);
     },
     async connectNostr() {
       try {
