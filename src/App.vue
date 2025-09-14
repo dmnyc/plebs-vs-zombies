@@ -203,10 +203,32 @@
         <div class="text-center mb-8">
           <div class="text-6xl mb-6">🧟‍♂️</div>
           <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
+          <p class="text-gray-300">Connect with your browser extension to manage your dormant follows.</p>
+        </div>
+        
+        <!-- Connection Info -->
+        <div class="mb-8">
+          <div class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg bg-gray-800/50">
+            <div class="text-2xl">🔌</div>
+            <div class="flex-grow">
+              <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
+              <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
+                <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEMPORARILY DISABLED - Multiple Signing Method Selection -->
+        <!--
+        <div class="text-center mb-8">
+          <div class="text-6xl mb-6">🧟‍♂️</div>
+          <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
           <p class="text-gray-300">Choose your signing method to connect and manage your dormant follows.</p>
         </div>
         
-        <!-- Signing Method Selection -->
         <div class="space-y-4 mb-8">
           <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
           
@@ -226,7 +248,11 @@
               </div>
             </div>
           </label>
+        </div>
+        -->
           
+          <!-- TEMPORARILY DISABLED - NIP-46 Remote Signer -->
+          <!--
           <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
                  :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
             <input 
@@ -244,11 +270,11 @@
               </div>
             </div>
           </label>
-        </div>
+          -->
         
         <div class="text-center">
-          <button @click="connectNostr" :disabled="!loginSigningMethod" class="btn-primary text-lg px-8 py-3">
-            {{ getConnectButtonText() }}
+          <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
+            Connect with Browser Extension
           </button>
           
         </div>
