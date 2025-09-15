@@ -111,9 +111,9 @@
         
         <!-- Progress Bar -->
         <div class="mb-6">
-          <div class="flex justify-between text-sm text-gray-400 mb-2">
-            <span class="truncate">{{ scanProgress.stage || 'Initializing scout...' }}</span>
-            <span class="flex-shrink-0 ml-2">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
+          <div class="flex justify-between items-center text-sm text-gray-400 mb-2 gap-2">
+            <span class="truncate flex-1 min-w-0">{{ scanProgress.stage || 'Initializing scout...' }}</span>
+            <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
           </div>
           <div class="w-full bg-gray-700 rounded-full h-3">
             <div 
