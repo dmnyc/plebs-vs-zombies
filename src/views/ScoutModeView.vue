@@ -149,6 +149,70 @@
       </div>
     </div>
 
+    <!-- Post Success Modal -->
+    <div 
+      v-if="showPostModal" 
+      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
+      @click.self="showPostModal = false"
+    >
+      <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold text-purple-400 flex items-center gap-2">
+              📡 Scout Report Posted! 
+            </h2>
+            <button 
+              @click="showPostModal = false"
+              class="text-gray-400 hover:text-gray-200 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <div class="text-center space-y-2">
+            <div class="text-4xl">🎯</div>
+            <h3 class="text-xl font-bold text-gray-100">
+              Successfully shared your Scout report!
+            </h3>
+            <p class="text-gray-400">
+              Your {{ isMyReport ? 'personal' : 'Scout' }} zombie analysis has been posted to Nostr
+            </p>
+          </div>
+
+          <div class="bg-gray-900 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-3 text-gray-200">Report Summary:</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-blue-300">Total Follows:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.totalFollows || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-red-300">Zombies Found:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.totalZombies || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-green-300">Zombie Score:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.zombieScore || 0 }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <button 
+              @click="showPostModal = false" 
+              class="btn-primary px-6"
+            >
+              Awesome! 🎉
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Scout Results -->
     <div v-else-if="scoutComplete && scoutResults">
       <!-- Results Summary -->
@@ -190,6 +254,18 @@
           <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
             📢 Share Scout Report
           </h4>
+          
+          <!-- "This is me!" toggle -->
+          <div class="mb-3">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                v-model="isMyReport"
+                class="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+              >
+              <span class="text-sm text-gray-300">This is me!</span>
+            </label>
+          </div>
           
           <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap">{{ shareMessage }}</div>
           
@@ -483,6 +559,8 @@ export default {
       copied: false,
       posting: false,
       posted: false,
+      showPostModal: false,
+      isMyReport: false,
       expandedSections: {
         active: false,
         fresh: false,
@@ -530,7 +608,18 @@ export default {
       const zombieCount = this.scoutResults.totalZombies;
       const zombieScore = this.scoutResults.zombieScore;
       
-      return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
+      if (this.isMyReport) {
+        return `I just scouted my follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
+
+My Zombie Count is: ${zombieCount}
+
+My Zombie Score is ${zombieScore}%!
+${this.scoreBarEmojis.join('')}
+
+Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
+https://plebs-vs-zombies.vercel.app`;
+      } else {
+        return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
 
 Your Zombie Count is: ${zombieCount}
 
@@ -539,6 +628,7 @@ ${this.scoreBarEmojis.join('')}
 
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
 https://plebs-vs-zombies.vercel.app`;
+      }
     },
     scoreBarSquares() {
       if (!this.scoutResults) return [];
@@ -793,6 +883,7 @@ https://plebs-vs-zombies.vercel.app`;
         
         if (publishResults.successful > 0) {
           this.posted = true;
+          this.showPostModal = true;
           console.log(`✅ Scout report posted to ${publishResults.successful}/${nostrService.getPublishRelays().length} relays`);
         } else {
           throw new Error('Failed to publish to any relays');

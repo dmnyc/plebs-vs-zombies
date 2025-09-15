@@ -342,7 +342,17 @@ class ScoutService {
     
     // Step 2: Use the ACTUAL authenticated mode's zombie classification method
     console.log('🔍 Using authentic zombieService.classifyZombies method');
-    const rawZombieResults = zombieService.classifyZombies(activityMap, null, progressCallback);
+    
+    if (progressCallback) {
+      progressCallback({
+        stage: 'Analyzing user activity and deleted accounts...',
+        processed: followList.length,
+        total: followList.length
+      });
+    }
+    
+    // Use null callback to prevent conflicting progress reports from zombieService
+    const rawZombieResults = zombieService.classifyZombies(activityMap, null, null);
     
     // Step 2.5: Use the ACTUAL authenticated mode's immunity filtering
     console.log('🔍 Using authentic immunityService.filterImmuneZombies method');
