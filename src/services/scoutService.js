@@ -10,6 +10,7 @@ import zombieService from './zombieService.js';
 class ScoutService {
   constructor() {
     this.ndk = null;
+    this.cancelled = false;
     // Use the EXACT same relays as authenticated mode for consistency
     this.defaultRelays = [
       'wss://relay.damus.io',
@@ -46,6 +47,8 @@ class ScoutService {
 
   async scoutUser(targetPubkey, progressCallback = null) {
     try {
+      // Reset cancellation flag
+      this.cancelled = false;
       console.log('🔍 Starting scout user for pubkey:', targetPubkey.substring(0, 8));
       await this.initialize();
       
@@ -263,66 +266,24 @@ class ScoutService {
   }
 
   async analyzeFollows(followList, progressCallback = null) {
-    console.log(`🔍 Starting authentic activity scan for ${followList.length} profiles using authenticated mode logic...`);
+    console.log(`🔍 Starting Scout Mode activity scan for ${followList.length} profiles...`);
     
-    // Step 1: Use the ENHANCED authenticated mode scanning with all retry logic
-    console.log('🚀 Using enhanced scanning with SMART RETRY + AGGRESSIVE FALLBACK');
+    // Check for cancellation
+    if (this.cancelled) {
+      console.log('🛑 Scout scan cancelled');
+      return { active: [], fresh: [], rotting: [], ancient: [], burned: [] };
+    }
     
-    // 1a. Standard activity scanning
-    const activityMap = await nostrService.getProfilesActivity(followList, 10, progressCallback);
+    // Use Scout's own scanning method instead of calling authenticated service
+    // This prevents the ongoing retry activity that continues after scan completion
+    console.log('🔍 Using Scout Mode\'s own scanning (prevents background retries)');
     
-    // 1b. SMART RETRY: Use relay-aware targeting for high-accuracy verification
-    const usersWithNoActivity = followList.filter(pubkey => {
-      const events = activityMap.get(pubkey) || [];
-      return events.length === 0;
-    });
+    const activityMap = await this.getProfilesActivityScout(followList, 10, progressCallback);
     
-    if (usersWithNoActivity.length > 0) {
-      console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
-      
-      if (progressCallback) {
-        progressCallback({
-          stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
-          processed: followList.length - usersWithNoActivity.length,
-          total: followList.length
-        });
-      }
-      
-      const retryResults = await nostrService.smartRelayRetry(usersWithNoActivity, progressCallback);
-      
-      // Merge retry results back into main activity data
-      let recoveredUsers = 0;
-      for (const [pubkey, events] of retryResults.entries()) {
-        if (events.length > 0) {
-          activityMap.set(pubkey, events);
-          console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
-          recoveredUsers++;
-        }
-      }
-      
-      console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
-      
-      // 1c. Fall back to aggressive retry for remaining users without relay lists
-      const stillNoActivity = usersWithNoActivity.filter(pubkey => {
-        const events = activityMap.get(pubkey) || [];
-        return events.length === 0;
-      });
-      
-      if (stillNoActivity.length > 0) {
-        console.log(`🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`);
-        
-        const aggressiveResults = await nostrService.aggressiveActivityRetry(stillNoActivity, progressCallback);
-        
-        let fallbackRecovered = 0;
-        for (const [pubkey, events] of aggressiveResults.entries()) {
-          if (events.length > 0) {
-            activityMap.set(pubkey, events);
-            fallbackRecovered++;
-          }
-        }
-        
-        console.log(`🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`);
-      }
+    // Check for cancellation before proceeding
+    if (this.cancelled) {
+      console.log('🛑 Scout scan cancelled during activity analysis');
+      return { active: [], fresh: [], rotting: [], ancient: [], burned: [] };
     }
     
     // Step 2: Use the ACTUAL authenticated mode's zombie classification method
@@ -343,8 +304,8 @@ class ScoutService {
     return zombieResults;
   }
 
-  // Legacy method - now Scout Mode uses authentic nostrService methods directly
-  async getProfilesActivityAuthentic(pubkeys, limit = 10, progressCallback = null) {
+  // Scout Mode's own activity scanning to prevent background retries
+  async getProfilesActivityScout(pubkeys, limit = 10, progressCallback = null) {
     if (!pubkeys || pubkeys.length === 0) {
       return new Map();
     }
@@ -362,11 +323,17 @@ class ScoutService {
     const batchSize = 25;
     
     for (let i = 0; i < pubkeys.length; i += batchSize) {
+      // Check for cancellation
+      if (this.cancelled) {
+        console.log('🛑 Scout scan cancelled during batch processing');
+        break;
+      }
+      
       const batch = pubkeys.slice(i, i + batchSize);
       
       if (progressCallback) {
         progressCallback({
-          stage: `Initial scan... (${i}/${pubkeys.length})`,
+          stage: `Scanning batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(pubkeys.length/batchSize)}...`,
           processed: i,
           total: pubkeys.length
         });
@@ -417,36 +384,7 @@ class ScoutService {
       }
     }
     
-    // PASS 2: SMART RETRY - Use relay-aware targeting for users with no activity
-    const usersWithNoActivity = pubkeys.filter(pubkey => {
-      const events = activityMap.get(pubkey) || [];
-      return events.length === 0;
-    });
-    
-    if (usersWithNoActivity.length > 0) {
-      console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
-      
-      if (progressCallback) {
-        progressCallback({
-          stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
-          processed: pubkeys.length - usersWithNoActivity.length,
-          total: pubkeys.length
-        });
-      }
-      
-      const retryResults = await this.smartRelayRetry(usersWithNoActivity, limit, progressCallback);
-      
-      let recoveredUsers = 0;
-      for (const [pubkey, events] of retryResults.entries()) {
-        if (events.length > 0) {
-          activityMap.set(pubkey, events);
-          console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
-          recoveredUsers++;
-        }
-      }
-      
-      console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
-    }
+    // Scout Mode: Single pass scanning to prevent background retry activity
     
     console.log(`✅ Enhanced activity scan complete. Found activity for ${Array.from(activityMap.values()).filter(events => events.length > 0).length} users`);
     return activityMap;
@@ -792,7 +730,13 @@ class ScoutService {
     };
   }
 
+  cancelScan() {
+    this.cancelled = true;
+    console.log('🛑 Scout scan cancellation requested');
+  }
+
   disconnect() {
+    this.cancelled = true;
     if (this.ndk) {
       // NDK doesn't have explicit disconnect, connections are managed automatically
       this.ndk = null;
