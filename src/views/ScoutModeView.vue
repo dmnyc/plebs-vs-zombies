@@ -115,10 +115,10 @@
             <span class="truncate flex-1 min-w-0">{{ scanProgress.stage || 'Initializing scout...' }}</span>
             <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
           </div>
-          <div class="w-full bg-gray-700 rounded-full h-3">
+          <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
             <div 
               class="bg-yellow-400 h-3 rounded-full transition-all duration-300"
-              :style="{ width: scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total * 100) + '%' : '0%' }"
+              :style="{ width: scanProgress.total > 0 ? Math.min(100, (scanProgress.processed / scanProgress.total * 100)) + '%' : '0%' }"
             ></div>
           </div>
         </div>

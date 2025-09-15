@@ -388,7 +388,7 @@ class ScoutService {
       if (progressCallback) {
         progressCallback({
           stage: `Scanning batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(pubkeys.length/batchSize)}...`,
-          processed: i,
+          processed: Math.min(i + batch.length, pubkeys.length),
           total: pubkeys.length
         });
       }
@@ -487,7 +487,7 @@ class ScoutService {
         if (progressCallback) {
           progressCallback({
             stage: `Reliable retry batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(pubkeys.length/batchSize)}`,
-            processed: i,
+            processed: Math.min(i + userBatch.length, pubkeys.length),
             total: pubkeys.length
           });
         }
