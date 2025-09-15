@@ -266,7 +266,7 @@ class ScoutService {
   }
 
   async analyzeFollows(followList, progressCallback = null) {
-    console.log(`🔍 Starting Scout Mode activity scan for ${followList.length} profiles...`);
+    console.log(`🔍 Starting authentic activity scan for ${followList.length} profiles using authenticated mode logic...`);
     
     // Check for cancellation
     if (this.cancelled) {
@@ -274,16 +274,70 @@ class ScoutService {
       return { active: [], fresh: [], rotting: [], ancient: [], burned: [] };
     }
     
-    // Use Scout's own scanning method instead of calling authenticated service
-    // This prevents the ongoing retry activity that continues after scan completion
-    console.log('🔍 Using Scout Mode\'s own scanning (prevents background retries)');
+    // Step 1: Use the ENHANCED authenticated mode scanning with all retry logic
+    console.log('🚀 Using enhanced scanning with SMART RETRY + AGGRESSIVE FALLBACK');
     
-    const activityMap = await this.getProfilesActivityScout(followList, 10, progressCallback);
+    // 1a. Standard activity scanning
+    const activityMap = await nostrService.getProfilesActivity(followList, 10, progressCallback);
     
     // Check for cancellation before proceeding
     if (this.cancelled) {
       console.log('🛑 Scout scan cancelled during activity analysis');
       return { active: [], fresh: [], rotting: [], ancient: [], burned: [] };
+    }
+    
+    // 1b. SMART RETRY: Use relay-aware targeting for high-accuracy verification
+    const usersWithNoActivity = followList.filter(pubkey => {
+      const events = activityMap.get(pubkey) || [];
+      return events.length === 0;
+    });
+    
+    if (usersWithNoActivity.length > 0) {
+      console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
+      
+      if (progressCallback) {
+        progressCallback({
+          stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
+          processed: followList.length - usersWithNoActivity.length,
+          total: followList.length
+        });
+      }
+      
+      const retryResults = await nostrService.smartRelayRetry(usersWithNoActivity, progressCallback);
+      
+      // Merge retry results back into main activity data
+      let recoveredUsers = 0;
+      for (const [pubkey, events] of retryResults.entries()) {
+        if (events.length > 0) {
+          activityMap.set(pubkey, events);
+          console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
+          recoveredUsers++;
+        }
+      }
+      
+      console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
+      
+      // 1c. Fall back to aggressive retry for remaining users without relay lists
+      const stillNoActivity = usersWithNoActivity.filter(pubkey => {
+        const events = activityMap.get(pubkey) || [];
+        return events.length === 0;
+      });
+      
+      if (stillNoActivity.length > 0) {
+        console.log(`🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`);
+        
+        const aggressiveResults = await nostrService.aggressiveActivityRetry(stillNoActivity, progressCallback);
+        
+        let fallbackRecovered = 0;
+        for (const [pubkey, events] of aggressiveResults.entries()) {
+          if (events.length > 0) {
+            activityMap.set(pubkey, events);
+            fallbackRecovered++;
+          }
+        }
+        
+        console.log(`🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`);
+      }
     }
     
     // Step 2: Use the ACTUAL authenticated mode's zombie classification method
@@ -341,7 +395,7 @@ class ScoutService {
 
       try {
         const filter = {
-          kinds: [0, 1, 3, 6, 7, 9735], // Profiles, posts, contacts, reposts, reactions, zaps
+          kinds: [0, 1, 3, 6, 7, 9735], // Original Scout Mode kinds
           authors: batch,
           limit: limit * batch.length,
           since: Math.floor(Date.now() / 1000) - (120 * 24 * 60 * 60) // 120 days
@@ -384,9 +438,8 @@ class ScoutService {
       }
     }
     
-    // Scout Mode: Single pass scanning to prevent background retry activity
     
-    console.log(`✅ Enhanced activity scan complete. Found activity for ${Array.from(activityMap.values()).filter(events => events.length > 0).length} users`);
+    console.log(`✅ Scout Mode activity scan complete. Found activity for ${Array.from(activityMap.values()).filter(events => events.length > 0).length}/${pubkeys.length} users`);
     return activityMap;
   }
 
