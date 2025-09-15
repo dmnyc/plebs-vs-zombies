@@ -2,58 +2,59 @@
   <div>
     <!-- Scout Mode Header -->
     <div class="card mb-6 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border-yellow-600/30">
-      <div class="flex items-center justify-between">
+      <!-- Header row with title and buttons -->
+      <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-4">
-          <div class="text-3xl">🔍</div>
-          <div>
-            <h2 class="text-2xl text-yellow-400">Scout Mode</h2>
-            <div class="flex items-center gap-3 mt-1">
-              <!-- Target User Avatar -->
-              <div class="flex-shrink-0">
-                <img 
-                  v-if="scoutTarget.picture" 
-                  :src="scoutTarget.picture" 
-                  :alt="targetUsername"
-                  class="w-8 h-8 rounded-full object-cover"
-                  @error="$event.target.style.display='none'"
-                >
-                <div 
-                  v-else 
-                  class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-xs font-medium"
-                >
-                  {{ (targetUsername || 'U').charAt(0).toUpperCase() }}
-                </div>
-              </div>
-              <!-- Analyzing text with username and link -->
-              <div class="flex items-center gap-2 text-gray-400">
-                <span>Analyzing</span>
-                <span class="font-bold text-white">{{ targetUsername || targetDisplay }}</span>
-                <a 
-                  :href="getNostrProfileUrl(scoutTarget.pubkey)" 
-                  target="_blank" 
-                  class="text-purple-400 hover:text-purple-300 text-sm"
-                >
-                  profile ↗
-                </a>
-              </div>
-            </div>
-          </div>
+          <div class="text-3xl flex-shrink-0">🔍</div>
+          <h2 class="text-2xl text-yellow-400">Scout Mode</h2>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-shrink-0">
           <button 
             @click="showScoutNewUser" 
-            class="btn-secondary text-sm"
+            class="btn-secondary text-sm whitespace-nowrap"
             :disabled="scanning"
           >
             Scout Different User
           </button>
           <button 
             @click="exitScoutMode" 
-            class="text-red-400 hover:text-red-300 text-2xl"
+            class="text-red-400 hover:text-red-300 text-2xl flex-shrink-0"
             title="Exit Scout Mode"
           >
             ❌
           </button>
+        </div>
+      </div>
+      
+      <!-- User info section -->
+      <div class="flex items-center gap-3">
+        <!-- Target User Avatar -->
+        <div class="flex-shrink-0">
+          <img 
+            v-if="scoutTarget.picture" 
+            :src="scoutTarget.picture" 
+            :alt="targetUsername"
+            class="w-8 h-8 rounded-full object-cover"
+            @error="$event.target.style.display='none'"
+          >
+          <div 
+            v-else 
+            class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-xs font-medium"
+          >
+            {{ (targetUsername || 'U').charAt(0).toUpperCase() }}
+          </div>
+        </div>
+        <!-- Analyzing text with username and link -->
+        <div class="flex items-center gap-2 text-gray-400 min-w-0">
+          <span class="flex-shrink-0">Analyzing</span>
+          <span class="font-bold text-white truncate">{{ targetUsername || targetDisplay }}</span>
+          <a 
+            :href="getNostrProfileUrl(scoutTarget.pubkey)" 
+            target="_blank" 
+            class="text-purple-400 hover:text-purple-300 text-sm flex-shrink-0"
+          >
+            profile ↗
+          </a>
         </div>
       </div>
     </div>
