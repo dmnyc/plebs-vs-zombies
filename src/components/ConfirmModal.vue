@@ -14,7 +14,7 @@
           }"
         >
           <span v-if="type === 'info'">ℹ️</span>
-          <span v-else-if="type === 'error'">❌</span>
+          <span v-else-if="type === 'error'">🚫</span>
           <span v-else-if="type === 'success'">✅</span>
           <span v-else-if="type === 'warning'">⚠️</span>
           <span v-else-if="type === 'nuclear'">☢️</span>

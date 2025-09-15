@@ -165,7 +165,7 @@
             <div class="text-sm text-gray-400">Zombie Follows</div>
           </div>
           <div class="bg-gray-800 p-4 rounded-lg text-center">
-            <div class="text-2xl font-bold text-yellow-400">{{ scoutResults.zombieScore }}%</div>
+            <div class="text-2xl font-bold text-green-400">{{ scoutResults.zombieScore }}%</div>
             <div class="text-sm text-gray-400">Zombie Score</div>
           </div>
         </div>
@@ -182,10 +182,7 @@
             >
             </span>
           </div>
-          <div class="flex justify-between text-xs text-gray-400">
-            <span>Healthy Follows</span>
-            <span>Zombie Follows</span>
-          </div>
+          <!-- Labels removed for clarity -->
         </div>
 
         <!-- Social Share -->
@@ -556,7 +553,7 @@ https://plebs-vs-zombies.vercel.app`;
         squares.push('<span class="inline-block w-3 h-3 rounded-sm" style="background-color: #8e30eb;"></span>');
       }
       for (let i = 0; i < zombieSquares; i++) {
-        squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-yellow-400"></span>');
+        squares.push('<span class="inline-block w-3 h-3 rounded-sm bg-green-400"></span>');
       }
       
       return squares;
@@ -618,7 +615,7 @@ https://plebs-vs-zombies.vercel.app`;
       }
     },
     stopScan() {
-      // TODO: Implement scan cancellation
+      scoutService.cancelScan();
       this.scanning = false;
       console.log('🛑 Scout scan stopped by user');
     },
@@ -728,18 +725,64 @@ https://plebs-vs-zombies.vercel.app`;
         console.log('📡 Posting scout report to Nostr...');
         
         // Create a note event
-        const eventContent = this.shareMessage;
-        const eventKind = 1; // Text note
-        const tags = [['t', 'PlebsVsZombies']]; // Add hashtag
+        const event = {
+          kind: 1, // Text note
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [
+            ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+            ['t', 'PlebsVsZombies']
+          ],
+          content: this.shareMessage
+        };
         
-        // Create and sign the event
-        const signedEvent = await nostrService.createAndSignEvent(eventKind, eventContent, tags);
+        // Ensure appropriate signing method is ready
+        if (!nostrService.isSigningReady()) {
+          if (nostrService.signingMethod === 'nip07') {
+            console.log('🔄 Extension not ready, attempting connection...');
+            await nostrService.connectExtension();
+          } else if (nostrService.signingMethod === 'nip46') {
+            throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
+          }
+        }
+        
+        // Double-check connection is still valid
+        if (!nostrService.isSigningReady()) {
+          throw new Error(`Unable to establish connection with signing method: ${nostrService.signingMethod}`);
+        }
+        
+        console.log('🔐 Starting signing process for scout report...');
+        
+        // Sign event using appropriate method
+        let signedEvent;
+        try {
+          if (nostrService.signingMethod === 'nip07') {
+            console.log('Attempting NIP-07 signing...');
+            console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
+            
+            signedEvent = await Promise.race([
+              window.nostr.signEvent(event),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
+              )
+            ]);
+          } else if (nostrService.signingMethod === 'nip46') {
+            console.log('Attempting NIP-46 signing...');
+            console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
+            
+            signedEvent = await nostrService.nip46Service.signEvent(event);
+          } else {
+            throw new Error(`Invalid signing method: ${nostrService.signingMethod}`);
+          }
+          
+          console.log('✅ Event signed successfully:', signedEvent.id);
+        } catch (signingError) {
+          console.error('❌ Signing failed:', signingError);
+          throw new Error(`Failed to sign event: ${signingError.message}`);
+        }
         
         if (!signedEvent) {
           throw new Error('Failed to create or sign event');
         }
-        
-        console.log('✅ Event signed successfully:', signedEvent.id);
         
         // Ensure relay list is fresh for posting
         if (!nostrService.isConnected) {

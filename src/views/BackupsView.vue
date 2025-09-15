@@ -10,7 +10,7 @@
       />
       
       <!-- Backup History -->
-      <BackupHistory ref="backupHistory" />
+      <BackupHistory ref="backupHistory" @backup-restored="handleBackupRestored" />
       
       <!-- Remote Backup Section -->
       <div class="card">
@@ -123,10 +123,19 @@ export default {
       }
     },
     handleBackupImported(result) {
+      console.log('📢 BackupsView received backup-imported event:', result);
       // Refresh the backup history
       if (this.$refs.backupHistory) {
+        console.log('🔄 Refreshing BackupHistory component');
         this.$refs.backupHistory.loadBackups(true);
+      } else {
+        console.warn('⚠️ BackupHistory ref not found');
       }
+    },
+    handleBackupRestored(result) {
+      console.log('📢 Backup restored in parent:', result);
+      // The BackupHistory component already shows detailed success feedback
+      // Could potentially refresh other components here if needed
     }
   }
 };

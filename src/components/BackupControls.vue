@@ -2,6 +2,30 @@
   <div class="card">
     <h3 class="text-xl mb-4">Follow List Backups</h3>
     
+    <!-- Error Modal -->
+    <ConfirmModal
+      :show="showErrorModal"
+      :title="errorModal.title"
+      :message="errorModal.message"
+      :type="errorModal.type"
+      confirm-text="OK"
+      :cancel-text="null"
+      @confirm="showErrorModal = false"
+      @cancel="showErrorModal = false"
+    />
+    
+    <!-- Success Modal -->
+    <ConfirmModal
+      :show="showSuccessModal"
+      :title="successModal.title"
+      :message="successModal.message"
+      :type="successModal.type"
+      confirm-text="OK"
+      :cancel-text="null"
+      @confirm="showSuccessModal = false"
+      @cancel="showSuccessModal = false"
+    />
+    
     <div v-if="loading" class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
       <p class="mt-2 text-gray-400">{{ loadingMessage }}</p>
@@ -97,15 +121,31 @@
 <script>
 import { format } from 'date-fns';
 import backupService from '../services/backupService';
+import ConfirmModal from './ConfirmModal.vue';
 
 export default {
   name: 'BackupControls',
+  components: {
+    ConfirmModal
+  },
   emits: ['backup-created', 'backup-imported'],
   data() {
     return {
       backups: [],
       loading: false,
-      loadingMessage: 'Loading backups...'
+      loadingMessage: 'Loading backups...',
+      showErrorModal: false,
+      errorModal: {
+        title: '',
+        message: '',
+        type: 'error'
+      },
+      showSuccessModal: false,
+      successModal: {
+        title: '',
+        message: '',
+        type: 'success'
+      }
     };
   },
   computed: {
@@ -121,6 +161,22 @@ export default {
     formatDate(timestamp) {
       if (!timestamp) return 'Unknown';
       return format(new Date(timestamp), 'MMM d, yyyy, HH:mm');
+    },
+    showError(title, message) {
+      this.errorModal = {
+        title,
+        message,
+        type: 'error'
+      };
+      this.showErrorModal = true;
+    },
+    showSuccess(title, message) {
+      this.successModal = {
+        title,
+        message,
+        type: 'success'
+      };
+      this.showSuccessModal = true;
     },
     async loadBackups(forceReload = false) {
       this.loading = true;
@@ -145,11 +201,11 @@ export default {
           await this.loadBackups(true);
           this.$emit('backup-created', result.backup);
         } else {
-          alert(`Failed to create backup: ${result.message}`);
+          this.showError('Backup Creation Failed', result.message);
         }
       } catch (error) {
         console.error('Failed to create backup:', error);
-        alert('Failed to create backup. See console for details.');
+        this.showError('Backup Creation Failed', 'Failed to create backup. See console for details.');
       } finally {
         this.loading = false;
       }
@@ -159,7 +215,7 @@ export default {
         backupService.exportBackupToJson(backup);
       } catch (error) {
         console.error('Failed to export backup:', error);
-        alert('Failed to export backup. See console for details.');
+        this.showError('Export Failed', 'Failed to export backup. See console for details.');
       }
     },
     async handleFileUpload(event) {
@@ -178,15 +234,21 @@ export default {
             const result = await backupService.importBackupFromJson(content);
             
             if (result.success) {
+              console.log('📥 Backup import successful:', result);
               await this.loadBackups(true);
+              console.log('🔄 BackupControls refreshed, emitting backup-imported event');
               this.$emit('backup-imported', result);
-              alert('Backup imported successfully!');
+              const followCount = result.backup.followCount || result.backup.follows?.length || 'Unknown';
+              this.showSuccess(
+                'Backup Imported Successfully!', 
+                `Backup ID: ${result.backup.id}\nFollows: ${followCount}\n\nThe backup is now marked as "Imported" and appears at the top of your backup list.`
+              );
             } else {
-              alert(`Failed to import backup: ${result.message}`);
+              this.showError('Import Failed', result.message);
             }
           } catch (error) {
             console.error('Failed to import backup:', error);
-            alert('Failed to import backup. See console for details.');
+            this.showError('Import Failed', 'Failed to import backup. See console for details.');
           } finally {
             this.loading = false;
           }
@@ -195,7 +257,7 @@ export default {
         reader.readAsText(file);
       } catch (error) {
         console.error('Failed to read file:', error);
-        alert('Failed to read file. See console for details.');
+        this.showError('File Read Failed', 'Failed to read file. See console for details.');
         this.loading = false;
       }
       
