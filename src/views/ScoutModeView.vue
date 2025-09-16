@@ -95,7 +95,7 @@
             <button 
               @click="scoutNewUser" 
               :disabled="!newScoutValid"
-              class="btn-primary flex-1"
+              class="btn-scout flex-1"
               :class="{'opacity-50 cursor-not-allowed': !newScoutValid}"
             >
               Start Scouting
@@ -519,7 +519,7 @@
       <p class="text-gray-400 mb-6">
         Scout mode will analyze {{ targetDisplay }}'s zombie follows.
       </p>
-      <button @click="startScout" class="btn-primary">
+      <button @click="startScout" class="btn-scout">
         🏹 Begin Scouting
       </button>
     </div>
@@ -687,20 +687,35 @@ https://plebs-vs-zombies.vercel.app`;
           };
         });
         
-        if (results.success) {
-          this.scoutResults = results;
-          this.scoutComplete = true;
-          console.log('✅ Scout completed successfully:', results);
+        // Check if scan was cancelled - if so, don't show results
+        if (!scoutService.cancelled) {
+          if (results.success) {
+            this.scoutResults = results;
+            this.scoutComplete = true;
+            console.log('✅ Scout completed successfully:', results);
+          } else {
+            console.error('❌ Scout failed:', results.message);
+            this.scoutComplete = true;
+            this.scoutResults = null;
+          }
         } else {
-          console.error('❌ Scout failed:', results.message);
-          this.scoutComplete = true;
+          console.log('🛑 Scan was cancelled, not showing results');
+          // Ensure we stay in initial state
+          this.scoutComplete = false;
           this.scoutResults = null;
         }
         
       } catch (error) {
         console.error('❌ Scout error:', error);
-        this.scoutComplete = true;
-        this.scoutResults = null;
+        // Only set error state if not cancelled
+        if (!scoutService.cancelled) {
+          this.scoutComplete = true;
+          this.scoutResults = null;
+        } else {
+          // Stay in initial state if cancelled
+          this.scoutComplete = false;
+          this.scoutResults = null;
+        }
       } finally {
         this.scanning = false;
       }
@@ -708,6 +723,9 @@ https://plebs-vs-zombies.vercel.app`;
     stopScan() {
       scoutService.cancelScan();
       this.scanning = false;
+      // Reset to initial state - don't show incomplete results
+      this.scoutComplete = false;
+      this.scoutResults = null;
       console.log('🛑 Scout scan stopped by user');
     },
     showScoutNewUser() {
