@@ -513,7 +513,7 @@
     </div>
 
     <!-- Initial State -->
-    <div v-else class="card p-8 text-center">
+    <div v-else-if="!scanning && !scoutComplete" class="card p-8 text-center">
       <div class="text-6xl mb-4">🔍</div>
       <h3 class="text-xl mb-4">Ready to Scout</h3>
       <p class="text-gray-400 mb-6">
