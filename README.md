@@ -70,3 +70,8 @@ MIT
 
 - The Nostr community
 - All the plebs fighting the zombie apocalypse
+
+## Author
+
+- Created by The Daniel⚡️
+– Vibed with Claude

@@ -25,6 +25,9 @@
   .btn-danger {
     @apply btn bg-red-600 hover:bg-red-500;
   }
+  .btn-scout {
+    @apply btn bg-yellow-400 text-gray-900 hover:bg-yellow-300;
+  }
   .card {
     @apply bg-zombie-dark p-6 rounded-lg shadow-lg border border-gray-700;
   }

@@ -167,6 +167,12 @@ class ScoutService {
     try {
       console.log(`🔍 Fetching follow list for ${pubkey.substring(0, 8)}...`);
       
+      // Check for cancellation
+      if (this.cancelled) {
+        console.log('🛑 Follow list fetch cancelled');
+        return [];
+      }
+      
       // Create temporary NDK instance with user's relays if available
       let queryNdk = this.ndk;
       if (relays && relays.length > 0) {
@@ -190,13 +196,13 @@ class ScoutService {
         }
       }
 
-      // Fetch kind 3 (follow list) events with timeout
+      // Fetch multiple kind 3 (follow list) events to improve coverage
       console.log('📡 Fetching follow list events...');
       const followEvents = await Promise.race([
         queryNdk.fetchEvents({
           kinds: [3],
           authors: [pubkey],
-          limit: 1
+          limit: 5 // Fetch up to 5 recent events to merge follows
         }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Follow list fetch timeout')), 25000)
@@ -208,17 +214,105 @@ class ScoutService {
         return [];
       }
 
-      const latestFollowEvent = Array.from(followEvents)[0];
-      const followList = [];
-
-      // Extract pubkeys from p tags
-      for (const tag of latestFollowEvent.tags) {
-        if (tag[0] === 'p' && tag[1]) {
-          followList.push(tag[1]);
-        }
+      // Check for cancellation before processing events
+      if (this.cancelled) {
+        console.log('🛑 Follow list processing cancelled');
+        return [];
       }
 
-      console.log(`✅ Found ${followList.length} follows`);
+      console.log(`📡 Found ${followEvents.size} follow list events`);
+      const allFollows = new Set(); // Use Set to avoid duplicates
+
+      // Merge follows from all events, prioritizing newer ones
+      const eventArray = Array.from(followEvents).sort((a, b) => b.created_at - a.created_at);
+      
+      for (const [index, event] of eventArray.entries()) {
+        // Check for cancellation during event processing
+        if (this.cancelled) {
+          console.log('🛑 Follow list processing cancelled during event loop');
+          return Array.from(allFollows);
+        }
+        console.log(`📡 Processing event ${index + 1}/${eventArray.length} (timestamp: ${event.created_at}, tags: ${event.tags?.length || 0})`);
+        
+        // Extract pubkeys from p tags
+        for (const tag of event.tags || []) {
+          if (tag[0] === 'p' && tag[1]) {
+            allFollows.add(tag[1]);
+          }
+        }
+        
+        console.log(`📡 Total unique follows after event ${index + 1}: ${allFollows.size}`);
+      }
+
+      const followList = Array.from(allFollows);
+
+      console.log(`✅ Found ${followList.length} follows from ${followEvents.size} events`);
+      
+      // If we got a surprisingly low count, try additional popular relays as fallback
+      if (followList.length < 500 && !this.cancelled) {
+        console.log(`⚠️ Low follow count (${followList.length}), trying additional popular relays...`);
+        
+        const additionalRelays = [
+          'wss://relay.nostr.bg',
+          'wss://nostr-pub.wellorder.net',
+          'wss://relay.nostrmag.social',
+          'wss://atlas.nostr.land',
+          'wss://brb.io'
+        ];
+        
+        try {
+          const fallbackNdk = new NDK({
+            explicitRelayUrls: additionalRelays
+          });
+          
+          await Promise.race([
+            fallbackNdk.connect(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Fallback relay timeout')), 10000)
+            )
+          ]);
+          
+          const fallbackEvents = await Promise.race([
+            fallbackNdk.fetchEvents({
+              kinds: [3],
+              authors: [pubkey],
+              limit: 3
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Fallback fetch timeout')), 15000)
+            )
+          ]);
+          
+          console.log(`📡 Fallback found ${fallbackEvents.size} additional events`);
+          
+          // Check for cancellation before processing fallback events
+          if (this.cancelled) {
+            console.log('🛑 Fallback processing cancelled');
+            return Array.from(allFollows);
+          }
+          
+          // Merge any new follows from fallback
+          for (const event of fallbackEvents) {
+            if (this.cancelled) {
+              console.log('🛑 Fallback processing cancelled during event merge');
+              break;
+            }
+            for (const tag of event.tags || []) {
+              if (tag[0] === 'p' && tag[1]) {
+                allFollows.add(tag[1]);
+              }
+            }
+          }
+          
+          const finalFollowList = Array.from(allFollows);
+          console.log(`✅ Final count after fallback: ${finalFollowList.length} follows (+${finalFollowList.length - followList.length})`);
+          return finalFollowList;
+          
+        } catch (fallbackError) {
+          console.warn('⚠️ Fallback relay strategy failed:', fallbackError);
+        }
+      }
+      
       return followList;
 
     } catch (error) {
@@ -281,8 +375,8 @@ class ScoutService {
     // Step 1: Use the ENHANCED authenticated mode scanning with all retry logic
     console.log('🚀 Using enhanced scanning with SMART RETRY + AGGRESSIVE FALLBACK');
     
-    // 1a. Standard activity scanning
-    const activityMap = await nostrService.getProfilesActivity(followList, 10, progressCallback);
+    // 1a. Standard activity scanning using scout's cancellation-aware method
+    const activityMap = await this.getProfilesActivityScout(followList, 10, progressCallback);
     
     // Check for cancellation before proceeding
     if (this.cancelled) {

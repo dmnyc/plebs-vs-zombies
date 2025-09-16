@@ -560,7 +560,7 @@
           <button 
             @click="startScoutFromModal" 
             :disabled="!scoutNpubValid"
-            class="btn-primary flex-1"
+            class="btn-scout flex-1"
             :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid}"
           >
             Start Scouting
