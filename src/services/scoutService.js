@@ -11,13 +11,17 @@ class ScoutService {
   constructor() {
     this.ndk = null;
     this.cancelled = false;
-    // Use the EXACT same relays as authenticated mode for consistency
+    // Expanded relay list for better follow list coverage
     this.defaultRelays = [
       'wss://relay.damus.io',
       'wss://relay.nostr.band', 
       'wss://nos.lol',
       'wss://relay.primal.net',
-      'wss://nostr.wine'
+      'wss://nostr.wine',
+      'wss://purplepag.es',
+      'wss://relay.snort.social',
+      'wss://offchain.pub',
+      'wss://relay.current.fyi'
     ];
   }
 
@@ -65,9 +69,9 @@ class ScoutService {
         progressCallback({ stage: 'Fetching follow list...', processed: 0, total: 1 });
       }
 
-      // Get the user's follow list using default relays for consistency
+      // Get the user's follow list using their preferred relays for better coverage
       console.log('👥 Fetching follow list...');
-      const followList = await this.fetchFollowList(targetPubkey);
+      const followList = await this.fetchFollowList(targetPubkey, userRelays);
       console.log('👥 Found follows:', followList.length);
       
       if (!followList || followList.length === 0) {
@@ -168,7 +172,7 @@ class ScoutService {
       if (relays && relays.length > 0) {
         console.log(`🔗 Using ${relays.length} user relays for follow list fetch`);
         queryNdk = new NDK({
-          explicitRelayUrls: relays.slice(0, 10) // Limit to first 10 relays
+          explicitRelayUrls: relays.slice(0, 15) // Use up to 15 relays for better coverage
         });
         
         try {
@@ -195,7 +199,7 @@ class ScoutService {
           limit: 1
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Follow list fetch timeout')), 15000)
+          setTimeout(() => reject(new Error('Follow list fetch timeout')), 25000)
         )
       ]);
 
