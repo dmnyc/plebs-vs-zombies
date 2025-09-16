@@ -74,4 +74,4 @@ MIT
 ## Author
 
 - Created by The Daniel⚡️
-– Vibed with Claude
+- Vibed with Claude
