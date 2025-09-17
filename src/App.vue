@@ -254,57 +254,6 @@
           </div>
         </div>
 
-        <!-- TEMPORARILY DISABLED - Multiple Signing Method Selection -->
-        <!--
-        <div class="text-center mb-8">
-          <div class="text-6xl mb-6">🧟‍♂️</div>
-          <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
-          <p class="text-gray-300">Choose your signing method to connect and manage your dormant follows.</p>
-        </div>
-        
-        <div class="space-y-4 mb-8">
-          <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
-          
-          <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
-            <input 
-              type="radio" 
-              value="nip07" 
-              v-model="loginSigningMethod" 
-              class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
-            />
-            <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
-              <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
-                <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
-              </div>
-            </div>
-          </label>
-        </div>
-        -->
-          
-          <!-- TEMPORARILY DISABLED - NIP-46 Remote Signer -->
-          <!--
-          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
-                 :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
-            <input 
-              type="radio" 
-              value="nip46" 
-              v-model="loginSigningMethod" 
-              class="w-5 h-5 text-purple-500 mt-0.5"
-            />
-            <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-100">Remote Signer (NIP-46)</span>
-              <p class="text-sm text-gray-400 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">📱 Mobile friendly</span>
-                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">🔒 Enhanced security</span>
-              </div>
-            </div>
-          </label>
-          -->
-        
         <div class="text-center">
           <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
             Connect with Browser Extension
@@ -374,36 +323,6 @@
         <component :is="currentView" ref="currentViewComponent" @logout="logout"></component>
       </div>
     </main>
-
-    <!-- NIP-46 Setup Modal -->
-    <div 
-      v-if="showNip46Setup" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
-      @click="closeNip46Setup"
-    >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h2 class="text-2xl font-bold text-gray-100">Setup Remote Signer</h2>
-              <p class="text-gray-400 mt-1">Connect to your NIP-46 bunker to continue</p>
-            </div>
-            <button 
-              @click="closeNip46Setup"
-              class="text-gray-400 hover:text-gray-200 text-2xl leading-none"
-            >
-              ×
-            </button>
-          </div>
-          
-          <!-- Use the existing Nip46Connection component -->
-          <Nip46Connection 
-            @connected="onNip46Connected"
-            @disconnected="closeNip46Setup"
-          />
-        </div>
-      </div>
-    </div>
 
     <footer class="mt-auto py-6 bg-zombie-dark border-t border-gray-700">
       <div class="container mx-auto px-4">
@@ -580,7 +499,6 @@ import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import ScoutModeView from './views/ScoutModeView.vue';
 import CopyButton from './components/CopyButton.vue';
-import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
@@ -597,7 +515,6 @@ export default {
     FollowsManagerView,
     ScoutModeView,
     CopyButton,
-    Nip46Connection,
     ClientAuthorizationModal
   },
   data() {
@@ -607,9 +524,7 @@ export default {
       mobileMenuOpen: false,
       userDropdownOpen: false,
       userProfile: null,
-      loginSigningMethod: 'nip07', // Default to NIP-07 for login
       forceUpdateKey: 0,
-      showNip46Setup: false, // Show NIP-46 setup modal
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
@@ -699,10 +614,6 @@ export default {
       }
     },
     async startScoutMode() {
-      console.log('🔍 Start Scout Mode clicked!');
-      console.log('Scout npub valid:', this.scoutNpubValid);
-      console.log('Scout npub:', this.scoutNpub);
-      
       if (!this.scoutNpubValid) {
         console.log('❌ Npub not valid, returning');
         return;
@@ -714,8 +625,6 @@ export default {
         // Decode the npub to get the pubkey
         const decoded = nip19.decode(this.scoutNpub.trim());
         const targetPubkey = decoded.data;
-        
-        console.log('✅ Decoded pubkey:', targetPubkey);
         
         // Fetch user profile to get name/display_name
         try {
@@ -742,10 +651,7 @@ export default {
         // Switch to scout mode
         this.isScoutMode = true;
         
-        console.log('🔍 Starting Scout Mode for:', this.scoutTarget);
-        console.log('isScoutMode:', this.isScoutMode);
-        
-      } catch (error) {
+        } catch (error) {
         console.error('Failed to start Scout Mode:', error);
         this.scoutNpubError = 'Failed to process npub';
       } finally {
@@ -761,37 +667,21 @@ export default {
     },
     updateScoutTarget(newTarget) {
       this.scoutTarget = newTarget;
-      console.log('🔄 Updated scout target:', newTarget);
-    },
+      },
     async connectNostr() {
       try {
-        console.log(`🚀 Starting Nostr connection with ${this.loginSigningMethod}...`);
+        // Use NIP-07 connection flow
+        const connectionResult = await nostrService.connectExtension();
+        console.log('✅ Extension connected successfully:', connectionResult);
         
-        // Only set the signing method if it's different to avoid resetting NDK
-        if (nostrService.getSigningMethod() !== this.loginSigningMethod) {
-          nostrService.setSigningMethod(this.loginSigningMethod);
-        }
+        this.isConnected = true;
+        this.userProfile = nostrService.userProfile;
         
-        if (this.loginSigningMethod === 'nip07') {
-          // Use NIP-07 connection flow
-          const connectionResult = await nostrService.connectExtension();
-          console.log('✅ Extension connected successfully:', connectionResult);
-          
-          this.isConnected = true;
-          this.userProfile = nostrService.userProfile;
-          
-          // Initialize other services (NDK is already initialized by connectExtension)
-          backupService.init();
-          await immunityService.init();
-          
-          console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
-          
-        } else if (this.loginSigningMethod === 'nip46') {
-          // For NIP-46, show the setup modal
-          console.log('📱 Opening NIP-46 setup modal...');
-          this.showNip46Setup = true;
-          return; // Don't mark as connected yet
-        }
+        // Initialize other services (NDK is already initialized by connectExtension)
+        backupService.init();
+        await immunityService.init();
+        
+        console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
         
       } catch (error) {
         console.error('❌ Failed to connect to Nostr:', error);
@@ -809,19 +699,7 @@ export default {
         alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
       }
     },
-    
-    getConnectButtonText() {
-      if (!this.loginSigningMethod) return 'Select a method';
-      
-      if (this.loginSigningMethod === 'nip07') {
-        return 'Connect Browser Extension';
-      } else if (this.loginSigningMethod === 'nip46') {
-        return 'Setup Remote Signer';
-      }
-      
-      return 'Connect to Nostr';
-    },
-    
+
     logout() {
       nostrService.logout();
       this.isConnected = false;
@@ -830,8 +708,7 @@ export default {
       this.mobileMenuOpen = false;
       // Reset to sign-in state
       this.activeView = 'dashboard'; // Reset view state
-      console.log('✅ Logged out and returned to sign-in page');
-    },
+      },
     
     formatNpub(pubkey) {
       if (!pubkey) return '';
@@ -847,91 +724,7 @@ export default {
     handleAvatarError(event) {
       event.target.src = '/default-avatar.svg';
     },
-    
-    onNip46Connected(result) {
-      console.log('✅ NIP-46 connected from setup modal:', result);
-      
-      // Handle both direct result object and CustomEvent
-      const data = result?.detail || result;
-      
-      if (!data || !data.pubkey) {
-        console.error('❌ Invalid connection data:', result);
-        return;
-      }
-      
-      console.log('🔄 Setting isConnected = true and userProfile');
-      this.isConnected = true;
-      
-      // CRITICAL: Set pubkey in nostrService for other parts of the app
-      nostrService.pubkey = data.pubkey;
-      nostrService.setSigningMethod('nip46');
-      console.log('✅ Set nostrService.pubkey:', data.pubkey.substring(0, 8) + '...');
-      
-      // Check if we already have profile data in nostrService
-      const existingProfile = nostrService.userProfile;
-      
-      this.userProfile = existingProfile ? {
-        ...existingProfile,
-        picture: existingProfile.picture || '/default-avatar.svg' // Ensure we have a picture
-      } : {
-        pubkey: data.pubkey,
-        // NIP-46 doesn't provide profile initially, will be loaded later
-        display_name: data.pubkey.substring(0, 8) + '...',
-        name: 'NIP-46 User',
-        picture: '/default-avatar.svg'
-      };
-      
-      console.log('✅ State after setting:', {
-        isConnected: this.isConnected,
-        userProfile: this.userProfile,
-        showNip46Setup: this.showNip46Setup
-      });
-      console.log('📋 userProfile details:', JSON.stringify(this.userProfile, null, 2));
-      
-      // Initialize other services
-      backupService.init();
-      immunityService.init();
-      
-      // Close the setup modal and navigate to dashboard immediately
-      console.log('🔄 Closing modal and navigating to dashboard');
-      this.showNip46Setup = false;
-      this.activeView = 'dashboard';
-      
-      console.log('✅ Final state:', {
-        isConnected: this.isConnected,
-        userProfile: this.userProfile,
-        showNip46Setup: this.showNip46Setup,
-        activeView: this.activeView
-      });
-      
-      // Force Vue reactivity update using key technique
-      this.forceUpdateKey += 1;
-      
-      // Load the user profile data which will dispatch user-profile-loaded event
-      console.log('🔄 Loading user profile data...');
-      // Use setTimeout to not block the UI update
-      setTimeout(() => {
-        nostrService.loadUserProfile().then(() => {
-          console.log('✅ User profile loading initiated');
-        }).catch(error => {
-          console.warn('⚠️ Failed to load user profile:', error);
-        });
-      }, 100); // Small delay to let UI update first
-      
-      // Force dashboard to refresh follow data after connection
-      this.$nextTick(() => {
-        if (this.activeView === 'dashboard' && this.$refs.currentViewComponent) {
-          console.log('🔄 Forcing dashboard refresh after NIP-46 connection');
-          this.$refs.currentViewComponent.loadDashboardData?.();
-        }
-      });
-    },
-    
-    closeNip46Setup() {
-      this.showNip46Setup = false;
-      this.loginSigningMethod = 'nip07'; // Reset to default
-    },
-    
+
     showZapModal() {
       // Generate QR code for the Lightning address
       this.generateQRCode();
@@ -994,7 +787,6 @@ export default {
       
       // TODO: Store permission preferences if remember is true
       if (options.remember) {
-        console.log('💾 User wants to remember this decision for future connections');
         // Could store app permissions in localStorage
       }
       
@@ -1010,7 +802,6 @@ export default {
       
       // TODO: Store permission preferences if remember is true
       if (options.remember) {
-        console.log('💾 User wants to remember this decision for future connections');
         // Could store app permissions in localStorage to auto-deny
       }
       
@@ -1021,7 +812,6 @@ export default {
     completePendingConnection() {
       if (this.authorizationModal.pendingConnection) {
         // Handle the connection completion based on the pending connection data
-        console.log('🔗 Completing authorized connection');
         // The connection logic would continue here
         this.authorizationModal.pendingConnection = null;
       }
@@ -1042,41 +832,21 @@ export default {
   async mounted() {
     // Try to restore session from localStorage
     const sessionRestored = await nostrService.restoreSession();
-    if (sessionRestored && (nostrService.isExtensionReady() || nostrService.isBunkerReady())) {
+    if (sessionRestored && nostrService.isExtensionReady()) {
       this.isConnected = true;
+      this.userProfile = nostrService.userProfile;
       
-      // For NIP-46, create default profile if userProfile is not set or incomplete
-      if (nostrService.getSigningMethod() === 'nip46' && nostrService.pubkey) {
-        this.userProfile = nostrService.userProfile || {
-          pubkey: nostrService.pubkey,
-          display_name: nostrService.pubkey.substring(0, 8) + '...',
-          name: 'NIP-46 User',
-          picture: '/default-avatar.svg'
-        };
-        
-        // If userProfile exists but is missing picture, add default
-        if (this.userProfile && !this.userProfile.picture) {
-          this.userProfile.picture = '/default-avatar.svg';
-        }
-      } else {
-        this.userProfile = nostrService.userProfile;
-      }
-      
-      console.log('✅ Session restored successfully');
       console.log('📋 Final userProfile:', this.userProfile);
     } else if (sessionRestored) {
-      // Session data exists but no signing method ready - clear it
-      console.log('⚠️ Session data found but no signing method ready - clearing session');
+      // Session data exists but extension not ready - clear it
+      console.log('⚠️ Session data found but extension not ready - clearing session');
       nostrService.logout();
     }
     
     // Initialize services
     backupService.init();
     immunityService.init();
-    
-    // Listen for NIP-46 connection events from SettingsView
-    window.addEventListener('nip46-connected', this.onNip46Connected);
-    
+
     // Listen for user profile loaded events
     window.addEventListener('user-profile-loaded', this.onUserProfileLoaded);
     
@@ -1092,7 +862,6 @@ export default {
   },
   
   beforeUnmount() {
-    window.removeEventListener('nip46-connected', this.onNip46Connected);
     window.removeEventListener('user-profile-loaded', this.onUserProfileLoaded);
   }
 }

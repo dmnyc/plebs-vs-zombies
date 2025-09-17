@@ -1,6 +1,5 @@
 import NDK, { NDKEvent, NDKNip07Signer } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
-import nip46Service from './nip46Service.js';
 
 class NostrService {
   constructor() {
@@ -17,11 +16,7 @@ class NostrService {
       // Removed problematic relays: relay.nostrich.de, relay.current.fyi, nostr.mutinywallet.com, relay.snort.social
     ];
     
-    // Signing method management
-    this.signingMethod = 'nip07'; // 'nip07' | 'nip46'
-    this.nip46Service = nip46Service;
-    
-    // NIP-07 specific state
+    // NIP-07 extension state
     this.extensionConnected = false;
     this.extensionAuthorized = false;
     this.connectionPromise = null; // Prevent multiple simultaneous connections
@@ -29,32 +24,22 @@ class NostrService {
     // NIP-65 relay lists
     this.userRelayList = null; // User's own relay preferences
     this.followsRelayLists = new Map(); // Map of pubkey -> relay list
-    
-    // Restore signing method preference and connections
-    this.restoreSigningMethod();
   }
 
   async initialize() {
     if (!this.ndk) {
-      console.log('🔧 Initializing NDK with relays:', this.relays);
-      console.log('🔍 NDK instance check - creating new NDK instance');
       
-      // Create NDK with appropriate signer based on signing method
+      // Create NDK with NIP-07 signer if extension is available
       let signer = null;
-      
-      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
+      if (typeof window.nostr !== 'undefined') {
         signer = new NDKNip07Signer();
-      } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
-        signer = this.nip46Service.getSigner();
       }
       
       this.ndk = new NDK({
         explicitRelayUrls: this.relays,
         signer: signer
       });
-      
-      console.log('🔗 Connecting to NDK...');
-      
+
       // Start connection but don't wait for all relays - NDK will connect in background
       this.ndk.connect().catch(error => {
         console.warn('⚠️ NDK connection error (non-blocking):', error.message);
@@ -66,21 +51,8 @@ class NostrService {
       const connectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
         .filter(r => r.connectivity.status === 1).length;
       
-      console.log(`✅ NDK initialized with ${connectedRelays} connected relays (more may connect in background)`);
     }
     return this.ndk;
-  }
-
-  /**
-   * Get the appropriate signer for the current signing method
-   */
-  getSigner() {
-    if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
-      return new NDKNip07Signer();
-    } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
-      return this.nip46Service.getSigner();
-    }
-    return null;
   }
 
   /**
@@ -90,7 +62,6 @@ class NostrService {
   async connectExtension() {
     if (this.connectionPromise) {
       // Already connecting, wait for existing connection
-      console.log('🔄 Connection already in progress, waiting...');
       return this.connectionPromise;
     }
 
@@ -107,8 +78,6 @@ class NostrService {
   }
 
   async _connectExtensionImpl() {
-    console.log('🔌 Starting NIP-07 extension connection...');
-
     // Check if extension is available
     if (typeof window.nostr === 'undefined') {
       this.extensionConnected = false;
@@ -117,8 +86,6 @@ class NostrService {
 
     try {
       // Test extension responsiveness first
-      console.log('🔍 Testing extension responsiveness...');
-      
       // Get public key with reasonable timeout
       const pubkey = await Promise.race([
         window.nostr.getPublicKey(),
@@ -131,28 +98,18 @@ class NostrService {
       this.extensionConnected = true;
       this.extensionAuthorized = true;
 
-      console.log('✅ Extension connected successfully');
-      console.log('👤 Public key:', pubkey.substring(0, 8) + '...');
-
       // Initialize NDK after successful extension connection
-      console.log('🔧 Initializing NDK...');
       await this.initialize();
-      console.log('✅ NDK initialization complete');
 
       // Load user profile
-      console.log('👤 Loading user profile...');
       await this.loadUserProfile();
-      console.log('✅ User profile loaded');
-
       // Fetch user's relay list (NIP-65)
-      console.log('📡 Fetching user relay list...');
       try {
         await this.fetchUserRelayList();
         if (this.userRelayList) {
           const writeRelays = this.getWriteRelays(this.userRelayList);
           const readRelays = this.getReadRelays(this.userRelayList);
-          console.log(`✅ User relay list loaded: ${writeRelays.length} write, ${readRelays.length} read relays`);
-        } else {
+          } else {
           console.log('ℹ️ No user relay list found, using default relays');
         }
       } catch (error) {
@@ -198,7 +155,6 @@ class NostrService {
       return;
     }
     
-    console.log(`🔄 Switching signing method from ${this.signingMethod} to ${method}`);
     this.signingMethod = method;
     
     // Reset NDK to force recreation with new signer
@@ -223,8 +179,7 @@ class NostrService {
       const savedMethod = localStorage.getItem('signing_method');
       if (savedMethod && ['nip07', 'nip46'].includes(savedMethod)) {
         this.signingMethod = savedMethod;
-        console.log(`📋 Restored signing method: ${savedMethod}`);
-      }
+        }
     } catch (error) {
       console.warn('Failed to restore signing method preference:', error);
     }
@@ -295,7 +250,6 @@ class NostrService {
           const cachedProfile = JSON.parse(cached);
           // Use cached data if it's less than 1 hour old
           if (Date.now() - cachedProfile.timestamp < 3600000) {
-            console.log('📋 Using cached profile data');
             this.userProfile = {
               pubkey: this.pubkey,
               name: cachedProfile.name || null,
@@ -307,7 +261,6 @@ class NostrService {
             
             // Dispatch event immediately with cached data
             if (this.userProfile && this.signingMethod === 'nip46') {
-              console.log('📡 Dispatching cached user-profile-loaded event for NIP-46');
               const profileEvent = new CustomEvent('user-profile-loaded', {
                 detail: this.userProfile
               });
@@ -373,8 +326,7 @@ class NostrService {
           nip05: null
         };
       }
-      
-      
+
       // Cache the profile data if we successfully loaded it
       if (this.userProfile && (this.userProfile.name || this.userProfile.display_name || this.userProfile.picture)) {
         try {
@@ -384,15 +336,13 @@ class NostrService {
             timestamp: Date.now()
           };
           localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-          console.log('💾 Cached profile data');
-        } catch (cacheError) {
+          } catch (cacheError) {
           console.warn('Failed to cache profile data:', cacheError);
         }
       }
       
       // Dispatch event to update UI with loaded profile data
       if (this.userProfile && this.signingMethod === 'nip46') {
-        console.log('📡 Dispatching user-profile-loaded event for NIP-46');
         const profileEvent = new CustomEvent('user-profile-loaded', {
           detail: this.userProfile
         });
@@ -536,8 +486,6 @@ class NostrService {
       try {
         const batchNumber = Math.floor(i/batchSize) + 1;
         const totalBatches = Math.ceil(validPubkeys.length/batchSize);
-        console.log(`Fetching profiles for batch ${batchNumber}/${totalBatches}...`);
-        
         // Report batch progress to UI
         if (progressCallback) {
           progressCallback({
@@ -648,8 +596,7 @@ class NostrService {
             profileMap.set(pubkey, updatedProfile);
             
             if (deletionTimeline) {
-              console.log(`🔥 User ${pubkey.substring(0, 8)}... marked deleted ${Math.floor(deletionTimeline.deletionAge / (24 * 60 * 60))} days ago, ${deletionTimeline.profileUpdatesAfterDeletion} profile updates since`);
-            }
+              }
           } catch (error) {
             console.error(`Failed to parse profile for ${pubkey}:`, error);
           }
@@ -693,7 +640,6 @@ class NostrService {
       limit: 5 // Get a few recent events to ensure we have the latest
     };
     
-    console.log('Fetching follow list...');
     const events = await this.ndk.fetchEvents(followListFilter);
     
     if (!events || events.size === 0) {
@@ -705,14 +651,10 @@ class NostrService {
     const eventArray = Array.from(events).sort((a, b) => b.created_at - a.created_at);
     const mostRecentEvent = eventArray[0];
     
-    console.log(`Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`);
-    
     // Extract and validate follow list - only include valid 64-character hex pubkeys
     const rawFollowList = mostRecentEvent.tags
       .filter(tag => tag[0] === 'p' && tag[1]) // Ensure tag[1] exists
       .map(tag => tag[1]);
-    
-    console.log(`Raw follow list contains ${rawFollowList.length} entries`);
     
     // Validate each entry is a proper 64-character hex pubkey
     const validFollowList = rawFollowList.filter(pubkey => {
@@ -739,7 +681,6 @@ class NostrService {
       console.warn(`⚠️ Filtered out ${filteredCount} invalid entries from follow list`);
     }
     
-    console.log(`Valid follow list contains ${validFollowList.length} follows`);
     return validFollowList;
   }
 
@@ -754,8 +695,6 @@ class NostrService {
     pubkeys.forEach(pubkey => {
       activityMap.set(pubkey, []);
     });
-    
-    console.log(`🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`);
     
     // Balanced approach: reasonable batches, good event coverage, sufficient time window
     const batchSize = 25; // Balanced batch size
@@ -773,8 +712,6 @@ class NostrService {
           limit: limit * batch.length, // Proportional limit
           since: Math.floor(Date.now() / 1000) - (120 * 24 * 60 * 60) // 120 days - good balance
         };
-        
-        console.log(`📡 Batch ${batchNum}/${totalBatches}: Scanning ${batch.length} users (balanced approach)...`);
         
         // Report progress before attempting
         if (progressCallback) {
@@ -799,8 +736,7 @@ class NostrService {
             timeoutPromise
           ]);
           
-          console.log(`✅ Batch ${batchNum}: Found ${events.size} events`);
-        } catch (error) {
+          } catch (error) {
           console.warn(`⚠️ Batch ${batchNum} failed: ${error.message}, continuing...`);
           events = new Set(); // Empty set to continue
         }
@@ -857,8 +793,6 @@ class NostrService {
     }
     
     const activeProfiles = Array.from(activityMap.values()).filter(events => events.length > 0).length;
-    console.log(`📊 Balanced activity scan complete. Found activity for ${activeProfiles} out of ${pubkeys.length} profiles.`);
-    
     // Final progress report
     if (progressCallback) {
       const finalData = {
@@ -878,8 +812,6 @@ class NostrService {
    * This method tries multiple strategies to find ANY activity
    */
   async aggressiveActivityRetry(pubkeys, progressCallback = null) {
-    console.log(`🔍 AGGRESSIVE RETRY: Attempting to find activity for ${pubkeys.length} users with unknown activity`);
-    
     await this.initialize();
     const retryResults = new Map();
     
@@ -891,8 +823,6 @@ class NostrService {
     // Strategy 1: Single user queries with maximum event limits
     for (let i = 0; i < pubkeys.length; i++) {
       const pubkey = pubkeys[i];
-      console.log(`🔍 RETRY STRATEGY 1: Individual search for ${pubkey.substring(0, 8)}...`);
-      
       if (progressCallback) {
         progressCallback({
           stage: `Aggressive retry: searching user ${i + 1}/${pubkeys.length}...`,
@@ -927,8 +857,7 @@ class NostrService {
         }
 
         if (events.size > 0) {
-          console.log(`🎉 RETRY SUCCESS: Found ${events.size} events for ${pubkey.substring(0, 8)}... using individual search`);
-        }
+          }
 
       } catch (error) {
         console.warn(`Individual search failed for ${pubkey.substring(0, 8)}...:`, error.message);
@@ -942,8 +871,6 @@ class NostrService {
     const stillEmpty = pubkeys.filter(pubkey => (retryResults.get(pubkey) || []).length === 0);
     
     if (stillEmpty.length > 0) {
-      console.log(`🔍 RETRY STRATEGY 2: Basic post search for ${stillEmpty.length} remaining users`);
-      
       const basicBatchSize = 3;
       for (let i = 0; i < stillEmpty.length; i += basicBatchSize) {
         const batch = stillEmpty.slice(i, i + basicBatchSize);
@@ -973,8 +900,7 @@ class NostrService {
           }
 
           if (events.size > 0) {
-            console.log(`🎉 RETRY SUCCESS: Found ${events.size} basic posts in batch ${Math.floor(i/basicBatchSize) + 1}`);
-          }
+            }
 
         } catch (error) {
           console.warn(`Basic search failed for batch:`, error.message);
@@ -993,8 +919,6 @@ class NostrService {
     }
 
     const foundActivity = Array.from(retryResults.values()).filter(events => events.length > 0).length;
-    console.log(`🔍 AGGRESSIVE RETRY COMPLETE: Found activity for ${foundActivity}/${pubkeys.length} users`);
-
     return retryResults;
   }
 
@@ -1002,9 +926,6 @@ class NostrService {
     if (!this.pubkey) {
       throw new Error('Public key not set');
     }
-    
-    console.log('Current pubkey:', this.pubkey);
-    console.log('Creating unfollow event for', pubkeysToRemove.length, 'pubkeys');
     
     if (!pubkeysToRemove || pubkeysToRemove.length === 0) {
       throw new Error('No pubkeys to remove');
@@ -1029,23 +950,14 @@ class NostrService {
     const eventArray = Array.from(events).sort((a, b) => b.created_at - a.created_at);
     const mostRecentEvent = eventArray[0];
     
-    console.log(`Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`);
-    
     // Separate user follows ('p' tags) from all other tags (including 't' tags)
     const userFollowTags = mostRecentEvent.tags.filter(tag => tag[0] === 'p' && tag[1]);
     const nonUserTags = mostRecentEvent.tags.filter(tag => tag[0] !== 'p');
     
-    console.log(`Current tags: ${userFollowTags.length} user follows, ${nonUserTags.length} other tags (topics, relays, etc.)`);
-    console.log('Non-user tags:', nonUserTags.map(tag => `${tag[0]}:${tag[1] || ''}`).join(', '));
-    
     // Remove the specified pubkeys from user follow tags only
     const newUserFollowTags = userFollowTags.filter(tag => !pubkeysToRemove.includes(tag[1]));
-    console.log(`Filtered user follows: ${userFollowTags.length} -> ${newUserFollowTags.length} (removed ${userFollowTags.length - newUserFollowTags.length})`);
-    
     // Combine the preserved non-user tags with the filtered user follow tags
     const tags = [...nonUserTags, ...newUserFollowTags];
-    
-    console.log(`Final tag count: ${tags.length} (${newUserFollowTags.length} user follows + ${nonUserTags.length} preserved tags)`);
     
     // Check if the event would be too large
     if (newUserFollowTags.length > 1000) {
@@ -1068,8 +980,6 @@ class NostrService {
       throw new Error(`Follow list too large (${Math.round(estimatedSize / 1024)} KB). Please unfollow users in smaller batches.`);
     }
     
-    console.log('Preserved all non-user tags and filtered user follows only');
-    
     // Create the event with preserved content and all tags
     const event = {
       kind: 3,
@@ -1081,7 +991,6 @@ class NostrService {
     // Ensure appropriate signing method is ready
     if (!this.isSigningReady()) {
       if (this.signingMethod === 'nip07') {
-        console.log('🔄 Extension not ready, attempting connection...');
         await this.connectExtension();
       } else if (this.signingMethod === 'nip46') {
         throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
@@ -1093,7 +1002,6 @@ class NostrService {
       throw new Error(`Unable to establish connection with signing method: ${this.signingMethod}`);
     }
     
-    console.log('🔐 Starting signing process...');
     console.log('Event to sign:', {
       kind: event.kind,
       created_at: event.created_at,
@@ -1113,8 +1021,6 @@ class NostrService {
     try {
       if (this.signingMethod === 'nip07') {
         console.log('Attempting NIP-07 signing...');
-        console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-        
         signedEvent = await Promise.race([
           window.nostr.signEvent(event),
           new Promise((_, reject) => 
@@ -1123,8 +1029,6 @@ class NostrService {
         ]);
       } else if (this.signingMethod === 'nip46') {
         console.log('Attempting NIP-46 signing...');
-        console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
-        
         signedEvent = await this.nip46Service.signEvent(event);
       } else {
         throw new Error(`Invalid signing method: ${this.signingMethod}`);
@@ -1134,8 +1038,6 @@ class NostrService {
       
       // Publish to relays using simple WebSocket connections
       const publishResults = await this.publishEventToRelays(signedEvent);
-      
-      console.log(`✅ Event published to ${publishResults.successful}/${this.getPublishRelays().length} relays`);
       
       if (publishResults.successful === 0) {
         throw new Error('Failed to publish to any relays. Please check your internet connection.');
@@ -1288,8 +1190,7 @@ class NostrService {
     // Reset to default signing method
     this.signingMethod = 'nip07';
     
-    console.log('✅ User logged out - all connection state cleared');
-  }
+    }
 
   saveSession() {
     if (this.pubkey && this.userProfile) {
@@ -1350,7 +1251,6 @@ class NostrService {
                 // Initialize NDK connection
                 await this.initialize();
                 
-                console.log('✅ NIP-07 session restored successfully');
                 return true;
               } else {
                 console.log('⚠️ Different user detected - clearing session');
@@ -1373,29 +1273,6 @@ class NostrService {
     } catch (error) {
       console.error('Failed to restore NIP-07 session:', error);
       localStorage.removeItem('nostr_session');
-    }
-    
-    return false;
-  }
-
-  async restoreNip46Session() {
-    try {
-      const restored = await this.nip46Service.restoreConnection();
-      if (restored) {
-        // Get pubkey from restored connection
-        this.pubkey = await this.nip46Service.getPublicKey();
-        
-        // Load user profile
-        await this.loadUserProfile();
-        
-        // Initialize NDK with NIP-46 signer
-        await this.initialize();
-        
-        console.log('✅ NIP-46 session restored successfully');
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to restore NIP-46 session:', error);
     }
     
     return false;
@@ -1467,8 +1344,6 @@ class NostrService {
         limit: 1
       };
 
-      console.log(`🔍 Fetching NIP-65 relay list for ${pubkey.substring(0, 8)}...`);
-      
       // Use fetchEvents approach directly (same as follow lists) - faster and more reliable
       try {
         const events = await this.ndk.fetchEvents({
@@ -1503,8 +1378,6 @@ class NostrService {
       
       // If no relays are connected yet, wait briefly for connections to establish
       if (connectedRelays.length === 0) {
-        console.log('⏳ No relays connected yet, waiting for connections...');
-        
         // Wait up to 3 seconds for at least one relay to connect (fallback only)
         let attempts = 0;
         const maxAttempts = 6; // 6 x 500ms = 3 seconds max
@@ -1517,13 +1390,11 @@ class NostrService {
             .filter(r => r.connectivity.status === 1);
           
           if (nowConnectedRelays.length > 0) {
-            console.log(`✅ Connected to ${nowConnectedRelays.length} relays after ${attempts * 500}ms`);
             console.log(`📡 Connected relay URLs:`, nowConnectedRelays.map(r => r.url));
             break;
           }
           
           if (attempts % 6 === 0) { // Log every 3 seconds
-            console.log(`⏳ Still waiting for relay connections... (${attempts * 500}ms)`);
             // Log relay statuses to debug connection issues
             const allRelays = Array.from(this.ndk?.pool?.relays?.values() || []);
             const relayStatuses = allRelays.map(r => ({ 
@@ -1622,8 +1493,6 @@ class NostrService {
       return new Map();
     }
 
-    console.log(`🔍 Fetching relay lists for ${pubkeys.length} follows...`);
-    
     const relayLists = new Map();
     const batchSize = 20; // Process in batches to avoid overwhelming relays
     
@@ -1663,7 +1532,6 @@ class NostrService {
       });
     }
     
-    console.log(`✅ Fetched relay lists for ${relayLists.size} out of ${pubkeys.length} follows`);
     return relayLists;
   }
 
@@ -1685,8 +1553,6 @@ class NostrService {
       activityMap.set(pubkey, []);
     });
     
-    console.log('🚀 Using optimized activity scanning with per-user relay preferences');
-    
     // Process users individually or in small relay-specific batches
     let processed = 0;
     for (const pubkey of pubkeys) {
@@ -1704,8 +1570,7 @@ class NostrService {
         const events = await this.fetchUserActivity(pubkey, relaysToScan, limit);
         if (events.length > 0) {
           activityMap.set(pubkey, events);
-          console.log(`📊 Found ${events.length} events for ${pubkey.substring(0, 8)}... using ${relaysToScan.length} relays`);
-        }
+          }
       } catch (error) {
         console.warn(`⚠️ Failed to fetch activity for ${pubkey.substring(0, 8)}...:`, error.message);
       }
@@ -1727,8 +1592,6 @@ class NostrService {
     }
     
     const foundActivity = Array.from(activityMap.values()).filter(events => events.length > 0).length;
-    console.log(`✅ Optimized activity scan complete: found activity for ${foundActivity}/${pubkeys.length} users`);
-    
     return activityMap;
   }
 
@@ -1741,8 +1604,6 @@ class NostrService {
       return new Map();
     }
 
-    console.log(`🎯 Starting smart relay retry for ${pubkeys.length} users with cached relay preferences`);
-    
     const retryResults = new Map();
     
     // Initialize all pubkeys with empty arrays
@@ -1753,8 +1614,6 @@ class NostrService {
     // Group users by their specific relay preferences (only those who have relay lists)
     const usersWithRelayLists = pubkeys.filter(pubkey => this.followsRelayLists.has(pubkey));
     const usersWithoutRelayLists = pubkeys.filter(pubkey => !this.followsRelayLists.has(pubkey));
-    
-    console.log(`📊 Smart retry: ${usersWithRelayLists.length} users have relay lists, ${usersWithoutRelayLists.length} don't`);
     
     if (usersWithRelayLists.length > 0) {
       // Process users with relay lists in small batches
@@ -1782,8 +1641,7 @@ class NostrService {
               const events = await this.fetchUserActivitySingle(pubkey, writeRelays, 5);
               if (events.length > 0) {
                 retryResults.set(pubkey, events);
-                console.log(`🎯 SMART SUCCESS: ${pubkey.substring(0, 8)}... found on their ${writeRelays.length} preferred relays`);
-              }
+                }
             } catch (error) {
               console.warn(`⚠️ Smart retry failed for ${pubkey.substring(0, 8)}...:`, error.message);
             }
@@ -1798,8 +1656,6 @@ class NostrService {
     }
     
     const recoveredCount = Array.from(retryResults.values()).filter(events => events.length > 0).length;
-    console.log(`✅ Smart relay retry complete: recovered ${recoveredCount}/${usersWithRelayLists.length} users with relay preferences`);
-    
     return retryResults;
   }
 
@@ -1928,7 +1784,6 @@ class NostrService {
       const combinedRelays = [...new Set([...writeRelays, ...readRelays])];
       
       if (combinedRelays.length > 0) {
-        console.log(`📡 Using ${writeRelays.length} write + ${readRelays.length} read relays (${combinedRelays.length} unique) for ${pubkey.substring(0, 8)}...`);
         return combinedRelays;
       }
     }
@@ -1942,8 +1797,6 @@ class NostrService {
    * Queries both user-specific relays and default relays simultaneously for comprehensive coverage
    */
   async getEnhancedUserActivity(pubkeys, progressCallback = null) {
-    console.log(`🔍 ENHANCED SCAN: Starting comprehensive activity scan for ${pubkeys.length} users`);
-    
     await this.initialize();
     const results = new Map();
     
@@ -1958,8 +1811,6 @@ class NostrService {
     for (let i = 0; i < pubkeys.length; i += batchSize) {
       const batch = pubkeys.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
-      
-      console.log(`🔍 Processing enhanced batch ${batchNumber}/${totalBatches} (${batch.length} users)`);
       
       if (progressCallback) {
         progressCallback({
@@ -1981,8 +1832,7 @@ class NostrService {
           if (result.status === 'fulfilled' && result.value) {
             results.set(pubkey, result.value);
             if (result.value.length > 0) {
-              console.log(`✅ Enhanced scan found ${result.value.length} events for ${pubkey.substring(0, 8)}...`);
-            }
+              }
           } else {
             console.warn(`⚠️ Enhanced scan failed for ${pubkey.substring(0, 8)}...`);
           }
@@ -2071,8 +1921,7 @@ class NostrService {
       const combinedEvents = Array.from(allEvents.values());
       
       if (combinedEvents.length > 0) {
-        console.log(`🎯 Parallel query success: Found ${combinedEvents.length} unique events for ${pubkey.substring(0, 8)}... from ${queries.length} relay sets`);
-      }
+        }
       
       return combinedEvents;
       
@@ -2090,38 +1939,14 @@ class NostrService {
     if (this.userRelayList) {
       const writeRelays = this.getWriteRelays(this.userRelayList);
       if (writeRelays.length > 0) {
-        console.log(`📡 Using ${writeRelays.length} user write relays for publishing`);
         return writeRelays;
       }
     }
     
     // Fallback to default relays if no user relay list
-    console.log(`📡 Using ${this.relays.length} default relays for publishing`);
     return this.relays;
   }
 
-  async restoreNip46Session() {
-    try {
-      const restored = await this.nip46Service.restoreConnection();
-      if (restored) {
-        // Get pubkey from restored connection
-        this.pubkey = await this.nip46Service.getPublicKey();
-        
-        // Load user profile
-        await this.loadUserProfile();
-        
-        // Initialize NDK with NIP-46 signer
-        await this.initialize();
-        
-        console.log('✅ NIP-46 session restored successfully');
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to restore NIP-46 session:', error);
-    }
-    
-    return false;
-  }
 }
 
 // Create singleton instance

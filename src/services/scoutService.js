@@ -27,8 +27,6 @@ class ScoutService {
 
   async initialize() {
     if (!this.ndk) {
-      console.log('🔍 Initializing Scout Service...');
-      
       this.ndk = new NDK({
         explicitRelayUrls: this.defaultRelays
       });
@@ -41,8 +39,7 @@ class ScoutService {
             setTimeout(() => reject(new Error('Connection timeout')), 10000)
           )
         ]);
-        console.log('✅ Scout Service connected to relays');
-      } catch (error) {
+        } catch (error) {
         console.warn('⚠️ Some relays failed to connect:', error);
         // Continue anyway - NDK will work with whatever relays did connect
       }
@@ -61,7 +58,6 @@ class ScoutService {
       }
 
       // Get user's announced relays (NIP-65)
-      console.log('📡 Fetching user relays...');
       const userRelays = await this.fetchUserRelays(targetPubkey);
       console.log('📡 Found relays:', userRelays.length);
       
@@ -106,9 +102,6 @@ class ScoutService {
         ancient: analysisResults.ancient.length
       };
 
-      console.log(`🎯 Scout Results: ${totalFollows} follows, ${totalZombies} zombies (${zombieScore}% zombie score)`);
-      console.log(`📊 Breakdown: ${analysisResults.active.length} active, ${breakdown.fresh} fresh, ${breakdown.rotting} rotting, ${breakdown.ancient} ancient, ${breakdown.burned} burned`);
-
       return {
         success: true,
         totalFollows,
@@ -129,8 +122,6 @@ class ScoutService {
 
   async fetchUserRelays(pubkey) {
     try {
-      console.log(`🔍 Fetching relay list for ${pubkey.substring(0, 8)}...`);
-      
       // Fetch NIP-65 relay list events (kind: 10002)
       const relayListEvents = await this.ndk.fetchEvents({
         kinds: [10002],
@@ -150,8 +141,7 @@ class ScoutService {
           }
         }
         
-        console.log(`✅ Found ${userRelays.length} user relays`);
-      } else {
+        } else {
         console.log('⚠️ No relay list found, using default relays');
       }
 
@@ -165,8 +155,6 @@ class ScoutService {
 
   async fetchFollowList(pubkey, relays = null) {
     try {
-      console.log(`🔍 Fetching follow list for ${pubkey.substring(0, 8)}...`);
-      
       // Check for cancellation
       if (this.cancelled) {
         console.log('🛑 Follow list fetch cancelled');
@@ -176,7 +164,6 @@ class ScoutService {
       // Create temporary NDK instance with user's relays if available
       let queryNdk = this.ndk;
       if (relays && relays.length > 0) {
-        console.log(`🔗 Using ${relays.length} user relays for follow list fetch`);
         queryNdk = new NDK({
           explicitRelayUrls: relays.slice(0, 15) // Use up to 15 relays for better coverage
         });
@@ -189,15 +176,13 @@ class ScoutService {
               setTimeout(() => reject(new Error('User relay connection timeout')), 8000)
             )
           ]);
-          console.log('✅ Connected to user relays');
-        } catch (error) {
+          } catch (error) {
           console.warn('⚠️ Failed to connect to user relays, falling back to default:', error);
           queryNdk = this.ndk; // Fall back to default relays
         }
       }
 
       // Fetch multiple kind 3 (follow list) events to improve coverage
-      console.log('📡 Fetching follow list events...');
       const followEvents = await Promise.race([
         queryNdk.fetchEvents({
           kinds: [3],
@@ -220,7 +205,6 @@ class ScoutService {
         return [];
       }
 
-      console.log(`📡 Found ${followEvents.size} follow list events`);
       const allFollows = new Set(); // Use Set to avoid duplicates
 
       // Merge follows from all events, prioritizing newer ones
@@ -232,8 +216,6 @@ class ScoutService {
           console.log('🛑 Follow list processing cancelled during event loop');
           return Array.from(allFollows);
         }
-        console.log(`📡 Processing event ${index + 1}/${eventArray.length} (timestamp: ${event.created_at}, tags: ${event.tags?.length || 0})`);
-        
         // Extract pubkeys from p tags
         for (const tag of event.tags || []) {
           if (tag[0] === 'p' && tag[1]) {
@@ -241,13 +223,10 @@ class ScoutService {
           }
         }
         
-        console.log(`📡 Total unique follows after event ${index + 1}: ${allFollows.size}`);
-      }
+        }
 
       const followList = Array.from(allFollows);
 
-      console.log(`✅ Found ${followList.length} follows from ${followEvents.size} events`);
-      
       // If we got a surprisingly low count, try additional popular relays as fallback
       if (followList.length < 500 && !this.cancelled) {
         console.log(`⚠️ Low follow count (${followList.length}), trying additional popular relays...`);
@@ -283,8 +262,6 @@ class ScoutService {
             )
           ]);
           
-          console.log(`📡 Fallback found ${fallbackEvents.size} additional events`);
-          
           // Check for cancellation before processing fallback events
           if (this.cancelled) {
             console.log('🛑 Fallback processing cancelled');
@@ -305,7 +282,6 @@ class ScoutService {
           }
           
           const finalFollowList = Array.from(allFollows);
-          console.log(`✅ Final count after fallback: ${finalFollowList.length} follows (+${finalFollowList.length - followList.length})`);
           return finalFollowList;
           
         } catch (fallbackError) {
@@ -323,8 +299,6 @@ class ScoutService {
 
   async fetchUserProfiles(pubkeys) {
     try {
-      console.log(`👤 Fetching profiles for ${pubkeys.length} users...`);
-      
       // Fetch kind 0 (user profile) events with timeout
       const profileEvents = await Promise.race([
         this.ndk.fetchEvents({
@@ -354,7 +328,6 @@ class ScoutService {
         }
       }
 
-      console.log(`✅ Found ${profiles.size} profiles`);
       return profiles;
 
     } catch (error) {
@@ -364,8 +337,6 @@ class ScoutService {
   }
 
   async analyzeFollows(followList, progressCallback = null) {
-    console.log(`🔍 Starting authentic activity scan for ${followList.length} profiles using authenticated mode logic...`);
-    
     // Check for cancellation
     if (this.cancelled) {
       console.log('🛑 Scout scan cancelled');
@@ -373,8 +344,6 @@ class ScoutService {
     }
     
     // Step 1: Use the ENHANCED authenticated mode scanning with all retry logic
-    console.log('🚀 Using enhanced scanning with SMART RETRY + AGGRESSIVE FALLBACK');
-    
     // 1a. Standard activity scanning using scout's cancellation-aware method
     const activityMap = await this.getProfilesActivityScout(followList, 10, progressCallback);
     
@@ -391,8 +360,6 @@ class ScoutService {
     });
     
     if (usersWithNoActivity.length > 0) {
-      console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
-      
       if (progressCallback) {
         progressCallback({
           stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
@@ -408,12 +375,9 @@ class ScoutService {
       for (const [pubkey, events] of retryResults.entries()) {
         if (events.length > 0) {
           activityMap.set(pubkey, events);
-          console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
           recoveredUsers++;
         }
       }
-      
-      console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
       
       // 1c. Fall back to aggressive retry for remaining users without relay lists
       const stillNoActivity = usersWithNoActivity.filter(pubkey => {
@@ -422,8 +386,6 @@ class ScoutService {
       });
       
       if (stillNoActivity.length > 0) {
-        console.log(`🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`);
-        
         const aggressiveResults = await nostrService.aggressiveActivityRetry(stillNoActivity, progressCallback);
         
         let fallbackRecovered = 0;
@@ -434,13 +396,10 @@ class ScoutService {
           }
         }
         
-        console.log(`🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`);
-      }
+        }
     }
     
     // Step 2: Use the ACTUAL authenticated mode's zombie classification method
-    console.log('🔍 Using authentic zombieService.classifyZombies method');
-    
     if (progressCallback) {
       progressCallback({
         stage: 'Analyzing user activity and deleted accounts...',
@@ -453,13 +412,10 @@ class ScoutService {
     const rawZombieResults = zombieService.classifyZombies(activityMap, null, null);
     
     // Step 2.5: Use the ACTUAL authenticated mode's immunity filtering
-    console.log('🔍 Using authentic immunityService.filterImmuneZombies method');
     await immunityService.init();
     const zombieResults = immunityService.filterImmuneZombies(rawZombieResults);
     const rawCount = rawZombieResults.fresh.length + rawZombieResults.rotting.length + rawZombieResults.ancient.length;
     const filteredCount = zombieResults.fresh.length + zombieResults.rotting.length + zombieResults.ancient.length;
-    console.log(`🛡️ Authentic immunity filtering: ${rawCount} raw zombies → ${filteredCount} after filtering`);
-    
     // Step 3: Fetch profiles for display samples
     await this.addProfileSamples(zombieResults);
     
@@ -478,8 +434,6 @@ class ScoutService {
     pubkeys.forEach(pubkey => {
       activityMap.set(pubkey, []);
     });
-    
-    console.log(`🔍 Starting enhanced activity scan for ${pubkeys.length} profiles...`);
     
     // PASS 1: Standard scanning with default relays
     const batchSize = 25;
@@ -545,9 +499,7 @@ class ScoutService {
         console.warn(`⚠️ Error in batch ${Math.floor(i/batchSize) + 1}:`, error.message);
       }
     }
-    
-    
-    console.log(`✅ Scout Mode activity scan complete. Found activity for ${Array.from(activityMap.values()).filter(events => events.length > 0).length}/${pubkeys.length} users`);
+
     return activityMap;
   }
 
@@ -563,8 +515,6 @@ class ScoutService {
       'wss://nostr.wine',
       'wss://relay.nostr.band'
     ];
-    
-    console.log(`🔄 Simplified retry: Using ${reliableRelays.length} reliable relays for ${pubkeys.length} users`);
     
     // Initialize results
     for (const pubkey of pubkeys) {
@@ -584,8 +534,6 @@ class ScoutService {
           setTimeout(() => reject(new Error('Reliable relay connection timeout')), 8000)
         )
       ]);
-      
-      console.log(`✅ Connected to reliable relays for retry`);
       
       // Process users in small batches
       const batchSize = 10; // Larger batches since we're using reliable relays
@@ -652,8 +600,6 @@ class ScoutService {
     
     // Count successful recoveries
     const recoveredCount = Array.from(retryMap.values()).filter(events => events.length > 0).length;
-    console.log(`✅ Reliable retry recovered ${recoveredCount}/${pubkeys.length} users using stable relays`);
-    
     return retryMap;
   }
 
@@ -673,8 +619,6 @@ class ScoutService {
     const freshThreshold = 180; // 6 months
     const rottingThreshold = 365; // 1 year
 
-    console.log(`🔍 Classifying zombies using authenticated thresholds: active=${conservativeActiveThreshold}d, fresh=${freshThreshold}d, rotting=${rottingThreshold}d`);
-
     let processedCount = 0;
     const totalUsers = activityData.size;
     
@@ -683,7 +627,6 @@ class ScoutService {
       
       // Check for no activity first
       if (events.length === 0) {
-        console.log(`💀 User ${pubkey.substring(0, 8)}... is ANCIENT zombie: no activity found`);
         zombies.ancient.push({
           pubkey,
           lastActivity: null,
@@ -704,16 +647,12 @@ class ScoutService {
 
       // ULTRA CONSERVATIVE - same as authenticated mode
       if (daysSinceLastActivity < conservativeActiveThreshold) {
-        console.log(`✅ User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity.toFixed(1)} days ago (< ${conservativeActiveThreshold} days)`);
         zombies.active.push(zombieInfo);
       } else if (daysSinceLastActivity >= rottingThreshold) {
-        console.log(`💀 User ${pubkey.substring(0, 8)}... is ANCIENT zombie: ${daysSinceLastActivity.toFixed(1)} days since activity`);
         zombies.ancient.push(zombieInfo);
       } else if (daysSinceLastActivity >= freshThreshold) {
-        console.log(`🧟‍♂️ User ${pubkey.substring(0, 8)}... is ROTTING zombie: ${daysSinceLastActivity.toFixed(1)} days since activity`);
         zombies.rotting.push(zombieInfo);
       } else {
-        console.log(`🧟‍♀️ User ${pubkey.substring(0, 8)}... is FRESH zombie: ${daysSinceLastActivity.toFixed(1)} days since activity`);
         zombies.fresh.push(zombieInfo);
       }
 
@@ -730,8 +669,6 @@ class ScoutService {
     }
 
     const totalZombies = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
-    console.log(`✅ Classification complete: ${zombies.active.length} active, ${totalZombies} zombies (${zombies.fresh.length} fresh, ${zombies.rotting.length} rotting, ${zombies.ancient.length} ancient, ${zombies.burned.length} burned)`);
-
     return zombies;
   }
 
@@ -771,8 +708,6 @@ class ScoutService {
       // Use the SAME comprehensive event search as authenticated mode
       const oneYearAgo = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
       
-      console.log(`🔍 Analyzing batch of ${pubkeys.length} users with comprehensive event search...`);
-      
       // Fetch ALL activity types that authenticated mode searches for
       const recentEvents = await this.ndk.fetchEvents({
         kinds: [
@@ -807,8 +742,6 @@ class ScoutService {
       }
 
       // Process all activity (not just "recent" - we're looking at full year)
-      console.log(`📊 Processing ${recentEvents.size} events across all kinds...`);
-      
       for (const event of recentEvents) {
         // Skip deletion events for activity tracking (but count them separately)
         if (event.kind === 5) continue;
@@ -819,16 +752,12 @@ class ScoutService {
         }
       }
       
-      console.log(`👤 Found activity for ${userActivity.size} out of ${pubkeys.length} users`);
-
       const now = Math.floor(Date.now() / 1000);
       
       // Use the same conservative thresholds as authenticated mode
       const conservativeActiveThreshold = 120; // 4 months - ULTRA CONSERVATIVE like main app
       const freshThreshold = 180; // 6 months
       const rottingThreshold = 365; // 1 year
-
-      console.log(`🔍 Scout Mode using conservative thresholds: active=${conservativeActiveThreshold}d, fresh=${freshThreshold}d, rotting=${rottingThreshold}d`);
 
       // Categorize each user using same logic as authenticated mode
       for (const pubkey of pubkeys) {
@@ -841,27 +770,21 @@ class ScoutService {
 
         // Check if account is deleted first (highest priority)
         if (deletedUsers.has(pubkey)) {
-          console.log(`🔥 User ${pubkey.substring(0, 8)}... is BURNED zombie: account marked as deleted`);
           results.burned.push(userInfo);
         } else if (!lastActivity) {
           // No activity found in last 90 days, consider ancient
-          console.log(`💀 User ${pubkey.substring(0, 8)}... is ANCIENT zombie: no activity found`);
           results.ancient.push(userInfo);
         } else {
           const daysSinceActivity = (now - lastActivity) / (24 * 60 * 60);
           
           // ULTRA CONSERVATIVE - same as authenticated mode
           if (daysSinceActivity < conservativeActiveThreshold) {
-            console.log(`✅ User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceActivity.toFixed(1)} days ago (< ${conservativeActiveThreshold} days)`);
             results.active.push(userInfo);
           } else if (daysSinceActivity >= rottingThreshold) {
-            console.log(`💀 User ${pubkey.substring(0, 8)}... is ANCIENT zombie: ${daysSinceActivity.toFixed(1)} days since activity`);
             results.ancient.push(userInfo);
           } else if (daysSinceActivity >= freshThreshold) {
-            console.log(`🧟‍♂️ User ${pubkey.substring(0, 8)}... is ROTTING zombie: ${daysSinceActivity.toFixed(1)} days since activity`);
             results.rotting.push(userInfo);
           } else {
-            console.log(`🧟‍♀️ User ${pubkey.substring(0, 8)}... is FRESH zombie: ${daysSinceActivity.toFixed(1)} days since activity`);
             results.fresh.push(userInfo);
           }
         }
@@ -901,8 +824,7 @@ class ScoutService {
     if (this.ndk) {
       // NDK doesn't have explicit disconnect, connections are managed automatically
       this.ndk = null;
-      console.log('🔍 Scout Service disconnected');
-    }
+      }
   }
 }
 

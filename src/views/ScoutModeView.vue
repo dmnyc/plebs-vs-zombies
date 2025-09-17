@@ -842,8 +842,6 @@ https://plebs-vs-zombies.vercel.app`;
       this.posting = true;
       
       try {
-        console.log('📡 Posting scout report to Nostr...');
-        
         // Create a note event
         const event = {
           kind: 1, // Text note
@@ -858,7 +856,6 @@ https://plebs-vs-zombies.vercel.app`;
         // Ensure appropriate signing method is ready
         if (!nostrService.isSigningReady()) {
           if (nostrService.signingMethod === 'nip07') {
-            console.log('🔄 Extension not ready, attempting connection...');
             await nostrService.connectExtension();
           } else if (nostrService.signingMethod === 'nip46') {
             throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
@@ -870,15 +867,11 @@ https://plebs-vs-zombies.vercel.app`;
           throw new Error(`Unable to establish connection with signing method: ${nostrService.signingMethod}`);
         }
         
-        console.log('🔐 Starting signing process for scout report...');
-        
         // Sign event using appropriate method
         let signedEvent;
         try {
           if (nostrService.signingMethod === 'nip07') {
             console.log('Attempting NIP-07 signing...');
-            console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-            
             signedEvent = await Promise.race([
               window.nostr.signEvent(event),
               new Promise((_, reject) => 
@@ -887,8 +880,6 @@ https://plebs-vs-zombies.vercel.app`;
             ]);
           } else if (nostrService.signingMethod === 'nip46') {
             console.log('Attempting NIP-46 signing...');
-            console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
-            
             signedEvent = await nostrService.nip46Service.signEvent(event);
           } else {
             throw new Error(`Invalid signing method: ${nostrService.signingMethod}`);
@@ -914,8 +905,7 @@ https://plebs-vs-zombies.vercel.app`;
         if (publishResults.successful > 0) {
           this.posted = true;
           this.showPostModal = true;
-          console.log(`✅ Scout report posted to ${publishResults.successful}/${nostrService.getPublishRelays().length} relays`);
-        } else {
+          } else {
           throw new Error('Failed to publish to any relays');
         }
         

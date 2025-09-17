@@ -21,7 +21,7 @@
                   <span class="text-gray-100 font-medium">Connected</span>
                 </div>
                 <span class="text-sm text-gray-400">
-                  {{ signingMethod === 'nip07' ? 'Browser Extension' : 'Remote Signer' }}
+                  Browser Extension
                 </span>
               </div>
               
@@ -539,13 +539,10 @@ import immunityService from '../services/immunityService';
 import { format } from 'date-fns';
 import { nip19 } from 'nostr-tools';
 import { getVersionSync } from '../utils/version';
-import Nip46Connection from '../components/Nip46Connection.vue';
 
 export default {
   name: 'SettingsView',
-  components: {
-    Nip46Connection
-  },
+  components: {},
   data() {
     return {
       isConnected: false,
@@ -566,8 +563,6 @@ export default {
       profilesLoading: false,
       profileData: new Map(),
       userRelayList: null,
-      signingMethod: nostrService.getSigningMethod() || 'nip07', // Track current signing method
-      isBunkerConnected: false, // Track NIP-46 connection status
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
@@ -593,20 +588,13 @@ export default {
   methods: {
 
     updateConnectionStatus() {
-      // Get the current signing method from nostrService (source of truth)
-      this.signingMethod = nostrService.getSigningMethod();
-      
       console.log('🔍 Settings updateConnectionStatus:', {
-        signingMethod: this.signingMethod,
         hasPubkey: !!nostrService.pubkey,
-        extensionConnected: nostrService.extensionConnected,
-        nip46Connected: nostrService.nip46Service?.isConnected()
+        extensionConnected: nostrService.extensionConnected
       });
       
-      // Get connection status from nostrService
-      this.isConnected = !!(nostrService.pubkey && 
-        ((nostrService.getSigningMethod() === 'nip07' && nostrService.extensionConnected) ||
-         (nostrService.getSigningMethod() === 'nip46' && nostrService.nip46Service.isConnected())));
+      // Get connection status from nostrService (NIP-07 only)
+      this.isConnected = !!(nostrService.pubkey && nostrService.extensionConnected);
       
       console.log('✅ Settings connection status result:', this.isConnected);
       
@@ -619,15 +607,7 @@ export default {
         this.npub = null;
       }
       
-      // Update bunker connection status
-      if (this.signingMethod === 'nip07') {
-        this.isBunkerConnected = false;
-      } else if (this.signingMethod === 'nip46') {
-        this.isBunkerConnected = nostrService.isBunkerReady();
-      }
-      
       console.log('🔄 Settings connection status updated:', {
-        signingMethod: this.signingMethod,
         isConnected: this.isConnected,
         hasPubkey: !!this.pubkey
       });
@@ -641,7 +621,6 @@ export default {
       this.isConnected = false;
       this.pubkey = null;
       this.npub = null;
-      this.isBunkerConnected = false;
       
       // Update connection status to reflect logout
       this.updateConnectionStatus();

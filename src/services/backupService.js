@@ -142,7 +142,6 @@ class BackupService {
    */
   async importBackupFromJson(fileContent) {
     try {
-      console.log('📥 Starting backup import from JSON...');
       const backup = JSON.parse(fileContent);
       
       console.log('📋 Parsed backup data:', {
@@ -170,8 +169,6 @@ class BackupService {
         throw new Error(`This backup belongs to a different Nostr identity.\n\nBackup owner: ${backup.pubkey.substring(0, 8)}...\nCurrent identity: ${currentUserPubkey.substring(0, 8)}...\n\nYou can only import backups that belong to your current Nostr identity.`);
       }
       
-      console.log('✅ Pubkey validation passed - backup belongs to current user');
-      
       // Add any missing fields
       if (!backup.id) {
         backup.id = this.generateBackupId();
@@ -192,11 +189,9 @@ class BackupService {
       backup.isImported = true;
       backup.importedAt = Date.now();
       
-      console.log('💾 Storing backup...');
       // Store the backup
       await this.storeBackup(backup);
       
-      console.log('✅ Backup import completed successfully');
       return {
         success: true,
         backup
@@ -248,8 +243,6 @@ class BackupService {
    */
   async applyImportedFollowList(backup) {
     try {
-      console.log('🔄 Starting backup restoration process...');
-      
       // Validate the backup
       console.log('🔍 Backup data received:', {
         hasFollows: !!backup.follows,
@@ -268,26 +261,17 @@ class BackupService {
         throw new Error('Backup contains no follows to restore');
       }
       
-      console.log(`📋 Restoring ${backup.follows.length} follows from backup`);
-      
       // Ensure nostrService is initialized and connected
       await nostrService.initialize();
       
-      // Check connection status based on signing method
+      // Check NIP-07 connection status
       console.log('🔍 Connection status check:', {
-        signingMethod: nostrService.signingMethod,
         extensionConnected: nostrService.extensionConnected,
         extensionAuthorized: nostrService.extensionAuthorized,
-        pubkey: nostrService.pubkey ? nostrService.pubkey.substring(0, 8) + '...' : 'None',
-        nip46Connected: nostrService.nip46Service.isConnected()
+        pubkey: nostrService.pubkey ? nostrService.pubkey.substring(0, 8) + '...' : 'None'
       });
       
-      let isConnected = false;
-      if (nostrService.signingMethod === 'nip07') {
-        isConnected = nostrService.extensionConnected && nostrService.extensionAuthorized && nostrService.pubkey;
-      } else if (nostrService.signingMethod === 'nip46') {
-        isConnected = nostrService.nip46Service.isConnected() && nostrService.pubkey;
-      }
+      const isConnected = nostrService.extensionConnected && nostrService.extensionAuthorized && nostrService.pubkey;
       
       console.log('🔍 Final connection check result:', isConnected);
       
@@ -318,22 +302,16 @@ class BackupService {
       
       console.log('📝 Creating and signing kind 3 event...');
       
-      // Ensure appropriate signing method is ready
+      // Ensure extension is ready
       if (!nostrService.isSigningReady()) {
-        if (nostrService.signingMethod === 'nip07') {
-          console.log('🔄 Extension not ready, attempting connection...');
-          await nostrService.connectExtension();
-        } else if (nostrService.signingMethod === 'nip46') {
-          throw new Error('NIP-46 bunker not connected. Please connect your bunker first.');
-        }
+        await nostrService.connectExtension();
       }
       
       // Double-check connection is still valid
       if (!nostrService.isSigningReady()) {
-        throw new Error(`Unable to establish connection with signing method: ${nostrService.signingMethod}`);
+        throw new Error('Unable to establish connection with NIP-07 extension');
       }
       
-      console.log('🔐 Starting signing process...');
       console.log('Event to sign:', {
         kind: event.kind,
         created_at: event.created_at,
@@ -341,27 +319,16 @@ class BackupService {
         content: event.content.length
       });
       
-      // Sign event using appropriate method
+      // Sign event using NIP-07 extension
       let signedEvent;
       try {
-        if (nostrService.signingMethod === 'nip07') {
-          console.log('Attempting NIP-07 signing...');
-          console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-          
-          signedEvent = await Promise.race([
-            window.nostr.signEvent(event),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
-            )
-          ]);
-        } else if (nostrService.signingMethod === 'nip46') {
-          console.log('Attempting NIP-46 signing...');
-          console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
-          
-          signedEvent = await nostrService.nip46Service.signEvent(event);
-        } else {
-          throw new Error(`Invalid signing method: ${nostrService.signingMethod}`);
-        }
+        console.log('Attempting NIP-07 signing...');
+        signedEvent = await Promise.race([
+          window.nostr.signEvent(event),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
+          )
+        ]);
         
         console.log('✅ Event signed successfully:', signedEvent.id);
       } catch (signingError) {
@@ -376,31 +343,23 @@ class BackupService {
       console.log('✅ Event created and signed:', signedEvent.id);
       
       // Ensure we have fresh relay list for publishing
-      console.log('🔗 Ensuring fresh relay list...');
       if (!nostrService.userRelayList || nostrService.userRelayList.length === 0) {
         await nostrService.fetchUserRelayList();
       }
       
       // Publish to user's write relays using the robust publishEventToRelays method
-      console.log('📡 Publishing to relays...');
       const publishResults = await nostrService.publishEventToRelays(signedEvent);
-      
-      console.log(`📊 Publication results: ${publishResults.successful}/${publishResults.total} relays successful`);
       
       if (publishResults.successful === 0) {
         throw new Error('Failed to publish to any relays. Check your relay connections.');
       }
       
       // Verify the restoration by fetching the updated follow list
-      console.log('🔍 Verifying restoration...');
-      
       // Wait a moment for the event to propagate
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Fetch the current follow list to verify
       const currentFollows = await nostrService.getFollowList();
-      
-      console.log(`✅ Verification: Current follow list has ${currentFollows.length} follows`);
       
       return {
         success: true,
@@ -432,20 +391,13 @@ class BackupService {
         return nostrService.pubkey;
       }
       
-      // If not available, try to get it from the signing method
-      if (nostrService.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
+      // If not available, try to get it from NIP-07 extension
+      if (typeof window.nostr !== 'undefined') {
         try {
           const pubkey = await window.nostr.getPublicKey();
           return pubkey;
         } catch (error) {
           console.warn('Failed to get pubkey from NIP-07 extension:', error);
-        }
-      } else if (nostrService.signingMethod === 'nip46' && nostrService.nip46Service.isConnected()) {
-        try {
-          const pubkey = await nostrService.nip46Service.getPublicKey();
-          return pubkey;
-        } catch (error) {
-          console.warn('Failed to get pubkey from NIP-46 bunker:', error);
         }
       }
       
