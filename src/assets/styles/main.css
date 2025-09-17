@@ -48,4 +48,13 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  
+  /* Word breaking utilities for long strings like npubs */
+  .break-long-strings {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto;
+    hyphens: auto;
+  }
 }

@@ -38,44 +38,35 @@ class NostrService {
     if (!this.ndk) {
       console.log('🔧 Initializing NDK with relays:', this.relays);
       console.log('🔍 NDK instance check - creating new NDK instance');
+      
       // Create NDK with appropriate signer based on signing method
-      // Create NDK without signer first to avoid automatic user() calls
+      let signer = null;
+      
+      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
+        signer = new NDKNip07Signer();
+      } else if (this.signingMethod === 'nip46' && this.nip46Service.isConnected()) {
+        signer = this.nip46Service.getSigner();
+      }
+      
       this.ndk = new NDK({
-        explicitRelayUrls: this.relays
+        explicitRelayUrls: this.relays,
+        signer: signer
       });
       
       console.log('🔗 Connecting to NDK...');
-      await this.ndk.connect();
       
-      const initialStats = {
-        relaysCount: this.ndk?.pool?.relays?.size || 0,
-        connectedRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
-          .filter(r => r.connectivity.status === 1).length,
-        connectingRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
-          .filter(r => r.connectivity.status === 0).length,
-        relayStatuses: Array.from(this.ndk?.pool?.relays?.values() || [])
-          .map(r => ({ url: r.url, status: r.connectivity.status }))
-      };
+      // Start connection but don't wait for all relays - NDK will connect in background
+      this.ndk.connect().catch(error => {
+        console.warn('⚠️ NDK connection error (non-blocking):', error.message);
+      });
       
-      console.log('✅ NDK connected. Initial pool stats:', initialStats);
+      // Give it a brief moment to establish initial connections
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Wait a bit to see if connections establish
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const connectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+        .filter(r => r.connectivity.status === 1).length;
       
-      const afterWaitStats = {
-        connectedRelays: Array.from(this.ndk?.pool?.relays?.values() || [])
-          .filter(r => r.connectivity.status === 1).length,
-        relayStatuses: Array.from(this.ndk?.pool?.relays?.values() || [])
-          .map(r => ({ url: r.url, status: r.connectivity.status }))
-      };
-      
-      console.log('🔄 NDK pool stats after 1s wait:', afterWaitStats);
-      
-      // Set signer after NDK is connected (but avoid NIP-46 signer to prevent NIP-05 lookups)
-      if (this.signingMethod === 'nip07' && typeof window.nostr !== 'undefined') {
-        this.ndk.signer = new NDKNip07Signer();
-      }
-      // For NIP-46, we'll set the signer only when needed for signing, not globally
+      console.log(`✅ NDK initialized with ${connectedRelays} connected relays (more may connect in background)`);
     }
     return this.ndk;
   }
@@ -99,10 +90,19 @@ class NostrService {
   async connectExtension() {
     if (this.connectionPromise) {
       // Already connecting, wait for existing connection
+      console.log('🔄 Connection already in progress, waiting...');
       return this.connectionPromise;
     }
 
-    this.connectionPromise = this._connectExtensionImpl();
+    this.connectionPromise = Promise.race([
+      this._connectExtensionImpl(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Overall connection timeout after 30 seconds')), 30000)
+      )
+    ]).finally(() => {
+      // Clear the connection promise when done (success or failure)
+      this.connectionPromise = null;
+    });
     return this.connectionPromise;
   }
 
@@ -135,10 +135,14 @@ class NostrService {
       console.log('👤 Public key:', pubkey.substring(0, 8) + '...');
 
       // Initialize NDK after successful extension connection
+      console.log('🔧 Initializing NDK...');
       await this.initialize();
+      console.log('✅ NDK initialization complete');
 
       // Load user profile
+      console.log('👤 Loading user profile...');
       await this.loadUserProfile();
+      console.log('✅ User profile loaded');
 
       // Fetch user's relay list (NIP-65)
       console.log('📡 Fetching user relay list...');

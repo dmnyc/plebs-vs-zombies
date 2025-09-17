@@ -268,7 +268,7 @@
             </label>
           </div>
           
-          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap">{{ shareMessage }}</div>
+          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap break-long-strings">{{ shareMessage }}</div>
           
           <div class="flex flex-col sm:flex-row gap-2">
             <!-- Post to Nostr button (only for authenticated users) -->
@@ -747,9 +747,20 @@ https://plebs-vs-zombies.vercel.app`;
         this.$emit('update-target', newTarget);
         this.showNewUserModal = false;
         
-        // Reset state and start new scout
+        // Reset all state and start new scout
         this.scoutComplete = false;
         this.scoutResults = null;
+        this.posted = false;
+        this.copied = false;
+        this.isMyReport = false;
+        this.showPostModal = false;
+        this.expandedSections = {
+          active: false,
+          fresh: false,
+          rotting: false,
+          ancient: false,
+          burned: false
+        };
         await this.startScout();
         
       } catch (error) {
