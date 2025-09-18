@@ -973,6 +973,49 @@ class ScoutService {
     console.log('🔄 Scout Service reset complete');
   }
 
+  async fetchUserProfile(pubkey) {
+    try {
+      await this.initialize();
+      
+      console.log('👤 Fetching user profile for:', pubkey.substring(0, 8), '...');
+      
+      // Fetch kind 0 (profile) events
+      const profileEvents = await Promise.race([
+        this.ndk.fetchEvents({
+          kinds: [0],
+          authors: [pubkey],
+          limit: 1
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+        )
+      ]);
+      
+      if (profileEvents && profileEvents.size > 0) {
+        const profileEvent = Array.from(profileEvents)[0];
+        try {
+          const profileData = JSON.parse(profileEvent.content);
+          console.log('✅ Found profile for:', profileData.name || profileData.display_name || 'unnamed user');
+          return {
+            name: profileData.name,
+            display_name: profileData.display_name,
+            picture: profileData.picture,
+            about: profileData.about
+          };
+        } catch (parseError) {
+          console.warn('⚠️ Failed to parse profile content:', parseError);
+        }
+      } else {
+        console.log('📭 No profile found for user:', pubkey.substring(0, 8));
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('⚠️ Error fetching user profile:', error);
+      return null;
+    }
+  }
+
   disconnect() {
     this.cancelled = true;
     if (this.ndk) {
