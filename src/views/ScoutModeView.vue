@@ -705,7 +705,7 @@ export default {
       const zombieScore = this.scoutResults.zombieScore;
       
       if (this.isMyReport) {
-        return `I just scouted my follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
+        return `I just scouted my follows with #PlebsVsZombies! 👁️🔍🧟‍♀🧟‍♀
 
 My Zombie Count is: ${zombieCount}
 
@@ -715,7 +715,7 @@ ${this.scoreBarEmojis.join('')}
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
 https://plebs-vs-zombies.vercel.app`;
       } else {
-        return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies!👁️🔍🧟‍♀🧟‍♀
+        return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies! 👁️🔍🧟‍♀🧟‍♀
 
 Your Zombie Count is: ${zombieCount}
 
@@ -845,9 +845,16 @@ https://plebs-vs-zombies.vercel.app`;
         await scoutService.reset();
         
         const decoded = nip19.decode(this.newScoutNpub.trim());
+        
+        // Fetch user profile to get display name and picture
+        const profile = await scoutService.fetchUserProfile(decoded.data);
+        
         const newTarget = {
           npub: this.newScoutNpub.trim(),
-          pubkey: decoded.data
+          pubkey: decoded.data,
+          name: profile?.name,
+          display_name: profile?.display_name,
+          picture: profile?.picture
         };
         
         console.log('🔄 Switching scout target from', this.scoutTarget.pubkey.substring(0, 8), 'to', newTarget.pubkey.substring(0, 8));
