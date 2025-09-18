@@ -12,16 +12,10 @@
           <button 
             @click="showScoutNewUser" 
             class="btn-secondary text-sm whitespace-nowrap"
+            :class="{'opacity-50 cursor-not-allowed': scanning}"
             :disabled="scanning"
           >
             Scout Different User
-          </button>
-          <button 
-            @click="exitScoutMode" 
-            class="text-red-400 hover:text-red-300 text-2xl flex-shrink-0"
-            title="Exit Scout Mode"
-          >
-            ❌
           </button>
         </div>
       </div>
@@ -122,6 +116,16 @@
               :style="{ width: scanProgress.total > 0 ? Math.min(100, (scanProgress.processed / scanProgress.total * 100)) + '%' : '0%' }"
             ></div>
           </div>
+          
+          <!-- Follow count explanation -->
+          <div class="text-right mt-2">
+            <button 
+              @click="showFollowCountModal = true"
+              class="text-xs text-gray-400 hover:text-gray-300 underline cursor-pointer"
+            >
+              Follow count explanation
+            </button>
+          </div>
         </div>
         
         <!-- Current Processing Info -->
@@ -208,6 +212,96 @@
               class="btn-primary px-6"
             >
               Awesome! 🎉
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Follow Count Explanation Modal -->
+    <div 
+      v-if="showFollowCountModal" 
+      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
+      @click.self="showFollowCountModal = false"
+    >
+      <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-yellow-400 flex items-center gap-2">
+              📊 Follow Count Explanation
+            </h2>
+            <button 
+              @click="showFollowCountModal = false"
+              class="text-gray-400 hover:text-gray-200 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <div class="text-gray-300">
+            <p class="mb-4">
+              <strong class="text-yellow-400">Why might the follow count be different?</strong>
+            </p>
+            
+            <div class="space-y-3 text-sm">
+              <div class="flex items-start gap-2">
+                <span class="text-blue-400 text-lg">📡</span>
+                <div>
+                  <strong class="text-gray-200">Relay Distribution:</strong> Your follow list may be stored across different Nostr relays, and we might not have access to all of them.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-green-400 text-lg">📅</span>
+                <div>
+                  <strong class="text-gray-200">Multiple Versions:</strong> You may have updated your follows recently, and older versions exist on some relays.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-purple-400 text-lg">🔒</span>
+                <div>
+                  <strong class="text-gray-200">Network Limits:</strong> Some relays may be temporarily unavailable or have connection limits.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-orange-400 text-lg">🔄</span>
+                <div>
+                  <strong class="text-gray-200">Batch Processing:</strong> Scout Mode analyzes follows in batches to determine zombie status. When network issues occur, it retries with smaller batches. Some follows may be skipped if they consistently fail analysis across multiple retry attempts.
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-4 p-3 bg-gray-900 rounded-lg">
+              <p class="text-xs text-gray-400 mb-2">
+                <strong class="text-yellow-400">Why counts vary between scans:</strong>
+              </p>
+              <ul class="text-xs text-gray-400 space-y-1 ml-2">
+                <li>• Batch processing may skip some follows due to network failures</li>
+                <li>• Relay timeouts can prevent analysis of certain accounts</li>
+                <li>• Retry attempts with smaller batches may not recover all data</li>
+                <li>• The scan analyzes only the accounts it can successfully reach</li>
+              </ul>
+            </div>
+            
+            <div class="mt-3 p-3 bg-gray-900 rounded-lg">
+              <p class="text-xs text-gray-400">
+                <strong class="text-yellow-400">Note:</strong> Scout Mode shows the most complete follow list we can access from available relays. The zombie analysis is performed on the follows we found.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <button 
+              @click="showFollowCountModal = false" 
+              class="btn-primary px-6"
+            >
+              Got it! 👍
             </button>
           </div>
         </div>
@@ -568,7 +662,8 @@ export default {
         rotting: false,
         ancient: false,
         burned: false
-      }
+      },
+      showFollowCountModal: false
     }
   },
   computed: {
@@ -720,8 +815,9 @@ https://plebs-vs-zombies.vercel.app`;
         this.scanning = false;
       }
     },
-    stopScan() {
-      scoutService.cancelScan();
+    async stopScan() {
+      // Force shutdown all scout activity
+      await scoutService.forceShutdown();
       this.scanning = false;
       // Reset to initial state - don't show incomplete results
       this.scoutComplete = false;
@@ -737,17 +833,30 @@ https://plebs-vs-zombies.vercel.app`;
       if (!this.newScoutValid) return;
       
       try {
+        // Stop any existing scan first
+        if (this.scanning) {
+          await this.stopScan();
+        }
+        
+        // Force shutdown to completely clear any cached data and close connections
+        await scoutService.forceShutdown();
+        
+        // Reset for fresh start (this will set cancelled = false)
+        await scoutService.reset();
+        
         const decoded = nip19.decode(this.newScoutNpub.trim());
         const newTarget = {
           npub: this.newScoutNpub.trim(),
           pubkey: decoded.data
         };
         
-        // Update the target and restart
+        console.log('🔄 Switching scout target from', this.scoutTarget.pubkey.substring(0, 8), 'to', newTarget.pubkey.substring(0, 8));
+        
+        // Update the target and close modal
         this.$emit('update-target', newTarget);
         this.showNewUserModal = false;
         
-        // Reset all state and start new scout
+        // Reset all component state
         this.scoutComplete = false;
         this.scoutResults = null;
         this.posted = false;
@@ -761,9 +870,14 @@ https://plebs-vs-zombies.vercel.app`;
           ancient: false,
           burned: false
         };
+        
+        // Wait for next tick to ensure the target is updated
+        await this.$nextTick();
+        console.log('✅ Target updated, starting scout for:', this.scoutTarget.pubkey.substring(0, 8));
         await this.startScout();
         
       } catch (error) {
+        console.error('❌ Failed to scout new user:', error);
         this.newScoutError = 'Failed to process npub';
       }
     },

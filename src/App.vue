@@ -13,7 +13,7 @@
           </div>
           
           <div class="flex items-center">
-            <!-- Desktop Navigation -->
+            <!-- Desktop Navigation for signed-in users -->
             <nav v-if="isConnected" class="hidden lg:block">
               <ul class="flex gap-6">
                 <li>
@@ -68,6 +68,21 @@
                     :class="{'text-zombie-green': isScoutMode, 'hover:text-zombie-green transition-colors': !isScoutMode}"
                   >
                     Scout Mode
+                  </a>
+                </li>
+              </ul>
+            </nav>
+            
+            <!-- Desktop Navigation for signed-out Scout Mode -->
+            <nav v-if="!isConnected && isScoutMode" class="hidden lg:block">
+              <ul class="flex gap-6">
+                <li>
+                  <a 
+                    href="#" 
+                    @click.prevent="async () => await exitScoutMode()" 
+                    class="hover:text-zombie-green transition-colors"
+                  >
+                    Start Over
                   </a>
                 </li>
               </ul>
@@ -213,6 +228,21 @@
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Scout Mode
+              </a>
+            </li>
+          </ul>
+        </nav>
+        
+        <!-- Mobile/Tablet Navigation Menu for signed-out Scout Mode -->
+        <nav v-if="!isConnected && isScoutMode && mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
+          <ul class="space-y-2">
+            <li>
+              <a 
+                href="#" 
+                @click.prevent="async () => { await exitScoutMode(); mobileMenuOpen = false; }" 
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Start Over
               </a>
             </li>
           </ul>
@@ -585,6 +615,7 @@ import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue'
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
+import scoutService from './services/scoutService';
 import { nip19 } from 'nostr-tools';
 
 export default {
@@ -679,6 +710,11 @@ export default {
       if (this.views[view]) {
         this.activeView = view;
         this.mobileMenuOpen = false; // Close mobile menu when view changes
+        
+        // Exit scout mode when navigating to other views
+        if (this.isScoutMode && view !== 'scout') {
+          this.exitScoutMode();
+        }
       }
     },
     showScoutModeMenu() {
@@ -752,7 +788,10 @@ export default {
         this.scoutModeLoading = false;
       }
     },
-    exitScoutMode() {
+    async exitScoutMode() {
+      // Force shutdown all scout activity and connections
+      await scoutService.forceShutdown();
+      
       this.isScoutMode = false;
       this.scoutTarget = null;
       this.scoutNpub = '';
@@ -828,6 +867,12 @@ export default {
       this.userProfile = null;
       this.userDropdownOpen = false;
       this.mobileMenuOpen = false;
+      
+      // Exit Scout Mode if active
+      if (this.isScoutMode) {
+        this.exitScoutMode();
+      }
+      
       // Reset to sign-in state
       this.activeView = 'dashboard'; // Reset view state
       console.log('✅ Logged out and returned to sign-in page');

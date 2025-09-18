@@ -21,13 +21,30 @@ class ScoutService {
       'wss://purplepag.es',
       'wss://relay.snort.social',
       'wss://offchain.pub',
-      'wss://relay.current.fyi'
+      'wss://relay.current.fyi',
+      'wss://eden.nostr.land',
+      'wss://nostr.mutinywallet.com',
+      'wss://relay.mostr.pub'
     ];
   }
 
-  async initialize() {
-    if (!this.ndk) {
+  async initialize(force = false) {
+    if (!this.ndk || force) {
       console.log('🔍 Initializing Scout Service...');
+      
+      // Clean up existing connections if they exist
+      if (this.ndk) {
+        try {
+          for (const relay of this.ndk.pool.relays.values()) {
+            if (relay.connectivity.status === 1) {
+              relay.disconnect();
+            }
+          }
+          this.ndk.pool.relays.clear();
+        } catch (error) {
+          console.warn('⚠️ Error cleaning up existing NDK:', error);
+        }
+      }
       
       this.ndk = new NDK({
         explicitRelayUrls: this.defaultRelays
@@ -41,7 +58,7 @@ class ScoutService {
             setTimeout(() => reject(new Error('Connection timeout')), 10000)
           )
         ]);
-        console.log('✅ Scout Service connected to relays');
+        console.log('✅ Scout Service connected to', this.defaultRelays.length, 'default relays');
       } catch (error) {
         console.warn('⚠️ Some relays failed to connect:', error);
         // Continue anyway - NDK will work with whatever relays did connect
@@ -51,28 +68,31 @@ class ScoutService {
 
   async scoutUser(targetPubkey, progressCallback = null) {
     try {
-      // Reset cancellation flag
+      // Reset cancellation flag and force fresh start
       this.cancelled = false;
       console.log('🔍 Starting scout user for pubkey:', targetPubkey.substring(0, 8));
-      await this.initialize();
+      console.log('🔄 Target pubkey FULL:', targetPubkey);
+      
+      // Force fresh initialization to prevent caching issues
+      await this.initialize(true);
       
       if (progressCallback) {
         progressCallback({ stage: 'Fetching user relay list...', processed: 0, total: 1 });
       }
 
       // Get user's announced relays (NIP-65)
-      console.log('📡 Fetching user relays...');
+      console.log('📡 Fetching user relays for:', targetPubkey.substring(0, 8), '...');
       const userRelays = await this.fetchUserRelays(targetPubkey);
-      console.log('📡 Found relays:', userRelays.length);
+      console.log('📡 Found', userRelays.length, 'relays for user:', userRelays.slice(0, 3));
       
       if (progressCallback) {
         progressCallback({ stage: 'Fetching follow list...', processed: 0, total: 1 });
       }
 
       // Get the user's follow list using their preferred relays for better coverage
-      console.log('👥 Fetching follow list...');
+      console.log('👥 Fetching follow list for user:', targetPubkey.substring(0, 8));
       const followList = await this.fetchFollowList(targetPubkey, userRelays);
-      console.log('👥 Found follows:', followList.length);
+      console.log('👥 *** CRITICAL *** Found', followList.length, 'follows for user:', targetPubkey.substring(0, 8));
       
       if (!followList || followList.length === 0) {
         return {
@@ -202,10 +222,10 @@ class ScoutService {
         queryNdk.fetchEvents({
           kinds: [3],
           authors: [pubkey],
-          limit: 5 // Fetch up to 5 recent events to merge follows
+          limit: 25 // Fetch up to 25 recent events to merge follows
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Follow list fetch timeout')), 25000)
+          setTimeout(() => reject(new Error('Follow list fetch timeout')), 30000)
         )
       ]);
 
@@ -248,16 +268,21 @@ class ScoutService {
 
       console.log(`✅ Found ${followList.length} follows from ${followEvents.size} events`);
       
-      // If we got a surprisingly low count, try additional popular relays as fallback
-      if (followList.length < 500 && !this.cancelled) {
-        console.log(`⚠️ Low follow count (${followList.length}), trying additional popular relays...`);
+      // Always try additional popular relays for maximum coverage
+      if (!this.cancelled) {
+        console.log(`🔍 Current count: ${followList.length}, trying additional popular relays for maximum coverage...`);
         
         const additionalRelays = [
-          'wss://relay.nostr.bg',
           'wss://nostr-pub.wellorder.net',
-          'wss://relay.nostrmag.social',
           'wss://atlas.nostr.land',
-          'wss://brb.io'
+          'wss://brb.io',
+          'wss://nostr.fmt.wiz.biz',
+          'wss://relay.orangepill.dev',
+          'wss://nostr.oxtr.dev',
+          'wss://nostr.mom',
+          'wss://relay.nostr.wirednet.jp',
+          'wss://nostr.bitcoiner.social',
+          'wss://relay.westernbtc.com'
         ];
         
         try {
@@ -276,7 +301,7 @@ class ScoutService {
             fallbackNdk.fetchEvents({
               kinds: [3],
               authors: [pubkey],
-              limit: 3
+              limit: 15
             }),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Fallback fetch timeout')), 15000)
@@ -894,6 +919,58 @@ class ScoutService {
   cancelScan() {
     this.cancelled = true;
     console.log('🛑 Scout scan cancellation requested');
+  }
+
+  async forceShutdown() {
+    // Set cancellation flag and keep it set
+    this.cancelled = true;
+    
+    // Aggressively close all WebSocket connections
+    if (this.ndk) {
+      try {
+        console.log('🛑 Force closing all relay connections...');
+        for (const relay of this.ndk.pool.relays.values()) {
+          try {
+            if (relay.connectivity.status === 1) {
+              relay.disconnect();
+            }
+            // Also try to close the WebSocket directly if accessible
+            if (relay.ws && relay.ws.readyState === WebSocket.OPEN) {
+              relay.ws.close();
+            }
+          } catch (relayError) {
+            console.warn('⚠️ Error closing individual relay:', relayError);
+          }
+        }
+        this.ndk.pool.relays.clear();
+      } catch (error) {
+        console.warn('⚠️ Error during force shutdown:', error);
+      }
+      this.ndk = null;
+    }
+    
+    console.log('🛑 Scout Service force shutdown complete');
+  }
+
+  async reset() {
+    this.cancelled = false;
+    
+    // Properly close all WebSocket connections
+    if (this.ndk) {
+      try {
+        for (const relay of this.ndk.pool.relays.values()) {
+          if (relay.connectivity.status === 1) {
+            relay.disconnect();
+          }
+        }
+        this.ndk.pool.relays.clear();
+      } catch (error) {
+        console.warn('⚠️ Error closing connections:', error);
+      }
+      this.ndk = null;
+    }
+    
+    console.log('🔄 Scout Service reset complete');
   }
 
   disconnect() {
