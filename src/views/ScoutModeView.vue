@@ -825,6 +825,7 @@ https://plebs-vs-zombies.vercel.app`;
       console.log('🛑 Scout scan stopped by user');
     },
     showScoutNewUser() {
+      this.showPostModal = false;
       this.showNewUserModal = true;
       this.newScoutNpub = '';
       this.newScoutError = '';
