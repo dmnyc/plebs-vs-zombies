@@ -88,11 +88,12 @@
             </button>
             <button 
               @click="scoutNewUser" 
-              :disabled="!newScoutValid"
+              :disabled="!newScoutValid || processingNewUser"
               class="btn-scout flex-1"
-              :class="{'opacity-50 cursor-not-allowed': !newScoutValid}"
+              :class="{'opacity-50 cursor-not-allowed': !newScoutValid || processingNewUser}"
             >
-              Start Scouting
+              <span v-if="processingNewUser">⏳ Processing...</span>
+              <span v-else>Start Scouting</span>
             </button>
           </div>
         </div>
@@ -651,6 +652,7 @@ export default {
       showNewUserModal: false,
       newScoutNpub: '',
       newScoutError: '',
+      processingNewUser: false,
       copied: false,
       posting: false,
       posted: false,
@@ -833,22 +835,52 @@ https://plebs-vs-zombies.vercel.app`;
     async scoutNewUser() {
       if (!this.newScoutValid) return;
       
+      // Prevent multiple simultaneous calls
+      if (this.processingNewUser) return;
+      this.processingNewUser = true;
+      
       try {
-        // Stop any existing scan first
+        console.log('🔄 Starting new user scout process...');
+        
+        // Stop any existing scan first with timeout
         if (this.scanning) {
-          await this.stopScan();
+          console.log('⏹️ Stopping existing scan...');
+          await Promise.race([
+            this.stopScan(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Stop scan timeout')), 5000)
+            )
+          ]);
         }
         
-        // Force shutdown to completely clear any cached data and close connections
-        await scoutService.forceShutdown();
+        // Force shutdown with timeout
+        console.log('🔄 Shutting down scout service...');
+        await Promise.race([
+          scoutService.forceShutdown(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Shutdown timeout')), 5000)
+          )
+        ]);
         
-        // Reset for fresh start (this will set cancelled = false)
-        await scoutService.reset();
+        // Reset service with timeout
+        console.log('🔄 Resetting scout service...');
+        await Promise.race([
+          scoutService.reset(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Reset timeout')), 3000)
+          )
+        ]);
         
         const decoded = nip19.decode(this.newScoutNpub.trim());
         
-        // Fetch user profile to get display name and picture
-        const profile = await scoutService.fetchUserProfile(decoded.data);
+        // Fetch user profile with timeout
+        console.log('👤 Fetching user profile...');
+        const profile = await Promise.race([
+          scoutService.fetchUserProfile(decoded.data),
+          new Promise((resolve) => 
+            setTimeout(() => resolve(null), 8000)
+          )
+        ]);
         
         const newTarget = {
           npub: this.newScoutNpub.trim(),
@@ -886,7 +918,11 @@ https://plebs-vs-zombies.vercel.app`;
         
       } catch (error) {
         console.error('❌ Failed to scout new user:', error);
-        this.newScoutError = 'Failed to process npub';
+        this.newScoutError = error.message.includes('timeout') ? 
+          'Operation timed out, please try again' : 
+          'Failed to process npub';
+      } finally {
+        this.processingNewUser = false;
       }
     },
     exitScoutMode() {
