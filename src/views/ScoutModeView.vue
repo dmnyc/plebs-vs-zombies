@@ -351,6 +351,8 @@
             📢 Share Scout Report
           </h4>
           
+          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap break-long-strings">{{ shareMessage }}</div>
+
           <!-- "This is me!" toggle with prominent callout -->
           <div class="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
             <div class="text-yellow-400 text-sm font-medium mb-2">
@@ -366,8 +368,6 @@
               <span class="text-sm text-gray-300">This is me!</span>
             </label>
           </div>
-          
-          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap break-long-strings">{{ shareMessage }}</div>
           
           <div class="flex flex-col sm:flex-row gap-2">
             <!-- Post to Nostr button (only for authenticated users) -->
