@@ -351,13 +351,17 @@
             📢 Share Scout Report
           </h4>
           
-          <!-- "This is me!" toggle -->
-          <div class="mb-3">
+          <!-- "This is me!" toggle with prominent callout -->
+          <div class="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+            <div class="text-yellow-400 text-sm font-medium mb-2">
+              Sharing your own Zombie Score? Check this box!
+            </div>
             <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox" 
+              <div class="text-yellow-400 text-lg">👉</div>
+              <input
+                type="checkbox"
                 v-model="isMyReport"
-                class="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                class="w-4 h-4 text-yellow-600 bg-gray-700 border-gray-600 rounded focus:ring-yellow-500 focus:ring-2"
               >
               <span class="text-sm text-gray-300">This is me!</span>
             </label>
@@ -834,9 +838,12 @@ https://plebs-vs-zombies.vercel.app`;
     },
     async scoutNewUser() {
       if (!this.newScoutValid) return;
-      
+
       // Prevent multiple simultaneous calls
-      if (this.processingNewUser) return;
+      if (this.processingNewUser) {
+        console.log('⚠️ scoutNewUser already processing, ignoring duplicate call');
+        return;
+      }
       this.processingNewUser = true;
       
       try {

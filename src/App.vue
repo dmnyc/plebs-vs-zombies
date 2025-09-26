@@ -253,8 +253,9 @@
     <main class="container mx-auto px-4 py-8 flex-grow">
       <!-- Scout Mode View -->
       <div v-if="isScoutMode">
-        <ScoutModeView 
-          :scout-target="scoutTarget" 
+        <ScoutModeView
+          ref="scoutModeComponent"
+          :scout-target="scoutTarget"
           :is-logged-in="isConnected"
           @update-target="updateScoutTarget"
           @exit-scout="exitScoutMode"
@@ -728,10 +729,31 @@ export default {
       this.scoutNpub = '';
       this.scoutNpubError = '';
     },
-    startScoutFromModal() {
+    async startScoutFromModal() {
       if (this.scoutNpubValid) {
         this.showScoutModal = false;
-        this.startScoutMode();
+
+        // If already in Scout Mode, force a complete reset by exiting and re-entering
+        if (this.isScoutMode) {
+          console.log('🔄 Already in Scout Mode, doing complete reset...');
+
+          // Force shutdown and reset scout service
+          await scoutService.forceShutdown();
+          await scoutService.reset();
+
+          // Temporarily exit scout mode to force component remount
+          this.isScoutMode = false;
+          this.scoutTarget = null;
+
+          // Wait for Vue to process the state change
+          await this.$nextTick();
+
+          // Now start scout mode with new target
+          await this.startScoutMode();
+        } else {
+          // Not in Scout Mode yet, start normally
+          await this.startScoutMode();
+        }
       }
     },
     async startScoutMode() {
