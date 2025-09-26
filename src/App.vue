@@ -253,8 +253,9 @@
     <main class="container mx-auto px-4 py-8 flex-grow">
       <!-- Scout Mode View -->
       <div v-if="isScoutMode">
-        <ScoutModeView 
-          :scout-target="scoutTarget" 
+        <ScoutModeView
+          ref="scoutModeComponent"
+          :scout-target="scoutTarget"
           :is-logged-in="isConnected"
           @update-target="updateScoutTarget"
           @exit-scout="exitScoutMode"
@@ -717,7 +718,32 @@ export default {
         }
       }
     },
-    showScoutModeMenu() {
+    async showScoutModeMenu() {
+      // If already in Scout Mode, reset the display to show new scout UI
+      if (this.isScoutMode) {
+        // Reset scout service state (similar to showScoutNewUser button)
+        await scoutService.forceShutdown();
+        await scoutService.reset();
+
+        // Reset the ScoutModeView component state
+        if (this.$refs.scoutModeComponent) {
+          // Reset component state similar to what showScoutNewUser does
+          this.$refs.scoutModeComponent.scoutComplete = false;
+          this.$refs.scoutModeComponent.scoutResults = null;
+          this.$refs.scoutModeComponent.posted = false;
+          this.$refs.scoutModeComponent.copied = false;
+          this.$refs.scoutModeComponent.isMyReport = false;
+          this.$refs.scoutModeComponent.showPostModal = false;
+          this.$refs.scoutModeComponent.expandedSections = {
+            active: false,
+            fresh: false,
+            rotting: false,
+            ancient: false,
+            burned: false
+          };
+        }
+      }
+
       // For signed-in users, show Scout Mode modal
       this.showScoutModal = true;
       this.scoutNpub = '';
