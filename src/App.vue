@@ -718,32 +718,7 @@ export default {
         }
       }
     },
-    async showScoutModeMenu() {
-      // If already in Scout Mode, reset the display to show new scout UI
-      if (this.isScoutMode) {
-        // Reset scout service state (similar to showScoutNewUser button)
-        await scoutService.forceShutdown();
-        await scoutService.reset();
-
-        // Reset the ScoutModeView component state
-        if (this.$refs.scoutModeComponent) {
-          // Reset component state similar to what showScoutNewUser does
-          this.$refs.scoutModeComponent.scoutComplete = false;
-          this.$refs.scoutModeComponent.scoutResults = null;
-          this.$refs.scoutModeComponent.posted = false;
-          this.$refs.scoutModeComponent.copied = false;
-          this.$refs.scoutModeComponent.isMyReport = false;
-          this.$refs.scoutModeComponent.showPostModal = false;
-          this.$refs.scoutModeComponent.expandedSections = {
-            active: false,
-            fresh: false,
-            rotting: false,
-            ancient: false,
-            burned: false
-          };
-        }
-      }
-
+    showScoutModeMenu() {
       // For signed-in users, show Scout Mode modal
       this.showScoutModal = true;
       this.scoutNpub = '';
@@ -754,10 +729,31 @@ export default {
       this.scoutNpub = '';
       this.scoutNpubError = '';
     },
-    startScoutFromModal() {
+    async startScoutFromModal() {
       if (this.scoutNpubValid) {
         this.showScoutModal = false;
-        this.startScoutMode();
+
+        // If already in Scout Mode, force a complete reset by exiting and re-entering
+        if (this.isScoutMode) {
+          console.log('🔄 Already in Scout Mode, doing complete reset...');
+
+          // Force shutdown and reset scout service
+          await scoutService.forceShutdown();
+          await scoutService.reset();
+
+          // Temporarily exit scout mode to force component remount
+          this.isScoutMode = false;
+          this.scoutTarget = null;
+
+          // Wait for Vue to process the state change
+          await this.$nextTick();
+
+          // Now start scout mode with new target
+          await this.startScoutMode();
+        } else {
+          // Not in Scout Mode yet, start normally
+          await this.startScoutMode();
+        }
       }
     },
     async startScoutMode() {
