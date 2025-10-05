@@ -334,11 +334,11 @@ My Zombie Score was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
-https://plebs-vs-zombies.vercel.app`;
+https://plebsvszombies.cc`;
 
         return message;
       }
-      
+
       // Regular purge messaging
       // Fun variation based on number purged with multiple options per tier
       let actionOptions = ['slaughtered'];
@@ -346,25 +346,25 @@ https://plebs-vs-zombies.vercel.app`;
       else if (this.totalPurged >= 20) actionOptions = ['eliminated', 'eradicated', 'demolished'];
       else if (this.totalPurged >= 10) actionOptions = ['purged', 'destroyed', 'terminated'];
       else if (this.totalPurged >= 5) actionOptions = ['hunted down', 'slaughtered'];
-      
+
       // Randomly select action from the tier
       const action = actionOptions[Math.floor(Math.random() * actionOptions.length)];
-      
+
       // Randomize weapon side and zombie positions
       const leftWeapons = ['🔪', '🏹', '⚔️'];
       const rightWeapons = ['🗡️', '🪓', '🔨'];
       const zombies = ['🧟‍♂️', '🧟‍♀️'];
-      
+
       // Randomly choose left or right side
       const useLeftSide = Math.random() < 0.5;
-      const weapon = useLeftSide 
+      const weapon = useLeftSide
         ? leftWeapons[Math.floor(Math.random() * leftWeapons.length)]
         : rightWeapons[Math.floor(Math.random() * rightWeapons.length)];
-      
+
       const zombie1 = zombies[Math.floor(Math.random() * zombies.length)];
       const zombie2 = zombies[Math.floor(Math.random() * zombies.length)];
 
-      const message = useLeftSide 
+      const message = useLeftSide
         ? `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${weapon}${zombie1}${zombie2}`
         : `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${zombie1}${zombie2}${weapon}`;
 
@@ -374,7 +374,7 @@ My Zombie Score was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
-https://plebs-vs-zombies.vercel.app`;
+https://plebsvszombies.cc`;
     },
     scoreBarSquares() {
       // Create HTML-based colored squares for the UI display

@@ -469,8 +469,8 @@ class Nip46Service {
       console.log('🔗 Relay URLs:', relayUrls);
       
       // Use production URL for logo so external signers can access it
-      const logoUrl = window.location.hostname === 'localhost' 
-        ? 'https://plebs-vs-zombies.vercel.app/logo.svg'
+      const logoUrl = window.location.hostname === 'localhost'
+        ? 'https://plebsvszombies.cc/logo.svg'
         : `${window.location.origin}/logo.svg`;
       
       console.log('🖼️ Using logo URL:', logoUrl);

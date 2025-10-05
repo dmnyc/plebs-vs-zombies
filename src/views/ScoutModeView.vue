@@ -719,7 +719,7 @@ My Zombie Score is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
-https://plebs-vs-zombies.vercel.app`;
+https://plebsvszombies.cc`;
       } else {
         return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies! 👁️🔍🧟‍♀🧟‍♀
 
@@ -729,7 +729,7 @@ Your Zombie Score is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
-https://plebs-vs-zombies.vercel.app`;
+https://plebsvszombies.cc`;
       }
     },
     scoreBarSquares() {
