@@ -14,6 +14,7 @@ import { nip19 } from 'nostr-tools';
 
 // LEADERBOARD DATA - Update this with your participants
 const participants = [
+    { npub: "npub1t49ker2fyy2xc5y7qrsfxrp6g8evsxluqmaq09xt7uuhhzsurm3srw4jj5", zombiesKilled: 249 },
     { npub: "npub1mgvmt553uphdpxa9gk79xejq3hyzh2xfa8uh6vh236nq78mvh74q8tr9yd", zombiesKilled: 207 },
     { npub: "npub16secklpnqey3el04fy2drfftsz5k26zlwdsnz84wtul2luwj8fdsugjdxk", zombiesKilled: 191 },
     { npub: "npub15m4qhqdrzsvu4u0v7992u657nqn56sw2l658a5f2zq7fk9klnd0srukzau", zombiesKilled: 126 },
@@ -25,7 +26,8 @@ const participants = [
     { npub: "npub1y8sj0myap0a7awl4qsswzz653p4p6llclww5g9m8nvls0dp62s2qpcsd3u", zombiesKilled: 29 },
     { npub: "npub1nz4y6dxnt0kzvgyhyvwnqklpennhv20dgly4c5gnpx4aa6ns08vqr8kkgx", zombiesKilled: 20 },
     { npub: "npub1uzt238htjzpq39dxmltlx60vxym9fetk9czz6kddq6fhvkf4z3usy9qtrh", zombiesKilled: 19 },
-    { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6 }
+    { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6 },
+    { npub: "npub1m4ny6hjqzepn4rxknuq94c2gpqzr29ufkkw7ttcxyak7v43n6vvsajc2jl", zombiesKilled: 4 }
 ];
 
 // Nostr relays to query
