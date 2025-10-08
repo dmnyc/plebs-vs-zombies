@@ -3,10 +3,13 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
+    // [TEMPORARY - October 2025 Competition] START
+    // Remove this route after October 31, 2025
     {
       "source": "/leaderboard",
       "destination": "/leaderboard.html"
     },
+    // [TEMPORARY - October 2025 Competition] END
     {
       "source": "/(.*)",
       "destination": "/index.html"
