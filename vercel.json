@@ -8,6 +8,10 @@
       "destination": "/leaderboard.html"
     },
     {
+      "source": "/competition",
+      "destination": "/competition.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

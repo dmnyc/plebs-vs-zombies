@@ -82,24 +82,56 @@
           </div>
         </div>
 
+        <!-- [TEMPORARY - October 2025 Competition] START -->
+        <!-- Competition Announcement Banner (shown before posting) -->
+        <div v-if="!posted" class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-600/50 rounded-lg p-4 mb-4">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl flex-shrink-0">🏆</div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-yellow-400 font-bold text-base mb-1">Enter the Top Zombie Challenge!</h3>
+              <p class="text-gray-300 text-sm mb-2">
+                Share your results to enter October's competition. Over 100K sats in prizes across the top 10 hunters, sponsored by <strong>Rizful</strong>!
+              </p>
+              <a
+                href="/competition"
+                target="_blank"
+                class="text-sm text-yellow-400 hover:text-yellow-300 underline font-semibold"
+              >
+                View Competition Details & Prizes →
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- [TEMPORARY - October 2025 Competition] END -->
+
         <!-- Social Share Message -->
         <div class="bg-gray-900 rounded-lg p-4">
-          <h4 class="text-lg font-semibold mb-3 text-gray-200 flex items-center gap-2">
-            📢 Share Your Victory!
-          </h4>
-          
+          <div class="text-center mb-3">
+            <h4 class="text-base font-bold text-yellow-400 mb-1">
+              📢 SHARE YOUR RESULTS
+            </h4>
+            <p class="text-lg font-bold text-zombie-green">
+              ENTER TO WIN UP TO 42,000 SATS
+            </p>
+            <p class="text-sm font-semibold text-gray-300 mt-1">
+              FROM RIZFUL.COM
+            </p>
+          </div>
+
           <!-- Generated Message -->
           <div class="bg-gray-800 border border-gray-600 rounded-lg p-4 mb-4">
             <div class="text-sm font-mono leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">{{ shareMessage }}</div>
           </div>
           
           <!-- Action Buttons -->
-          <div class="flex flex-col sm:flex-row gap-3">
-            <button 
+          <div class="flex flex-col gap-3">
+            <button
               @click="postToNostr"
               :disabled="posting || posted"
-              :class="posted ? 'btn-success' : ''"
-              class="flex-1 flex items-center justify-center gap-2"
+              :class="[
+                posted ? 'btn-success' : 'post-to-nostr-glow',
+                'w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg'
+              ]"
               :style="!posted ? 'background-color: #8e30eb; color: white;' : ''"
               :onmouseover="!posted ? 'this.style.backgroundColor=\'#7a2bc7\'' : ''"
               :onmouseout="!posted ? 'this.style.backgroundColor=\'#8e30eb\'' : ''"
@@ -109,11 +141,10 @@
               <span v-else>🚀</span>
               {{ posting ? 'Posting...' : posted ? 'Posted to Nostr!' : 'Post to Nostr' }}
             </button>
-            
-            <button 
+
+            <button
               @click="copyToClipboard"
-              :class="copied ? 'btn-success' : 'btn-secondary'"
-              class="flex-1 flex items-center justify-center gap-2"
+              class="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-300 py-2 transition-colors"
             >
               <span v-if="copied">✅</span>
               <span v-else>📋</span>
@@ -126,6 +157,28 @@
             <span v-else>Your victory has been shared! You can still copy the message to share elsewhere.</span>
           </p>
         </div>
+
+        <!-- [TEMPORARY - October 2025 Competition] START -->
+        <!-- Competition Announcement Banner (shown after posting) -->
+        <div v-if="posted" class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-600/50 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl flex-shrink-0">🏆</div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-yellow-400 font-bold text-sm mb-1">You're Entered in the Top Zombie Challenge!</h3>
+              <p class="text-gray-300 text-xs mb-2">
+                Your {{ totalPurged }} zombie kills count toward October's competition. Over 100K sats in prizes across the top 10 hunters, sponsored by <strong>Rizful</strong>!
+              </p>
+              <a
+                href="/competition"
+                target="_blank"
+                class="text-xs text-yellow-400 hover:text-yellow-300 underline font-semibold"
+              >
+                View Competition Details & Prizes →
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- [TEMPORARY - October 2025 Competition] END -->
 
         <!-- Follow Recommendations -->
         <div class="bg-gradient-to-r from-purple-900 to-blue-900 rounded-lg p-4">
@@ -621,5 +674,28 @@ https://plebsvszombies.cc`;
 
 .celebration-emoji {
   animation: bounce 2s infinite;
+}
+
+/* Glow effect for Post to Nostr button */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(142, 48, 235, 0.5),
+                0 0 20px rgba(142, 48, 235, 0.3),
+                0 0 30px rgba(142, 48, 235, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(142, 48, 235, 0.7),
+                0 0 30px rgba(142, 48, 235, 0.5),
+                0 0 45px rgba(142, 48, 235, 0.3);
+  }
+}
+
+.post-to-nostr-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+.post-to-nostr-glow:hover {
+  animation: glow-pulse 1s ease-in-out infinite;
 }
 </style>
