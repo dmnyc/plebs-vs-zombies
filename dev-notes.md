@@ -1,5 +1,113 @@
 # Development Notes - Plebs vs. Zombies
 
+## Session: October 8, 2025
+
+### Top Zombie Challenge Leaderboard Update - RECORD SHATTERED!
+
+**Branch**: main
+**Status**: Completed, ready to commit and push
+
+### Changes Made
+
+#### Leaderboard Update with Record-Breaking Entry
+**New Champion**: The Bitcoin Street Journal with 1,466 zombie kills - the highest score ever recorded!
+
+**Files Modified**:
+1. `/scripts/fetch-leaderboard-profiles.js`
+   - Added The Bitcoin Street Journal at top of participant list
+   - Updated to 27 total participants
+   - Successfully fetched all 27 profiles from Nostr relays (100% success rate)
+
+2. `/public/leaderboard.html`
+   - Updated participants array with new champion and enriched profile data
+   - Total zombies killed across all participants: 3,602
+   - Leaderboard automatically sorts by kill count
+
+**Top 10 Current Standings**:
+1. The Bitcoin Street Journal - 1,466 kills (NEW RECORD! 🔥)
+2. Antihumano - 320 kills
+3. Undisciplined - 249 kills
+4. inpc - 242 kills
+5. n0>1 - 207 kills
+6. Sergio - 191 kills
+7. StellarStoic - 160 kills
+8. Shirley Baby - 126 kills
+9. negr0 - 97 kills
+10. SuiGenerisJohn - 97 kills
+
+**Profile Data Enriched**:
+- All 27 participants have complete Nostr profile data
+- Includes: display names, NIP-05 addresses, profile pictures
+- Source: Multiple Nostr relays (relay.damus.io, relay.nostr.band, nos.lol, relay.primal.net, nostr.wine)
+
+**Special Note**:
+- Champion npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g pledges to contribute winnings to npub1lrnvvs6z78s9yjqxxr38uyqkmn34lsaxznnqgd877j4z2qej3j5s09qnw5
+
+#### Social Post Created
+Breaking news announcement ready to share:
+- Highlights the astonishing 1,466 kill record
+- Notes the verification (6,961 follows checked)
+- Full top 10 with nostr: tags for mentions
+- Prize pool information (97,000+ sats)
+- Mentions the generous donation pledge
+- Link to full leaderboard
+
+### Next Steps
+
+1. **Commit changes**:
+   ```bash
+   git add scripts/fetch-leaderboard-profiles.js public/leaderboard.html dev-notes.md
+   git commit -m "Update leaderboard with record-breaking 1466 kills
+
+   - Add The Bitcoin Street Journal as new champion with 1,466 zombie kills
+   - Update total participants to 27 with enriched Nostr profile data
+   - Total zombies killed: 3,602
+   - All profiles successfully fetched (100% success rate)
+
+   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+   Co-Authored-By: Claude <noreply@anthropic.com>"
+   ```
+
+2. **Push to production**:
+   ```bash
+   git push origin main
+   ```
+
+3. **Share social post** on Nostr with the announcement text
+
+### Technical Details
+
+**Leaderboard Stats**:
+- Total participants: 27
+- Profiles found: 27/27 (100%)
+- Total zombies killed: 3,602
+- Highest score: 1,466 (21.06% zombie rate based on 6,961 follows)
+- Display limit: 50 participants max
+
+**Profile Fetch Process**:
+- Script: `/scripts/fetch-leaderboard-profiles.js`
+- Connects to 5 Nostr relays
+- Fetches kind 0 (profile metadata) events
+- Enriches with display_name, name, nip05, picture
+- Outputs formatted JavaScript array ready for HTML
+
+**Leaderboard Hosting**:
+- Live at: https://plebsvszombies.cc/leaderboard
+- Static HTML served from `/public/leaderboard.html`
+- Vercel routing configured in `vercel.json`
+
+### Files Modified This Session
+- `/scripts/fetch-leaderboard-profiles.js` - Added new champion to participant list
+- `/public/leaderboard.html` - Updated with enriched profile data for all 27 participants
+- `/dev-notes.md` - This file
+
+---
+*Session ended: Computer reboot needed*
+*Resume: Commit and push leaderboard updates*
+
+---
+
 ## Session: September 21, 2025
 
 ### Branch: scout-post-fix
