@@ -45,12 +45,14 @@ Automated cleanup script:
 
 ### Components Requiring Code Removal
 
-#### 1. Competition Banner in Purge Celebration Modal ✅ MARKED
-**Location**: `/src/components/ZombiePurgeCelebration.vue` (lines 130-150)
-**Purpose**: Notify users they're entered in competition after posting purge results
-**Removal**: Delete marked code block
+#### 1. Competition Banners in Purge Celebration Modal ✅ MARKED
+**Location**: `/src/components/ZombiePurgeCelebration.vue`
+**Purpose**:
+- Banner 1 (lines 85-105): Shows BEFORE posting - encourages participation
+- Banner 2 (lines 150-170): Shows AFTER posting - confirms entry
+**Removal**: Delete both marked code blocks
 **Marker**: `[TEMPORARY - October 2025 Competition]`
-**Note**: Only shows after user posts to Nostr (when `posted === true`)
+**Note**: Banners toggle based on `posted` state
 
 #### 2. Competition Details Page ✅ MARKED
 **Location**: `/public/competition.html`
@@ -64,18 +66,22 @@ Automated cleanup script:
 ### Vercel Configuration
 **File**: `/vercel.json` ✅ MARKED
 
-**Current temporary routes** (lines 6-12):
+**Current temporary routes** (lines 6-16):
 ```json
 // [TEMPORARY - October 2025 Competition] START
-// Remove this route after October 31, 2025
+// Remove these routes after October 31, 2025
 {
   "source": "/leaderboard",
   "destination": "/leaderboard.html"
+},
+{
+  "source": "/competition",
+  "destination": "/competition.html"
 }
 // [TEMPORARY - October 2025 Competition] END
 ```
 
-**Action**: Remove this rewrite rule after October 31, 2025
+**Action**: Remove these rewrite rules after October 31, 2025
 **Verification**: Run `./scripts/check-competition-markers.sh` to confirm
 **Automated Removal**: `./scripts/remove-competition-components.sh` handles this
 
@@ -206,12 +212,11 @@ Final competition data will be archived in:
    - Links to leaderboard and main app
    - Fully marked with temporary markers
 
-2. **Purge Celebration Banner** (`/src/components/ZombiePurgeCelebration.vue`)
-   - Appears after user posts purge results to Nostr
-   - Notifies they're entered in competition
-   - Shows their zombie kill count
-   - Links to competition details page
-   - Only appears when `posted === true`
+2. **Purge Celebration Banners** (`/src/components/ZombiePurgeCelebration.vue`)
+   - Pre-post banner: Encourages users to enter competition (shown before posting)
+   - Post-post banner: Confirms entry and shows kill count (shown after posting)
+   - Both link to competition details page
+   - Banners toggle based on `posted` state
    - Marked with temporary comment blocks
 
 3. **Helper Scripts**

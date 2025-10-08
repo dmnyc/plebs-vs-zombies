@@ -46,7 +46,7 @@ echo "📝 Reverting vercel.json changes..."
 # Create a backup
 cp vercel.json vercel.json.backup
 
-# Remove the leaderboard route (lines 6-12)
+# Remove the competition routes (lines 6-16)
 cat > vercel.json << 'EOF'
 {
   "buildCommand": "npm run build",
@@ -61,7 +61,7 @@ cat > vercel.json << 'EOF'
 }
 EOF
 
-echo "  ✓ Removed leaderboard route from vercel.json"
+echo "  ✓ Removed competition routes from vercel.json"
 
 echo ""
 echo "📝 Removing competition banner from Purge Celebration..."

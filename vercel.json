@@ -4,10 +4,14 @@
   "framework": "vite",
   "rewrites": [
     // [TEMPORARY - October 2025 Competition] START
-    // Remove this route after October 31, 2025
+    // Remove these routes after October 31, 2025
     {
       "source": "/leaderboard",
       "destination": "/leaderboard.html"
+    },
+    {
+      "source": "/competition",
+      "destination": "/competition.html"
     },
     // [TEMPORARY - October 2025 Competition] END
     {
