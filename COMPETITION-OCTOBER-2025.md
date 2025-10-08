@@ -33,6 +33,7 @@ Automated cleanup script:
 ### Leaderboard Files
 - [ ] `/public/leaderboard.html` - Main leaderboard page (October 2025 version) ✅ MARKED
 - [ ] `/charts/top-zombie-challenge-october-2025.html` - Competition chart/redirect page ✅ MARKED
+- [ ] `/public/competition.html` - Competition details and prizes page ✅ MARKED
 - [ ] `/scripts/fetch-leaderboard-profiles.js` - Leaderboard data fetcher (competition data source)
 
 ### Documentation
@@ -44,20 +45,17 @@ Automated cleanup script:
 
 ### Components Requiring Code Removal
 
-#### 1. Competition Banner/Notification
-**Location**: TBD
-**Purpose**: Display competition info to users
-**Removal**: Delete component and all references
+#### 1. Competition Banner in Purge Celebration Modal ✅ MARKED
+**Location**: `/src/components/ZombiePurgeCelebration.vue` (lines 130-150)
+**Purpose**: Notify users they're entered in competition after posting purge results
+**Removal**: Delete marked code block
+**Marker**: `[TEMPORARY - October 2025 Competition]`
+**Note**: Only shows after user posts to Nostr (when `posted === true`)
 
-#### 2. Leaderboard Link in Navigation
-**Location**: TBD
-**Purpose**: Link to competition leaderboard
-**Removal**: Remove navigation item
-
-#### 3. Competition-specific Modals/Popups
-**Location**: TBD
-**Purpose**: Competition announcements/rules
-**Removal**: Delete modal components
+#### 2. Competition Details Page ✅ MARKED
+**Location**: `/public/competition.html`
+**Purpose**: Display competition rules, prizes, and sponsor info
+**Removal**: Delete entire file
 
 ---
 
@@ -194,6 +192,74 @@ Final competition data will be archived in:
 
 ---
 
+---
+
+## Implementation Summary
+
+### What Was Added
+
+1. **Competition Details Page** (`/public/competition.html`)
+   - Complete competition information
+   - Prize tiers (100,000 sats total)
+   - Sponsor section with Rizful logo
+   - Rules and how to enter
+   - Links to leaderboard and main app
+   - Fully marked with temporary markers
+
+2. **Purge Celebration Banner** (`/src/components/ZombiePurgeCelebration.vue`)
+   - Appears after user posts purge results to Nostr
+   - Notifies they're entered in competition
+   - Shows their zombie kill count
+   - Links to competition details page
+   - Only appears when `posted === true`
+   - Marked with temporary comment blocks
+
+3. **Helper Scripts**
+   - `check-competition-markers.sh` - Find all competition code
+   - `remove-competition-components.sh` - Automated cleanup
+   - Scripts documentation in `/scripts/README.md`
+
+4. **Documentation**
+   - This comprehensive tracking document
+   - Updated vercel.json with temporary markers
+   - Updated leaderboard files with markers
+
+### Verification
+
+Run verification script:
+```bash
+./scripts/check-competition-markers.sh
+```
+
+Expected markers found:
+- ✅ `src/components/ZombiePurgeCelebration.vue` (lines 130-150)
+- ✅ `public/competition.html` (header comment)
+- ✅ `public/leaderboard.html` (header comment)
+- ✅ `charts/top-zombie-challenge-october-2025.html` (header comment)
+- ✅ `vercel.json` (lines 6-12)
+
+### Sponsor Information
+
+- **Sponsor**: Rizful
+- **npub**: npub1jluy3twvf338v6zlujzzdhjkzjy8ezj34ksydr8vw8a6jwp89ygshpp2kq
+- **Logo**: `/public/rizful_logo_white.png`
+- **Prize Pool**: 100,100 sats across top 10 hunters
+  - 1st: 42,000 sats
+  - 2nd: 21,000 sats
+  - 3rd: 14,000 sats
+  - 4th: 8,400 sats
+  - 5th: 4,200 sats
+  - 6th-10th: 2,100 sats each
+
+### Eligibility Rules
+- **Only zombie kills from personal purges count**
+- Users must be logged in and purge their own follow list
+- Must share purge results to Nostr using "Post to Nostr" button
+- Scout Mode results are NOT eligible
+
+---
+
 **Last Updated**: October 8, 2025
 **Next Review**: October 31, 2025 (Competition End)
 **Responsible**: Development Team
+**Status**: ✅ Fully Implemented & Documented

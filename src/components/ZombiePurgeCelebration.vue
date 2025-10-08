@@ -127,6 +127,28 @@
           </p>
         </div>
 
+        <!-- [TEMPORARY - October 2025 Competition] START -->
+        <!-- Competition Announcement Banner (shown after posting) -->
+        <div v-if="posted" class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-600/50 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <div class="text-2xl flex-shrink-0">🏆</div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-yellow-400 font-bold text-sm mb-1">You're Entered in the Top Zombie Challenge!</h3>
+              <p class="text-gray-300 text-xs mb-2">
+                Your {{ totalPurged }} zombie kills count toward October's competition. 100,100 sats in prizes across top 10 hunters!
+              </p>
+              <a
+                href="/competition.html"
+                target="_blank"
+                class="text-xs text-yellow-400 hover:text-yellow-300 underline font-semibold"
+              >
+                View Competition Details & Prizes →
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- [TEMPORARY - October 2025 Competition] END -->
+
         <!-- Follow Recommendations -->
         <div class="bg-gradient-to-r from-purple-900 to-blue-900 rounded-lg p-4">
           <h4 class="text-lg font-semibold mb-2 text-gray-200">

@@ -156,9 +156,9 @@
     </div>
 
     <!-- Post Success Modal -->
-    <div 
-      v-if="showPostModal" 
-      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
+    <div
+      v-if="showPostModal"
+      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
       @click.self="showPostModal = false"
     >
       <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
@@ -166,9 +166,9 @@
         <div class="p-6 border-b border-gray-700">
           <div class="flex items-center justify-between">
             <h2 class="text-2xl font-bold text-purple-400 flex items-center gap-2">
-              📡 Scout Report Posted! 
+              📡 Scout Report Posted!
             </h2>
-            <button 
+            <button
               @click="showPostModal = false"
               class="text-gray-400 hover:text-gray-200 text-2xl"
             >
