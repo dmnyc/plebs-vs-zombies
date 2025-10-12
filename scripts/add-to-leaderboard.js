@@ -163,9 +163,55 @@ async function main() {
         process.exit(1);
     }
 
-    // Check for duplicates
+    // Deduplicate within the batch (same user, multiple notes)
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log('📋 CHECKING FOR DUPLICATES');
+    console.log('🔍 DEDUPLICATING BATCH');
+    console.log('═══════════════════════════════════════════════════════════════\n');
+
+    const npubMap = new Map();
+    const consolidatedNotes = [];
+
+    for (const data of extractedData) {
+        if (npubMap.has(data.npub)) {
+            const existing = npubMap.get(data.npub);
+            // Keep the entry with higher kill count
+            if (data.zombiesKilled > existing.zombiesKilled) {
+                consolidatedNotes.push({
+                    npub: data.npub,
+                    authorName: data.authorName,
+                    oldKills: existing.zombiesKilled,
+                    newKills: data.zombiesKilled
+                });
+                npubMap.set(data.npub, data);
+            } else {
+                consolidatedNotes.push({
+                    npub: data.npub,
+                    authorName: data.authorName,
+                    oldKills: data.zombiesKilled,
+                    newKills: existing.zombiesKilled
+                });
+            }
+        } else {
+            npubMap.set(data.npub, data);
+        }
+    }
+
+    if (consolidatedNotes.length > 0) {
+        console.log('⚠️  Multiple notes from same user(s) detected:');
+        consolidatedNotes.forEach(c => {
+            console.log(`   - ${c.authorName}: Using highest count (${c.newKills} kills, ignoring ${c.oldKills})`);
+        });
+        console.log('');
+    } else {
+        console.log('✅ No duplicates within batch\n');
+    }
+
+    // Use deduplicated data
+    const deduplicatedData = Array.from(npubMap.values());
+
+    // Check for duplicates against existing leaderboard
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('📋 CHECKING AGAINST EXISTING LEADERBOARD');
     console.log('═══════════════════════════════════════════════════════════════\n');
 
     const fetchScriptContent = readFetchScript();
@@ -175,7 +221,7 @@ async function main() {
     const duplicates = [];
     const newParticipants = [];
 
-    for (const data of extractedData) {
+    for (const data of deduplicatedData) {
         if (participantExists(currentParticipants, data.npub)) {
             duplicates.push(data);
         } else {
@@ -204,7 +250,7 @@ async function main() {
     console.log(`✨ PREVIEW: ${newParticipants.length} NEW PARTICIPANT(S) TO ADD`);
     console.log('═══════════════════════════════════════════════════════════════\n');
 
-    const previewTable = extractedData
+    const previewTable = deduplicatedData
         .filter(d => !participantExists(currentParticipants, d.npub))
         .map((d, i) => {
             const rank = i + 1;
