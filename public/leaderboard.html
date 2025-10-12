@@ -373,6 +373,33 @@ See: /COMPETITION-OCTOBER-2025.md
             text-decoration: underline;
         }
 
+        .cta-section {
+            text-align: center;
+            margin: 40px 0;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+        }
+
         @media (max-width: 768px) {
             .title {
                 font-size: 2.5rem;
@@ -474,6 +501,13 @@ See: /COMPETITION-OCTOBER-2025.md
                 <div class="stat-value" id="displayedCount">0</div>
                 <div class="stat-label">Top Slayers Shown</div>
             </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="cta-section">
+            <h2 style="color: #10b981; margin-bottom: 10px;">Want to Compete?</h2>
+            <p style="font-size: 1.2rem; margin-bottom: 10px;">Join the hunt and climb the leaderboard!</p>
+            <a href="/competition" class="cta-button">See Competition Details 🏆</a>
         </div>
 
         <div class="timestamp" id="timestamp">
