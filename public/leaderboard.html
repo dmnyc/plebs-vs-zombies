@@ -290,6 +290,16 @@ See: /COMPETITION-OCTOBER-2025.md
             color: #cd7f32;
         }
 
+        .rank-4 .zombies-count,
+        .rank-5 .zombies-count,
+        .rank-6 .zombies-count,
+        .rank-7 .zombies-count,
+        .rank-8 .zombies-count,
+        .rank-9 .zombies-count,
+        .rank-10 .zombies-count {
+            color: #ea580c;
+        }
+
         .zombies-label {
             font-size: 0.8rem;
             color: #9ca3af;
@@ -481,17 +491,17 @@ See: /COMPETITION-OCTOBER-2025.md
                 <div style="background: rgba(17, 24, 39, 0.5); border-radius: 8px; padding: 12px; border: 1px solid rgba(107, 114, 128, 0.25); text-align: center;">
                     <div style="font-size: 1.5rem; margin-bottom: 5px;">🏅</div>
                     <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">4th Place</div>
-                    <div style="color: #a78bfa; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">8,400 sats</div>
+                    <div style="color: #ea580c; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">8,400 sats</div>
                 </div>
                 <div style="background: rgba(17, 24, 39, 0.5); border-radius: 8px; padding: 12px; border: 1px solid rgba(107, 114, 128, 0.25); text-align: center;">
                     <div style="font-size: 1.5rem; margin-bottom: 5px;">🏅</div>
                     <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">5th Place</div>
-                    <div style="color: #a78bfa; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">4,200 sats</div>
+                    <div style="color: #ea580c; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">4,200 sats</div>
                 </div>
                 <div style="background: rgba(17, 24, 39, 0.5); border-radius: 8px; padding: 12px; border: 1px solid rgba(107, 114, 128, 0.25); text-align: center;">
                     <div style="font-size: 1.5rem; margin-bottom: 5px;">🏅</div>
                     <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">6th-10th</div>
-                    <div style="color: #a78bfa; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">2,100 sats each</div>
+                    <div style="color: #ea580c; font-size: 0.95rem; font-weight: 700; margin-top: 6px;">2,100 sats each</div>
                 </div>
             </div>
             <p style="color: #9ca3af; margin-top: 15px; font-size: 0.9rem;">
@@ -635,7 +645,7 @@ See: /COMPETITION-OCTOBER-2025.md
         } else {
             displayedParticipants.forEach((participant, index) => {
                 const rank = index + 1;
-                const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                const rankClass = rank <= 10 ? `rank-${rank}` : '';
                 const badgeClass = rank <= 3 ? '' : 'other';
 
                 let rankDisplay;
@@ -690,6 +700,29 @@ See: /COMPETITION-OCTOBER-2025.md
                     item.style.opacity = '1';
                     item.style.transform = 'translateY(0)';
                 }, 100 + (index * 150));
+
+                // Insert prize divider after 10th place
+                if (rank === 10) {
+                    const divider = document.createElement('div');
+                    divider.className = 'prize-divider';
+                    divider.innerHTML = `
+                        <div class="prize-divider-text">💰 Prize Cutoff Line 💰</div>
+                        <div class="prize-divider-subtext">Top 10 win prizes • Keep hunting to break in!</div>
+                    `;
+
+                    // Add entrance animation for divider
+                    divider.style.opacity = '0';
+                    divider.style.transform = 'translateY(30px)';
+
+                    leaderboardContainer.appendChild(divider);
+
+                    // Animate divider entry
+                    setTimeout(() => {
+                        divider.style.transition = 'all 0.6s ease-out';
+                        divider.style.opacity = '1';
+                        divider.style.transform = 'translateY(0)';
+                    }, 100 + ((index + 1) * 150));
+                }
             });
         }
 
