@@ -15,6 +15,7 @@ import { nip19 } from 'nostr-tools';
 // LEADERBOARD DATA - Update this with your participants (supports up to 50)
 const participants = [
     { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466 },
+    { npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", zombiesKilled: 675 },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320 },
     { npub: "npub1t49ker2fyy2xc5y7qrsfxrp6g8evsxluqmaq09xt7uuhhzsurm3srw4jj5", zombiesKilled: 249 },
     { npub: "npub1q33jywkl8r0e5g48lvrenxnr3lw59kzrw4e7p0cecslqzwc56eesjymqu0", zombiesKilled: 242 },
@@ -30,9 +31,11 @@ const participants = [
     { npub: "npub1muge3z8k53ts45nfhthsrn6qjzjw6qxfg704r9e8pxnmgwnvpzsq7yv3av", zombiesKilled: 67 },
     { npub: "npub1vp8fdcyejd4pqjyrjk9sgz68vuhq7pyvnzk8j0ehlljvwgp8n6eqsrnpsw", zombiesKilled: 62 },
     { npub: "npub157dmyq6ehpra5xatrn0sssz03qe0y6k69v02xmzyqcrf0h0xxf5qxaw6u8", zombiesKilled: 34 },
+    { npub: "npub1qntwuu24q5lq0g94sz522nzaa646s3gtzklngazxymvl0zdcyzps889v2d", zombiesKilled: 31 },
     { npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", zombiesKilled: 30 },
     { npub: "npub19z9asfqjplh52ql3f9rc30706gwjxktgdyp3ap6sv08rvruzr3tsk4ylst", zombiesKilled: 30 },
     { npub: "npub1y8sj0myap0a7awl4qsswzz653p4p6llclww5g9m8nvls0dp62s2qpcsd3u", zombiesKilled: 29 },
+    { npub: "npub1jgn3dnnntuatzae2nqkhg2zp54tqxk3t6zpzljf8x9h7le89gagsxrwwl3", zombiesKilled: 28 },
     { npub: "npub1vgldyxx7syc30qm9v7padnnfpdfp4zwymsyl9ztzuklaf7j5jfyspk36wu", zombiesKilled: 24 },
     { npub: "npub190queyng2pmx0jfw5rkx4fjjl3u0zxz6nlyaja53p2n0ydupr6jsdnqt8q", zombiesKilled: 21 },
     { npub: "npub1nz4y6dxnt0kzvgyhyvwnqklpennhv20dgly4c5gnpx4aa6ns08vqr8kkgx", zombiesKilled: 20 },
