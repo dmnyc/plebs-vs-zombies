@@ -142,6 +142,10 @@
               {{ posting ? 'Posting...' : posted ? 'Posted to Nostr!' : 'Post to Nostr' }}
             </button>
 
+            <!-- [TEMPORARY - October 2025 Competition] -->
+            <!-- HIDDEN: Copy button disabled during competition to ensure participants use "Post to Nostr" -->
+            <!-- TO REVERT: Uncomment the button below after October 31, 2025 -->
+            <!--
             <button
               @click="copyToClipboard"
               class="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-300 py-2 transition-colors"
@@ -150,6 +154,7 @@
               <span v-else>📋</span>
               {{ copied ? 'Copied!' : 'Copy Message' }}
             </button>
+            -->
           </div>
           
           <p class="text-xs text-gray-500 mt-2 text-center">
