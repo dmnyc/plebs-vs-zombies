@@ -124,26 +124,8 @@ async function fetchProfiles() {
         }
     }
 
-    // Helper function to verify image URL is accessible
-    async function verifyImageUrl(url) {
-        if (!url) return null;
-
-        try {
-            const response = await fetch(url, { method: 'HEAD', timeout: 5000 });
-            if (response.ok) {
-                return url;
-            }
-            console.log(`⚠️  Image URL not accessible (${response.status}): ${url}`);
-            return null;
-        } catch (error) {
-            console.log(`⚠️  Image URL verification failed: ${url} - ${error.message}`);
-            return null;
-        }
-    }
-
     // Enrich participants with profile data
-    console.log('🖼️  Verifying profile picture URLs...\n');
-    const enrichedParticipants = await Promise.all(participants.map(async p => {
+    const enrichedParticipants = participants.map(p => {
         const decoded = nip19.decode(p.npub);
         const pubkey = decoded.data;
         const profile = profileMap.get(pubkey);
@@ -158,18 +140,15 @@ async function fetchProfiles() {
             handle = p.npub;
         }
 
-        // Verify picture URL is accessible
-        const verifiedPicture = await verifyImageUrl(profile?.picture);
-
         return {
             name,
             handle,
             zombiesKilled: p.zombiesKilled,
             npub: p.npub,
-            picture: verifiedPicture,
+            picture: profile?.picture || null,
             hasProfile: !!profile
         };
-    }));
+    });
 
     // Print results
     console.log('═══════════════════════════════════════════════════════════════');
