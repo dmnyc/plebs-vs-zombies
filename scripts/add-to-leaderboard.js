@@ -59,12 +59,15 @@ function extractParticipantsArray(content) {
  */
 function parseParticipants(arrayContent) {
     const participants = [];
-    const regex = /\{\s*npub:\s*"([^"]+)",\s*zombiesKilled:\s*(\d+)\s*\}/g;
+    // Updated regex to optionally capture processedEventIds array
+    const regex = /\{\s*npub:\s*"([^"]+)",\s*zombiesKilled:\s*(\d+)(?:\s*,\s*processedEventIds:\s*(\[[^\]]*\]))?\s*\}/g;
     let match;
     while ((match = regex.exec(arrayContent)) !== null) {
+        const processedEventIds = match[3] ? JSON.parse(match[3]) : [];
         participants.push({
             npub: match[1],
-            zombiesKilled: parseInt(match[2], 10)
+            zombiesKilled: parseInt(match[2], 10),
+            processedEventIds
         });
     }
     return participants;
@@ -80,17 +83,29 @@ function participantExists(participants, npub) {
 /**
  * Generate updated fetch script content
  */
-function generateUpdatedFetchScript(content, newParticipants) {
+function generateUpdatedFetchScript(content, newParticipants, updatedParticipants) {
     const currentArrayContent = extractParticipantsArray(content);
     const currentParticipants = parseParticipants(currentArrayContent);
+
+    // Apply updates to existing participants
+    for (const participant of currentParticipants) {
+        const update = updatedParticipants.find(u => u.npub === participant.npub);
+        if (update) {
+            participant.zombiesKilled = update.totalKills;
+            participant.processedEventIds = [...participant.processedEventIds, ...update.newEventIds];
+        }
+    }
 
     // Combine and sort by zombiesKilled descending
     const allParticipants = [...currentParticipants, ...newParticipants]
         .sort((a, b) => b.zombiesKilled - a.zombiesKilled);
 
-    // Generate new array content
+    // Generate new array content with processedEventIds
     const newArrayContent = allParticipants
-        .map(p => `    { npub: "${p.npub}", zombiesKilled: ${p.zombiesKilled} }`)
+        .map(p => {
+            const eventIdsStr = JSON.stringify(p.processedEventIds || []);
+            return `    { npub: "${p.npub}", zombiesKilled: ${p.zombiesKilled}, processedEventIds: ${eventIdsStr} }`;
+        })
         .join(',\n');
 
     // Replace the array in the content
@@ -163,9 +178,9 @@ async function main() {
         process.exit(1);
     }
 
-    // Deduplicate within the batch (same user, multiple notes)
+    // Consolidate multiple notes from the same user (sum kills, track event IDs)
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log('🔍 DEDUPLICATING BATCH');
+    console.log('🔍 CONSOLIDATING BATCH');
     console.log('═══════════════════════════════════════════════════════════════\n');
 
     const npubMap = new Map();
@@ -174,42 +189,42 @@ async function main() {
     for (const data of extractedData) {
         if (npubMap.has(data.npub)) {
             const existing = npubMap.get(data.npub);
-            // Keep the entry with higher kill count
-            if (data.zombiesKilled > existing.zombiesKilled) {
-                consolidatedNotes.push({
-                    npub: data.npub,
-                    authorName: data.authorName,
-                    oldKills: existing.zombiesKilled,
-                    newKills: data.zombiesKilled
-                });
-                npubMap.set(data.npub, data);
-            } else {
-                consolidatedNotes.push({
-                    npub: data.npub,
-                    authorName: data.authorName,
-                    oldKills: data.zombiesKilled,
-                    newKills: existing.zombiesKilled
-                });
-            }
+            // Sum the kills from multiple notes
+            const totalKills = existing.zombiesKilled + data.zombiesKilled;
+            consolidatedNotes.push({
+                npub: data.npub,
+                authorName: data.authorName,
+                note1Kills: existing.zombiesKilled,
+                note2Kills: data.zombiesKilled,
+                totalKills: totalKills
+            });
+            npubMap.set(data.npub, {
+                ...existing,
+                zombiesKilled: totalKills,
+                eventIds: [...existing.eventIds, data.eventId]
+            });
         } else {
-            npubMap.set(data.npub, data);
+            npubMap.set(data.npub, {
+                ...data,
+                eventIds: [data.eventId]
+            });
         }
     }
 
     if (consolidatedNotes.length > 0) {
         console.log('⚠️  Multiple notes from same user(s) detected:');
         consolidatedNotes.forEach(c => {
-            console.log(`   - ${c.authorName}: Using highest count (${c.newKills} kills, ignoring ${c.oldKills})`);
+            console.log(`   - ${c.authorName}: Summing kills (${c.note1Kills} + ${c.note2Kills} = ${c.totalKills} total)`);
         });
         console.log('');
     } else {
-        console.log('✅ No duplicates within batch\n');
+        console.log('✅ No multiple notes within batch\n');
     }
 
-    // Use deduplicated data
-    const deduplicatedData = Array.from(npubMap.values());
+    // Use consolidated data
+    const consolidatedData = Array.from(npubMap.values());
 
-    // Check for duplicates against existing leaderboard
+    // Check for existing entries and update them, or add new ones
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('📋 CHECKING AGAINST EXISTING LEADERBOARD');
     console.log('═══════════════════════════════════════════════════════════════\n');
@@ -218,51 +233,106 @@ async function main() {
     const currentArrayContent = extractParticipantsArray(fetchScriptContent);
     const currentParticipants = parseParticipants(currentArrayContent);
 
-    const duplicates = [];
+    const updates = [];
     const newParticipants = [];
+    const skippedEvents = [];
 
-    for (const data of deduplicatedData) {
-        if (participantExists(currentParticipants, data.npub)) {
-            duplicates.push(data);
+    for (const data of consolidatedData) {
+        const existingParticipant = currentParticipants.find(p => p.npub === data.npub);
+        if (existingParticipant) {
+            // Filter out already-processed events
+            const newEventIds = data.eventIds.filter(id =>
+                !existingParticipant.processedEventIds.includes(id)
+            );
+
+            if (newEventIds.length === 0) {
+                skippedEvents.push({
+                    npub: data.npub,
+                    authorName: data.authorName,
+                    reason: 'All events already processed'
+                });
+                continue;
+            }
+
+            // Calculate kills only from new events
+            const newKills = extractedData
+                .filter(e => e.npub === data.npub && newEventIds.includes(e.eventId))
+                .reduce((sum, e) => sum + e.zombiesKilled, 0);
+
+            const newTotal = existingParticipant.zombiesKilled + newKills;
+
+            updates.push({
+                npub: data.npub,
+                authorName: data.authorName,
+                oldKills: existingParticipant.zombiesKilled,
+                newKills: newKills,
+                totalKills: newTotal,
+                newEventIds: newEventIds
+            });
+
+            // Update the participant in the array
+            existingParticipant.zombiesKilled = newTotal;
+            existingParticipant.processedEventIds = [...existingParticipant.processedEventIds, ...newEventIds];
         } else {
             newParticipants.push({
                 npub: data.npub,
-                zombiesKilled: data.zombiesKilled
+                zombiesKilled: data.zombiesKilled,
+                processedEventIds: data.eventIds
             });
         }
     }
 
-    if (duplicates.length > 0) {
-        console.log('⚠️  Found duplicates (already on leaderboard):');
-        duplicates.forEach(d => {
-            console.log(`   - ${d.authorName} (${d.zombiesKilled} kills)`);
+    if (skippedEvents.length > 0) {
+        console.log('⏭️  Skipping already-processed events:');
+        skippedEvents.forEach(s => {
+            console.log(`   - ${s.authorName}: ${s.reason}`);
         });
         console.log('');
     }
 
-    if (newParticipants.length === 0) {
-        console.log('ℹ️  No new participants to add (all are duplicates).');
+    if (updates.length > 0) {
+        console.log('🔄 Found existing participants - updating totals:');
+        updates.forEach(u => {
+            console.log(`   - ${u.authorName}: ${u.oldKills} + ${u.newKills} = ${u.totalKills} kills (${u.newEventIds.length} new event(s))`);
+        });
+        console.log('');
+    }
+
+    if (newParticipants.length === 0 && updates.length === 0) {
+        console.log('ℹ️  No changes needed.');
         process.exit(0);
     }
 
     // Show preview
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`✨ PREVIEW: ${newParticipants.length} NEW PARTICIPANT(S) TO ADD`);
+    const changeCount = newParticipants.length + updates.length;
+    const changeType = newParticipants.length > 0 && updates.length > 0 ? 'NEW + UPDATED' :
+                       newParticipants.length > 0 ? 'NEW' : 'UPDATED';
+    console.log(`✨ PREVIEW: ${changeCount} ${changeType} PARTICIPANT(S)`);
     console.log('═══════════════════════════════════════════════════════════════\n');
 
-    const previewTable = deduplicatedData
-        .filter(d => !participantExists(currentParticipants, d.npub))
-        .map((d, i) => {
+    if (newParticipants.length > 0) {
+        console.log('🆕 New participants:');
+        const newData = consolidatedData.filter(d => !currentParticipants.some(p => p.npub === d.npub));
+        newData.forEach((d, i) => {
             const rank = i + 1;
             const name = d.authorName.padEnd(25);
             const kills = String(d.zombiesKilled).padStart(4);
             const npubShort = d.npub.substring(0, 12) + '...';
-            return `   ${rank}. ${name} ${kills} kills  (${npubShort})`;
-        })
-        .join('\n');
+            console.log(`   ${rank}. ${name} ${kills} kills  (${npubShort})`);
+        });
+        console.log('');
+    }
 
-    console.log(previewTable);
-    console.log('');
+    if (updates.length > 0) {
+        console.log('🔄 Updated participants:');
+        updates.forEach((u, i) => {
+            const rank = i + 1;
+            const name = u.authorName.padEnd(25);
+            console.log(`   ${rank}. ${name} ${u.oldKills} → ${u.totalKills} kills (+${u.newKills})`);
+        });
+        console.log('');
+    }
 
     if (errors.length > 0) {
         console.log('⚠️  Errors encountered:');
@@ -273,7 +343,7 @@ async function main() {
     }
 
     // Confirm
-    const answer = await prompt(`\n❓ Add these ${newParticipants.length} participant(s) to the leaderboard? (y/n): `);
+    const answer = await prompt(`\n❓ Apply these ${changeCount} change(s) to the leaderboard? (y/n): `);
 
     if (answer !== 'y' && answer !== 'yes') {
         console.log('\n❌ Cancelled. No changes made.');
@@ -286,7 +356,7 @@ async function main() {
 
     // Update fetch-leaderboard-profiles.js
     console.log('1️⃣  Updating fetch-leaderboard-profiles.js...');
-    const updatedFetchScript = generateUpdatedFetchScript(fetchScriptContent, newParticipants);
+    const updatedFetchScript = generateUpdatedFetchScript(fetchScriptContent, newParticipants, updates);
     writeFileSync('scripts/fetch-leaderboard-profiles.js', updatedFetchScript, 'utf-8');
     console.log('   ✅ Updated\n');
 
@@ -325,7 +395,13 @@ async function main() {
     console.log('✅ LEADERBOARD UPDATED SUCCESSFULLY!');
     console.log('═══════════════════════════════════════════════════════════════\n');
 
-    console.log(`Added ${newParticipants.length} new participant(s) to the leaderboard.\n`);
+    if (newParticipants.length > 0) {
+        console.log(`✨ Added ${newParticipants.length} new participant(s)`);
+    }
+    if (updates.length > 0) {
+        console.log(`🔄 Updated ${updates.length} existing participant(s)`);
+    }
+    console.log('');
 
     // Show git diff
     console.log('📊 Git changes:');
