@@ -563,7 +563,7 @@ See: /COMPETITION-OCTOBER-2025.md
     { name: "Worlds Gone Mad", handle: "WorldsGoneMad@NostrAddress.com", npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", picture: "https://m.primal.net/NcWJ.jpg", zombiesKilled: 1772 },
     { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", picture: "https://thebitcoinstreetjournal.com/wp-content/uploads/2024/08/9166u8.gif", zombiesKilled: 1466 },
     { name: "Dan Wedge", handle: "wedgesocial@nostrplebs.com", npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", picture: "https://image.nostr.build/5bbd5637def76123e51986d9d5edc39235334a83b708d1ca4a56d902fecff362.jpg", zombiesKilled: 675 },
-    { name: "Antihumano", handle: "antihumano@hodl.ar", npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", picture: "https://void.cat/d/KVbPHC5cgPYNSVAP7tUUJV.webp", zombiesKilled: 320 },
+    { name: "Antihumano", handle: "antihumano@hodl.ar", npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", picture: null, zombiesKilled: 320 },
     { name: "Tuvok", handle: "Tuvok@primal.net", npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", picture: "https://m.primal.net/HPLq.webp", zombiesKilled: 298 },
     { name: "Undisciplined", handle: "undisciplined@stacker.news", npub: "npub1t49ker2fyy2xc5y7qrsfxrp6g8evsxluqmaq09xt7uuhhzsurm3srw4jj5", picture: "https://blossom.primal.net/6769fc224bc089ae1dd37c6fb311f4792a9314f32dd82491ac2d631c511a9a6a.jpg", zombiesKilled: 249 },
     { name: "inpc", handle: "inpc@inpc.cat", npub: "npub1q33jywkl8r0e5g48lvrenxnr3lw59kzrw4e7p0cecslqzwc56eesjymqu0", picture: "https://image.nostr.build/11c57f3c866f6006e53839031e89e118856e618f01e42d6143f98cd0d7f0abbc.jpg", zombiesKilled: 242 },
@@ -664,11 +664,19 @@ See: /COMPETITION-OCTOBER-2025.md
                     displayHandle = participant.handle.substring(0, 12) + '...' + participant.handle.substring(participant.handle.length - 8);
                 }
 
-                // Generate profile picture HTML
+                // Generate profile picture HTML with robust error handling
                 let profilePicHtml;
                 if (participant.picture) {
-                    profilePicHtml = `<img src="${participant.picture}" alt="${participant.name}" class="profile-pic" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                      <div class="profile-pic-placeholder" style="display:none;">${participant.name.charAt(0).toUpperCase()}</div>`;
+                    // Escape any quotes in the picture URL and name for safety
+                    const safePictureUrl = participant.picture.replace(/"/g, '&quot;');
+                    const safeName = participant.name.replace(/"/g, '&quot;');
+                    const initial = participant.name.charAt(0).toUpperCase();
+
+                    profilePicHtml = `<img src="${safePictureUrl}" alt="${safeName}" class="profile-pic"
+                                           crossorigin="anonymous"
+                                           loading="lazy"
+                                           onerror="if(!this.dataset.errored){this.dataset.errored='true';this.style.display='none';this.nextElementSibling.style.display='flex';}">
+                                      <div class="profile-pic-placeholder" style="display:none;">${initial}</div>`;
                 } else {
                     profilePicHtml = `<div class="profile-pic-placeholder">${participant.name.charAt(0).toUpperCase()}</div>`;
                 }
