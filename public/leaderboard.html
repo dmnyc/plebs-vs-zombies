@@ -561,7 +561,7 @@ See: /COMPETITION-OCTOBER-2025.md
         // Fetched from Nostr relays - profiles enriched with real names, NIP-05 identifiers, and profile pictures
         const participants = [
     { name: "Worlds Gone Mad", handle: "WorldsGoneMad@NostrAddress.com", npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", picture: "https://m.primal.net/NcWJ.jpg", zombiesKilled: 1772 },
-    { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", picture: "https://thebitcoinstreetjournal.com/wp-content/uploads/2024/08/9166u8.gif", zombiesKilled: 1466 },
+    { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", picture: "https://primaldata.s3.us-east-005.backblazeb2.com/cache/9/fb/a7/9fba7a5d5d6d56f91c31e9f657d6229107a11ee7a4cb64b6e06fb22bc7bb7f3f.gif", zombiesKilled: 1466 },
     { name: "Dan Wedge", handle: "wedgesocial@nostrplebs.com", npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", picture: "https://image.nostr.build/5bbd5637def76123e51986d9d5edc39235334a83b708d1ca4a56d902fecff362.jpg", zombiesKilled: 675 },
     { name: "Antihumano", handle: "antihumano@hodl.ar", npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", picture: "https://void.cat/d/KVbPHC5cgPYNSVAP7tUUJV.webp", zombiesKilled: 320 },
     { name: "Tuvok", handle: "Tuvok@primal.net", npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", picture: "https://m.primal.net/HPLq.webp", zombiesKilled: 298 },
@@ -664,19 +664,11 @@ See: /COMPETITION-OCTOBER-2025.md
                     displayHandle = participant.handle.substring(0, 12) + '...' + participant.handle.substring(participant.handle.length - 8);
                 }
 
-                // Generate profile picture HTML with robust error handling
+                // Generate profile picture HTML
                 let profilePicHtml;
                 if (participant.picture) {
-                    // Escape any quotes in the picture URL and name for safety
-                    const safePictureUrl = participant.picture.replace(/"/g, '&quot;');
-                    const safeName = participant.name.replace(/"/g, '&quot;');
-                    const initial = participant.name.charAt(0).toUpperCase();
-
-                    profilePicHtml = `<img src="${safePictureUrl}" alt="${safeName}" class="profile-pic"
-                                           crossorigin="anonymous"
-                                           loading="lazy"
-                                           onerror="if(!this.dataset.errored){this.dataset.errored='true';this.style.display='none';this.nextElementSibling.style.display='flex';}">
-                                      <div class="profile-pic-placeholder" style="display:none;">${initial}</div>`;
+                    profilePicHtml = `<img src="${participant.picture}" alt="${participant.name}" class="profile-pic" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                                      <div class="profile-pic-placeholder" style="display:none;">${participant.name.charAt(0).toUpperCase()}</div>`;
                 } else {
                     profilePicHtml = `<div class="profile-pic-placeholder">${participant.name.charAt(0).toUpperCase()}</div>`;
                 }
