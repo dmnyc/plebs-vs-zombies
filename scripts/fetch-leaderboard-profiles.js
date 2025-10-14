@@ -16,6 +16,7 @@ import { nip19 } from 'nostr-tools';
 const participants = [
     { npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", zombiesKilled: 1772, processedEventIds: ["6f73ab007fc0611e5fd423544d57d3cc9bf0c5d0a7671cf8c530197dc689a660","83905efec74001b0847303d762933c45fdc6a2d0a9ee253905ebb2ee84871fd5"] },
     { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466, processedEventIds: [] },
+    { npub: "npub1faaxjg39cmycqfmgghz8tsat0qvnnnkmaaf6fvpx8lxr63qgtu2s5j7tj3", zombiesKilled: 1429, processedEventIds: ["a9912068576943c1c1789b46ab0cae20b33ef01d10fbc917647f15eb11024915"] },
     { npub: "npub1yejzp928cg48s3q857v8lnmmcqypmsrvmn9e3mruvx2nkntncm2qumhgha", zombiesKilled: 1281, processedEventIds: ["6c800b30903ba287b99ceb1d1e0aa1aada50a1cfc240ab0b290641bebdf1425f"] },
     { npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", zombiesKilled: 675, processedEventIds: [] },
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
@@ -36,6 +37,7 @@ const participants = [
     { npub: "npub1yrffsyxk5hujkpz6mcpwhwkujqmdwswvdp4sqs2ug26zxmly45hsfpn8p0", zombiesKilled: 97, processedEventIds: [] },
     { npub: "npub1v7k63c6y2vktlqhsuupywt3yc7ykursujc34at964f9cv9s9y9csjutfk0", zombiesKilled: 97, processedEventIds: [] },
     { npub: "npub1de6l09erjl9r990q7n9ql0rwh8x8n059ht7a267n0q3qe28wua8q20q0sd", zombiesKilled: 78, processedEventIds: [] },
+    { npub: "npub15wtwxm5k92v3mtppwvwaghdzaclajfjavhuc88q4s3effmyeruwqmtpy0d", zombiesKilled: 74, processedEventIds: ["44da55b7302c7970fdea329be5ae4d97054d361be3b77754de45b1d994d21b21"] },
     { npub: "npub1muge3z8k53ts45nfhthsrn6qjzjw6qxfg704r9e8pxnmgwnvpzsq7yv3av", zombiesKilled: 67, processedEventIds: [] },
     { npub: "npub1jgn3dnnntuatzae2nqkhg2zp54tqxk3t6zpzljf8x9h7le89gagsxrwwl3", zombiesKilled: 67, processedEventIds: ["05e86cf209e767cb939433908ef1868ab79ceaf43cf2aacb26ab19e99dbbbc6d","32195de99a5195259166bac6c250e7b496d3b64a0b9dc140ebd699034be652ac","9f99bfe02604b44149dec7f24584506976f4c90faf2d9162fe28ba38b93d132b"] },
     { npub: "npub1vp8fdcyejd4pqjyrjk9sgz68vuhq7pyvnzk8j0ehlljvwgp8n6eqsrnpsw", zombiesKilled: 62, processedEventIds: [] },
