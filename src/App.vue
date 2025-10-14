@@ -261,29 +261,95 @@
           @exit-scout="exitScoutMode"
         />
       </div>
-      
+
       <!-- Login Screen -->
-      <div v-else-if="!isConnected" class="card max-w-2xl mx-auto my-12">
-        <div class="text-center mb-8">
-          <div class="text-6xl mb-6">🧟‍♂️</div>
-          <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
-          <p class="text-gray-300">Connect with your browser extension to manage your dormant follows.</p>
-        </div>
-        
-        <!-- Connection Info -->
-        <div class="mb-8">
-          <div class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg bg-gray-800/50">
-            <div class="text-2xl">🔌</div>
-            <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
-              <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
-                <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
+      <div v-else-if="!isConnected">
+        <!-- [TEMPORARY - October 2025 Competition] Top Zombie Challenge Banner -->
+        <!-- REMOVE AFTER: October 31, 2025 -->
+        <div v-if="showCompetitionBanner" class="max-w-4xl mx-auto mb-6">
+          <div class="relative bg-gradient-to-r from-purple-900/90 via-red-900/90 to-orange-900/90 border-2 border-yellow-500 rounded-lg p-6 shadow-2xl">
+            <!-- Close Button -->
+            <button
+              @click="showCompetitionBanner = false"
+              class="absolute top-3 right-3 text-gray-300 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/30 transition-colors"
+              aria-label="Close banner"
+            >
+              ×
+            </button>
+
+            <!-- Banner Content -->
+            <div class="text-center">
+              <div class="text-4xl mb-3">🏆💀⚡</div>
+              <h2 class="text-2xl sm:text-3xl font-bold text-yellow-400 mb-2">
+                TOP ZOMBIE CHALLENGE - OCTOBER 2025
+              </h2>
+              <p class="text-gray-200 text-lg mb-4">
+                The hunt is ON! Compete for over <strong class="text-yellow-400">100K sats</strong> in prizes!
+              </p>
+
+              <div class="flex flex-col sm:flex-row gap-3 justify-center items-center mb-4">
+                <a
+                  href="/competition.html"
+                  target="_blank"
+                  class="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-6 py-3 rounded-lg transition-colors shadow-lg"
+                >
+                  🎯 Competition Rules
+                </a>
+                <a
+                  href="/leaderboard.html"
+                  target="_blank"
+                  class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3 rounded-lg transition-colors shadow-lg"
+                >
+                  📊 View Leaderboard
+                </a>
               </div>
+
+              <!-- Sponsor Credit -->
+              <div class="flex items-center justify-center gap-2 py-3 px-4 bg-black/30 rounded-lg mb-3 mx-auto max-w-md">
+                <span class="text-gray-300 text-sm font-medium">Sponsored by</span>
+                <a
+                  href="https://rizful.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src="/rizful_logo_white.png"
+                    alt="Rizful"
+                    class="h-6 w-auto"
+                  />
+                </a>
+              </div>
+
+              <p class="text-gray-300 text-sm">
+                Sign in to start hunting zombies and claim your spot on the leaderboard!
+              </p>
             </div>
           </div>
         </div>
+
+        <!-- Login Card -->
+        <div class="card max-w-2xl mx-auto my-12">
+          <div class="text-center mb-8">
+            <div class="text-6xl mb-6">🧟‍♂️</div>
+            <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
+            <p class="text-gray-300">Connect with your browser extension to manage your dormant follows.</p>
+          </div>
+
+          <!-- Connection Info -->
+          <div class="mb-8">
+            <div class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg bg-gray-800/50">
+              <div class="text-2xl">🔌</div>
+              <div class="flex-grow">
+                <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
+                <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
+                <div class="flex flex-wrap gap-2 mt-2">
+                  <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
+                  <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
         <!-- TEMPORARILY DISABLED - Multiple Signing Method Selection -->
         <!--
@@ -335,65 +401,66 @@
             </div>
           </label>
           -->
-        
-        <div class="text-center">
-          <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
-            Connect with Browser Extension
-          </button>
-        </div>
-        
-        <!-- Scout Mode Section -->
-        <div class="mt-8 pt-6 border-t border-gray-700">
-          <div class="text-center mb-6">
-            <div class="text-4xl mb-3">👁️🔍</div>
-            <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
-            <p class="text-gray-400 text-sm">
-              Analyze any Nostr user's zombie follows without signing in
-            </p>
-          </div>
-          
-          <div class="space-y-4">
-            <div>
-              <label for="scout-npub" class="block text-sm font-medium text-gray-300 mb-2">
-                Enter an npub to scout:
-              </label>
-              <input
-                id="scout-npub"
-                v-model="scoutNpub"
-                type="text"
-                placeholder="npub1..."
-                class="input w-full text-center"
-                :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
-              />
-              <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
-                {{ scoutNpubError }}
-              </div>
-              <div v-if="scoutNpubValid" class="text-green-400 text-xs mt-1">
-                ✅ Valid npub format
-              </div>
-            </div>
-            
-            <button 
-              @click="startScoutMode" 
-              :disabled="!scoutNpubValid || scoutModeLoading"
-              class="btn-secondary w-full flex items-center justify-center gap-2"
-              :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid || scoutModeLoading}"
-            >
-              <span v-if="scoutModeLoading">🔍</span>
-              <span v-else>🏹</span>
-              {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
+
+          <div class="text-center">
+            <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
+              Connect with Browser Extension
             </button>
           </div>
-          
-          <div class="mt-4 p-3 bg-gray-800 rounded-lg">
-            <div class="flex items-start gap-2">
-              <span class="text-yellow-400 text-sm">⚠️</span>
-              <div class="text-xs text-gray-400">
-                <strong class="text-yellow-400">Scout Mode features:</strong><br>
-                • Read-only analysis of any user's follows<br>
-                • Zombie count and score calculation<br>
-                • Social sharing capabilities<br>
-                • No account creation or purging abilities
+
+          <!-- Scout Mode Section -->
+          <div class="mt-8 pt-6 border-t border-gray-700">
+            <div class="text-center mb-6">
+              <div class="text-4xl mb-3">👁️🔍</div>
+              <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
+              <p class="text-gray-400 text-sm">
+                Analyze any Nostr user's zombie follows without signing in
+              </p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label for="scout-npub" class="block text-sm font-medium text-gray-300 mb-2">
+                  Enter an npub to scout:
+                </label>
+                <input
+                  id="scout-npub"
+                  v-model="scoutNpub"
+                  type="text"
+                  placeholder="npub1..."
+                  class="input w-full text-center"
+                  :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
+                />
+                <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
+                  {{ scoutNpubError }}
+                </div>
+                <div v-if="scoutNpubValid" class="text-green-400 text-xs mt-1">
+                  ✅ Valid npub format
+                </div>
+              </div>
+
+              <button
+                @click="startScoutMode"
+                :disabled="!scoutNpubValid || scoutModeLoading"
+                class="btn-secondary w-full flex items-center justify-center gap-2"
+                :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid || scoutModeLoading}"
+              >
+                <span v-if="scoutModeLoading">🔍</span>
+                <span v-else>🏹</span>
+                {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
+              </button>
+            </div>
+
+            <div class="mt-4 p-3 bg-gray-800 rounded-lg">
+              <div class="flex items-start gap-2">
+                <span class="text-yellow-400 text-sm">⚠️</span>
+                <div class="text-xs text-gray-400">
+                  <strong class="text-yellow-400">Scout Mode features:</strong><br>
+                  • Read-only analysis of any user's follows<br>
+                  • Zombie count and score calculation<br>
+                  • Social sharing capabilities<br>
+                  • No account creation or purging abilities
+                </div>
               </div>
             </div>
           </div>
@@ -642,6 +709,7 @@ export default {
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
       forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
+      showCompetitionBanner: true, // [TEMPORARY - October 2025] Show competition banner
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
