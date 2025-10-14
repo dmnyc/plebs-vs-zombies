@@ -398,7 +398,10 @@ class NostrService {
         });
         window.dispatchEvent(profileEvent);
       }
-      
+
+      // Save session after profile is loaded
+      this.saveSession();
+
       return this.userProfile;
     } catch (error) {
       console.error('Failed to load user profile:', error);

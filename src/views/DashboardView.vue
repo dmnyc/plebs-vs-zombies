@@ -1,7 +1,28 @@
 <template>
   <div>
     <h2 class="text-2xl mb-6">Dashboard</h2>
-    
+
+    <!-- Prominent Hunt Zombies CTA -->
+    <div class="mb-8 bg-gradient-to-r from-zombie-dark via-gray-800 to-zombie-dark p-6 rounded-lg border-2 border-zombie-green/50 shadow-2xl">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="text-center md:text-left">
+          <h3 class="text-2xl md:text-3xl font-bold text-zombie-green mb-2 flex items-center justify-center md:justify-start gap-2">
+            <span class="text-4xl">🧟</span>
+            <span>Ready to Hunt Zombies?</span>
+          </h3>
+          <p class="text-gray-300 text-sm md:text-base">
+            Scan your follows and purge inactive accounts to clean up your feed!
+          </p>
+        </div>
+        <button
+          @click="goToZombieHunting"
+          class="btn-hunt-large whitespace-nowrap"
+        >
+          🎯 Start Hunting Now
+        </button>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div class="card">
         <h3 class="text-xl mb-4">Follow List Overview</h3>

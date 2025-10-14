@@ -26,12 +26,15 @@
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="setActiveView('hunting')" 
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('hunting')"
                     :class="{'text-zombie-green': activeView === 'hunting', 'hover:text-zombie-green transition-colors': activeView !== 'hunting'}"
+                    class="font-bold text-lg inline-flex items-center gap-1"
+                    style="line-height: 0.75rem;"
                   >
-                    Hunt Zombies
+                    <span class="text-base">🧟</span>
+                    <span>Hunt Zombies</span>
                   </a>
                 </li>
                 <li>
@@ -181,13 +184,13 @@
               </a>
             </li>
             <li>
-              <a 
-                href="#" 
-                @click.prevent="setActiveView('hunting'); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="setActiveView('hunting'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'hunting'}"
-                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+                class="block px-4 py-4 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors font-bold text-lg border-2 border-zombie-green/30"
               >
-                Hunt Zombies
+                🧟 Hunt Zombies
               </a>
             </li>
             <li>
@@ -403,8 +406,14 @@
           -->
 
           <div class="text-center">
-            <button @click="connectNostr" class="btn-primary text-lg px-8 py-3">
-              Connect with Browser Extension
+            <button
+              @click="connectNostr"
+              :disabled="isConnecting"
+              class="btn-primary text-lg px-8 py-3 transition-all"
+              :class="{'opacity-50 cursor-not-allowed': isConnecting}"
+            >
+              <span v-if="isConnecting">🔄 Signing in...</span>
+              <span v-else>Connect with Browser Extension</span>
             </button>
           </div>
 
@@ -710,6 +719,7 @@ export default {
       forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
       showCompetitionBanner: true, // [TEMPORARY - October 2025] Show competition banner
+      isConnecting: false, // Track connection state for visual feedback
       zapModal: {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
@@ -894,37 +904,38 @@ export default {
     },
     async connectNostr() {
       try {
+        this.isConnecting = true;
         console.log(`🚀 Starting Nostr connection with ${this.loginSigningMethod}...`);
-        
+
         // Only set the signing method if it's different to avoid resetting NDK
         if (nostrService.getSigningMethod() !== this.loginSigningMethod) {
           nostrService.setSigningMethod(this.loginSigningMethod);
         }
-        
+
         if (this.loginSigningMethod === 'nip07') {
           // Use NIP-07 connection flow
           const connectionResult = await nostrService.connectExtension();
           console.log('✅ Extension connected successfully:', connectionResult);
-          
+
           this.isConnected = true;
           this.userProfile = nostrService.userProfile;
-          
+
           // Initialize other services (NDK is already initialized by connectExtension)
           backupService.init();
           await immunityService.init();
-          
+
           console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
-          
+
         } else if (this.loginSigningMethod === 'nip46') {
           // For NIP-46, show the setup modal
           console.log('📱 Opening NIP-46 setup modal...');
           this.showNip46Setup = true;
           return; // Don't mark as connected yet
         }
-        
+
       } catch (error) {
         console.error('❌ Failed to connect to Nostr:', error);
-        
+
         // Provide more specific error messages for different scenarios
         let userMessage = error.message;
         if (error.message.includes('timeout')) {
@@ -934,8 +945,10 @@ export default {
         } else if (error.message.includes('No Nostr extension found')) {
           userMessage = 'No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension, then refresh the page.';
         }
-        
+
         alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
+      } finally {
+        this.isConnecting = false;
       }
     },
     

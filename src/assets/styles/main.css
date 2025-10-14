@@ -28,6 +28,13 @@
   .btn-scout {
     @apply btn bg-yellow-400 text-gray-900 hover:bg-yellow-300;
   }
+  .btn-hunt {
+    @apply btn bg-zombie-green text-zombie-dark hover:bg-green-400 font-bold text-lg px-6 py-3 shadow-lg;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .btn-hunt-large {
+    @apply btn-hunt text-xl px-8 py-4;
+  }
   .card {
     @apply bg-zombie-dark p-6 rounded-lg shadow-lg border border-gray-700;
   }
@@ -56,5 +63,30 @@
     -webkit-hyphens: auto;
     -moz-hyphens: auto;
     hyphens: auto;
+  }
+}
+
+/* Hunt Button Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5), 0 0 10px rgba(16, 185, 129, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.8), 0 0 20px rgba(16, 185, 129, 0.5);
+    transform: scale(1.02);
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .btn-hunt {
+    animation: none;
+  }
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+      transform: scale(1);
+    }
   }
 }

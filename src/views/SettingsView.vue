@@ -41,15 +41,29 @@
               </div>
             </div>
             
+            <!-- Hunt Zombies Quick Access -->
+            <div class="mt-4 p-4 bg-gradient-to-br from-zombie-dark/50 to-gray-800/50 border border-zombie-green/30 rounded-lg">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl">🧟</span>
+                <span class="font-semibold text-zombie-green">Ready to clean up your follows?</span>
+              </div>
+              <button
+                @click="goToZombieHunting"
+                class="btn-hunt w-full text-base py-2"
+              >
+                🎯 Hunt Zombies
+              </button>
+            </div>
+
             <!-- Logout Button -->
-            <button 
-              @click="logout" 
-              class="btn-danger w-full"
+            <button
+              @click="logout"
+              class="btn-danger w-full mt-4"
             >
               Logout
             </button>
           </div>
-          
+
           <!-- Not Connected State -->
           <div v-else class="p-4 bg-gray-800 border border-gray-600 rounded-lg text-center">
             <div class="text-gray-400 mb-2">Not connected</div>
@@ -591,6 +605,13 @@ export default {
     }
   },
   methods: {
+    goToZombieHunting() {
+      this.$emit('navigate', 'hunting');
+      // If the parent App doesn't handle navigate event, use router or direct method
+      if (this.$parent && this.$parent.setActiveView) {
+        this.$parent.setActiveView('hunting');
+      }
+    },
 
     updateConnectionStatus() {
       // Get the current signing method from nostrService (source of truth)

@@ -1,7 +1,28 @@
 <template>
   <div>
     <h2 class="text-2xl mb-6">Backups & Restoration</h2>
-    
+
+    <!-- Hunt Zombies CTA - Persistent at top after backup -->
+    <div v-if="showHuntCTA" class="mb-6 bg-gradient-to-r from-green-900/30 via-zombie-dark to-green-900/30 p-6 rounded-lg border-2 border-zombie-green shadow-2xl">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="text-center md:text-left">
+          <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
+            <span class="text-3xl">✅</span>
+            <h3 class="text-xl md:text-2xl font-bold text-green-400">Backup Created!</h3>
+          </div>
+          <p class="text-gray-300 text-sm md:text-base">
+            Now that your follows are protected, it's time to start hunting zombies!
+          </p>
+        </div>
+        <button
+          @click="goToZombieHunting"
+          class="btn-hunt whitespace-nowrap"
+        >
+          🎯 Hunt Zombies Safely
+        </button>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
       <!-- Backup Controls with Information -->
       <BackupControls 
@@ -101,10 +122,18 @@ export default {
   },
   data() {
     return {
-      relayCopied: false
+      relayCopied: false,
+      showHuntCTA: false
     };
   },
   methods: {
+    goToZombieHunting() {
+      this.$emit('navigate', 'hunting');
+      // If the parent App doesn't handle navigate event, use router or direct method
+      if (this.$parent && this.$parent.setActiveView) {
+        this.$parent.setActiveView('hunting');
+      }
+    },
     async copyRelay() {
       try {
         await navigator.clipboard.writeText('wss://hist.nostr.land');
@@ -121,6 +150,9 @@ export default {
       if (this.$refs.backupHistory) {
         this.$refs.backupHistory.loadBackups(true);
       }
+
+      // Show Hunt CTA after successful backup (persists until user navigates away)
+      this.showHuntCTA = true;
     },
     handleBackupImported(result) {
       console.log('📢 BackupsView received backup-imported event:', result);

@@ -31,13 +31,32 @@
               <button @click="refreshFollowList" class="btn-primary w-full">
                 Refresh Follow List
               </button>
-              
+
               <button @click="createBackup" class="btn-secondary w-full">
                 Create Backup
               </button>
             </div>
           </div>
-          
+
+        </div>
+
+        <!-- Hunt Zombies CTA -->
+        <div v-if="followList.length > 50" class="card bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-zombie-green/40">
+          <div class="text-center">
+            <div class="text-5xl mb-3">🧟‍♂️</div>
+            <h3 class="text-xl font-bold text-zombie-green mb-2">
+              Got {{ followList.length }} Follows?
+            </h3>
+            <p class="text-gray-300 text-sm mb-4">
+              Time to hunt for zombies and clean up your feed!
+            </p>
+            <button
+              @click="goToZombieHunting"
+              class="btn-hunt w-full"
+            >
+              🎯 Scan for Zombies
+            </button>
+          </div>
         </div>
       </div>
       
@@ -564,6 +583,13 @@ export default {
     goToPage(page) {
       if (page >= 1 && page <= this.totalPages) {
         this.currentPage = page;
+      }
+    },
+    goToZombieHunting() {
+      this.$emit('navigate', 'hunting');
+      // If the parent App doesn't handle navigate event, use router or direct method
+      if (this.$parent && this.$parent.setActiveView) {
+        this.$parent.setActiveView('hunting');
       }
     },
     handleAvatarError(event) {
