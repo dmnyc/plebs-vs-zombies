@@ -44,3 +44,7 @@ screenshots/
 zombie-investigation.js
 zombie-comparison-analysis.md
 dev-notes.md
+
+# Claude Code files
+CLAUDE.md
+.claude/
