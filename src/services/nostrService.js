@@ -54,19 +54,35 @@ class NostrService {
       });
       
       console.log('🔗 Connecting to NDK...');
-      
-      // Start connection but don't wait for all relays - NDK will connect in background
+
+      // Start connection
       this.ndk.connect().catch(error => {
         console.warn('⚠️ NDK connection error (non-blocking):', error.message);
       });
-      
-      // Give it a brief moment to establish initial connections
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const connectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+
+      // Wait for at least one relay to connect (with timeout)
+      const maxWaitTime = 5000; // 5 seconds max
+      const checkInterval = 100; // Check every 100ms
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxWaitTime) {
+        const connectedRelays = Array.from(this.ndk?.pool?.relays?.values() || [])
+          .filter(r => r.connectivity.status === 1);
+
+        if (connectedRelays.length > 0) {
+          console.log(`✅ NDK initialized with ${connectedRelays.length} connected relay(s) (more may connect in background)`);
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+      }
+
+      const finalConnected = Array.from(this.ndk?.pool?.relays?.values() || [])
         .filter(r => r.connectivity.status === 1).length;
-      
-      console.log(`✅ NDK initialized with ${connectedRelays} connected relays (more may connect in background)`);
+
+      if (finalConnected === 0) {
+        console.warn('⚠️ No relays connected after 5s, but continuing anyway');
+      }
     }
     return this.ndk;
   }
