@@ -10,7 +10,7 @@ class ProfileSearchService {
     this.profileCache = new Map(); // Cache profiles by pubkey
     this.searchCache = new Map(); // Cache search results
     this.maxCacheSize = 100;
-    this.searchDebounceMs = 300;
+    this.searchDebounceMs = 400; // Balanced debounce for responsive UX
     this.searchTimeoutId = null;
   }
 
@@ -94,12 +94,14 @@ class ProfileSearchService {
   }
 
   /**
-   * Search for profiles by name or display_name using NIP-50 search
+   * Search for profiles by name or display_name
+   * Uses client-side filtering of recent profile metadata events
    * @param {string} query - Search query
    * @param {number} limit - Maximum results to return
+   * @param {Function} onResult - Optional callback for progressive results (result) => void
    * @returns {Promise<Array>} - Array of matching profiles
    */
-  async searchProfiles(query, limit = 10) {
+  async searchProfiles(query, limit = 10, onResult = null) {
     if (!query || query.length < 2) {
       return [];
     }
@@ -112,57 +114,110 @@ class ProfileSearchService {
     }
 
     try {
-      // Use NDK with NIP-50 search capability
-      const ndk = nostrService.ndk;
+      // Ensure NDK is initialized (works without signer for public data)
+      let ndk = nostrService.ndk;
 
       if (!ndk) {
-        console.warn('NDK not initialized');
-        return [];
-      }
+        console.log('🔧 NDK not initialized, initializing for profile search...');
+        await nostrService.initialize();
+        ndk = nostrService.ndk;
 
-      // NIP-50: Use search field for text search
-      // This queries relays that support NIP-50 (relay.nostr.band does)
-      const filter = {
-        kinds: [0],
-        search: query,
-        limit: limit
-      };
-
-      console.log('Searching profiles with NIP-50:', filter);
-
-      const events = await ndk.fetchEvents(filter, {
-        closeOnEose: true,
-        groupable: false
-      });
-
-      const profiles = [];
-      const seenPubkeys = new Set();
-
-      for (const event of events) {
-        if (seenPubkeys.has(event.pubkey)) continue;
-
-        try {
-          const content = JSON.parse(event.content);
-
-          const profile = {
-            pubkey: event.pubkey,
-            name: content.name,
-            display_name: content.display_name,
-            picture: content.picture,
-            nip05: content.nip05,
-            about: content.about,
-            npub: nip19.npubEncode(event.pubkey)
-          };
-
-          profiles.push(profile);
-          seenPubkeys.add(event.pubkey);
-          this.cacheProfile(event.pubkey, profile);
-
-          if (profiles.length >= limit) break;
-        } catch (parseError) {
-          console.debug('Failed to parse profile event:', parseError);
+        if (!ndk) {
+          console.warn('❌ Failed to initialize NDK');
+          return [];
         }
       }
+
+      console.log(`Searching profiles for "${query}"...`);
+
+      // Fetch recent profile metadata events (kind 0)
+      // Use subscription approach with generous limit for comprehensive results
+      const fetchLimit = 2000; // Fetch more events for better coverage
+      const resultsLimit = limit;
+
+      const filter = {
+        kinds: [0],
+        limit: fetchLimit
+      };
+
+      console.log('🔍 Fetching events from relays...');
+
+      // Use subscription that filters and emits results progressively
+      const profiles = [];
+      const seenPubkeys = new Set();
+      const queryLower = query.toLowerCase();
+      let eventCount = 0;
+
+      await new Promise((resolve, reject) => {
+        // Longer timeout since we're fetching more events
+        const timeout = setTimeout(() => {
+          console.log(`⏱️ Timeout reached after ${eventCount} events, found ${profiles.length} matches`);
+          resolve();
+        }, 12000); // 12 second timeout for larger fetch
+
+        const subscription = ndk.subscribe(filter, { closeOnEose: true });
+
+        subscription.on('event', (event) => {
+          eventCount++;
+
+          // Filter and emit results progressively as events arrive
+          if (!seenPubkeys.has(event.pubkey) && profiles.length < resultsLimit) {
+            try {
+              const content = JSON.parse(event.content);
+              const name = (content.name || '').toLowerCase();
+              const displayName = (content.display_name || '').toLowerCase();
+              const nip05 = (content.nip05 || '').toLowerCase();
+
+              // Check if query matches name, display_name, or nip05
+              if (name.includes(queryLower) ||
+                  displayName.includes(queryLower) ||
+                  nip05.includes(queryLower)) {
+
+                const profile = {
+                  pubkey: event.pubkey,
+                  name: content.name,
+                  display_name: content.display_name,
+                  picture: content.picture,
+                  nip05: content.nip05,
+                  about: content.about,
+                  npub: nip19.npubEncode(event.pubkey)
+                };
+
+                profiles.push(profile);
+                seenPubkeys.add(event.pubkey);
+                this.cacheProfile(event.pubkey, profile);
+
+                // Emit result progressively if callback provided
+                if (onResult) {
+                  onResult(profile);
+                }
+
+                // Stop subscription early if we have enough results
+                if (profiles.length >= resultsLimit) {
+                  subscription.stop();
+                  clearTimeout(timeout);
+                  console.log(`✅ Found ${profiles.length} matches, stopping search early`);
+                  resolve();
+                }
+              }
+            } catch (parseError) {
+              console.debug('Failed to parse profile event:', parseError);
+            }
+          }
+        });
+
+        subscription.on('eose', () => {
+          clearTimeout(timeout);
+          console.log(`📥 EOSE reached after ${eventCount} events, found ${profiles.length} matches`);
+          resolve();
+        });
+
+        subscription.on('close', () => {
+          clearTimeout(timeout);
+          console.log(`🔒 Subscription closed after ${eventCount} events`);
+          resolve();
+        });
+      });
 
       console.log(`Found ${profiles.length} profiles matching "${query}"`);
 
@@ -170,7 +225,11 @@ class ProfileSearchService {
       this.cacheSearchResults(cacheKey, profiles);
       return profiles;
     } catch (error) {
-      console.error('Profile search failed:', error);
+      if (error.message === 'Search timeout') {
+        console.warn('Profile search timed out, returning empty results');
+      } else {
+        console.error('Profile search failed:', error);
+      }
       return [];
     }
   }
@@ -179,9 +238,10 @@ class ProfileSearchService {
    * Debounced profile search
    * @param {string} query - Search query
    * @param {number} limit - Maximum results
+   * @param {Function} onResult - Optional callback for progressive results
    * @returns {Promise<Array>} - Array of profiles
    */
-  debouncedSearch(query, limit = 10) {
+  debouncedSearch(query, limit = 10, onResult = null) {
     return new Promise((resolve) => {
       // Clear existing timeout
       if (this.searchTimeoutId) {
@@ -190,7 +250,7 @@ class ProfileSearchService {
 
       // Set new timeout
       this.searchTimeoutId = setTimeout(async () => {
-        const results = await this.searchProfiles(query, limit);
+        const results = await this.searchProfiles(query, limit, onResult);
         resolve(results);
       }, this.searchDebounceMs);
     });

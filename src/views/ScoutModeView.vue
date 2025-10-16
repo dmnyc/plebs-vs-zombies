@@ -65,32 +65,28 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">
-              Enter npub to scout:
+              Search for a user to scout:
             </label>
-            <input
-              v-model="newScoutNpub"
-              type="text"
-              placeholder="npub1..."
-              class="input w-full text-center"
-              :class="{'border-red-500': newScoutError, 'border-green-500': newScoutValid}"
+            <ProfileSearchInput
+              ref="scoutInput"
+              placeholder="Search by username or paste npub/nprofile..."
+              :auto-focus="true"
+              @profile-selected="handleProfileSelected"
             />
-            <div v-if="newScoutError" class="text-red-400 text-xs mt-1">
-              {{ newScoutError }}
-            </div>
           </div>
-          
+
           <div class="flex gap-2">
-            <button 
-              @click="showNewUserModal = false" 
+            <button
+              @click="showNewUserModal = false"
               class="btn-secondary flex-1"
             >
               Cancel
             </button>
-            <button 
-              @click="scoutNewUser" 
-              :disabled="!newScoutValid || processingNewUser"
+            <button
+              @click="scoutNewUser"
+              :disabled="!selectedProfile || processingNewUser"
               class="btn-scout flex-1"
-              :class="{'opacity-50 cursor-not-allowed': !newScoutValid || processingNewUser}"
+              :class="{'opacity-50 cursor-not-allowed': !selectedProfile || processingNewUser}"
             >
               <span v-if="processingNewUser">⏳ Processing...</span>
               <span v-else>Start Scouting</span>
@@ -628,10 +624,14 @@
 <script>
 import scoutService from '../services/scoutService';
 import nostrService from '../services/nostrService';
+import ProfileSearchInput from '../components/ProfileSearchInput.vue';
 import { nip19 } from 'nostr-tools';
 
 export default {
   name: 'ScoutModeView',
+  components: {
+    ProfileSearchInput
+  },
   props: {
     scoutTarget: {
       type: Object,
@@ -654,8 +654,7 @@ export default {
         stage: 'initializing'
       },
       showNewUserModal: false,
-      newScoutNpub: '',
-      newScoutError: '',
+      selectedProfile: null,
       processingNewUser: false,
       copied: false,
       posting: false,
@@ -682,26 +681,6 @@ export default {
     targetUsername() {
       // Return just the username (name or display_name) without falling back to npub
       return this.scoutTarget.name || this.scoutTarget.display_name;
-    },
-    newScoutValid() {
-      if (!this.newScoutNpub.trim()) {
-        this.newScoutError = '';
-        return false;
-      }
-      
-      try {
-        if (!this.newScoutNpub.startsWith('npub1') || this.newScoutNpub.length !== 63) {
-          this.newScoutError = 'Invalid npub format';
-          return false;
-        }
-        
-        nip19.decode(this.newScoutNpub.trim());
-        this.newScoutError = '';
-        return true;
-      } catch (error) {
-        this.newScoutError = 'Invalid npub format';
-        return false;
-      }
     },
     shareMessage() {
       if (!this.scoutResults) return '';
@@ -830,14 +809,25 @@ https://plebsvszombies.cc`;
       this.scoutResults = null;
       console.log('🛑 Scout scan stopped by user');
     },
+    handleProfileSelected(profile) {
+      console.log('📝 Profile selected in ScoutModeView:', profile);
+      this.selectedProfile = profile;
+    },
     showScoutNewUser() {
       this.showPostModal = false;
       this.showNewUserModal = true;
-      this.newScoutNpub = '';
-      this.newScoutError = '';
+      this.selectedProfile = null;
+
+      // Clear the input when modal opens
+      this.$nextTick(() => {
+        this.$refs.scoutInput?.clear();
+      });
     },
     async scoutNewUser() {
-      if (!this.newScoutValid) return;
+      if (!this.selectedProfile) {
+        console.log('❌ No profile selected, returning');
+        return;
+      }
 
       // Prevent multiple simultaneous calls
       if (this.processingNewUser) {
@@ -873,30 +863,20 @@ https://plebsvszombies.cc`;
         console.log('🔄 Resetting scout service...');
         await Promise.race([
           scoutService.reset(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Reset timeout')), 3000)
           )
         ]);
-        
-        const decoded = nip19.decode(this.newScoutNpub.trim());
-        
-        // Fetch user profile with timeout
-        console.log('👤 Fetching user profile...');
-        const profile = await Promise.race([
-          scoutService.fetchUserProfile(decoded.data),
-          new Promise((resolve) => 
-            setTimeout(() => resolve(null), 8000)
-          )
-        ]);
-        
+
+        // Use the profile data from ProfileSearchInput
         const newTarget = {
-          npub: this.newScoutNpub.trim(),
-          pubkey: decoded.data,
-          name: profile?.name,
-          display_name: profile?.display_name,
-          picture: profile?.picture
+          npub: this.selectedProfile.npub,
+          pubkey: this.selectedProfile.pubkey,
+          name: this.selectedProfile.name,
+          display_name: this.selectedProfile.display_name,
+          picture: this.selectedProfile.picture
         };
-        
+
         console.log('🔄 Switching scout target from', this.scoutTarget.pubkey.substring(0, 8), 'to', newTarget.pubkey.substring(0, 8));
         
         // Update the target and close modal
@@ -925,9 +905,10 @@ https://plebsvszombies.cc`;
         
       } catch (error) {
         console.error('❌ Failed to scout new user:', error);
-        this.newScoutError = error.message.includes('timeout') ? 
-          'Operation timed out, please try again' : 
-          'Failed to process npub';
+        const errorMessage = error.message.includes('timeout') ?
+          'Operation timed out, please try again' :
+          'Failed to process profile';
+        alert(errorMessage);
       } finally {
         this.processingNewUser = false;
       }

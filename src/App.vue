@@ -429,30 +429,21 @@
 
             <div class="space-y-4">
               <div>
-                <label for="scout-npub" class="block text-sm font-medium text-gray-300 mb-2">
-                  Enter an npub to scout:
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Search for a user to scout:
                 </label>
-                <input
-                  id="scout-npub"
-                  v-model="scoutNpub"
-                  type="text"
-                  placeholder="npub1..."
-                  class="input w-full text-center"
-                  :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
+                <ProfileSearchInput
+                  ref="loginScoutInput"
+                  placeholder="Search by username or paste npub/nprofile..."
+                  @profile-selected="handleLoginScoutProfileSelected"
                 />
-                <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
-                  {{ scoutNpubError }}
-                </div>
-                <div v-if="scoutNpubValid" class="text-green-400 text-xs mt-1">
-                  ✅ Valid npub format
-                </div>
               </div>
 
               <button
                 @click="startScoutMode"
-                :disabled="!scoutNpubValid || scoutModeLoading"
+                :disabled="!selectedScoutProfile || scoutModeLoading"
                 class="btn-secondary w-full flex items-center justify-center gap-2"
-                :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid || scoutModeLoading}"
+                :class="{'opacity-50 cursor-not-allowed': !selectedScoutProfile || scoutModeLoading}"
               >
                 <span v-if="scoutModeLoading">🔍</span>
                 <span v-else>🏹</span>
@@ -641,34 +632,28 @@
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">
-            Enter npub to scout:
+            Search for a user to scout:
           </label>
-          <input
-            v-model="scoutNpub"
-            type="text"
-            placeholder="npub1..."
-            class="input w-full text-center"
-            :class="{'border-red-500': scoutNpubError, 'border-green-500': scoutNpubValid}"
-            @keyup.enter="startScoutFromModal"
-            autofocus
+          <ProfileSearchInput
+            ref="modalScoutInput"
+            placeholder="Search by username or paste npub/nprofile..."
+            :auto-focus="true"
+            @profile-selected="handleModalScoutProfileSelected"
           />
-          <div v-if="scoutNpubError" class="text-red-400 text-xs mt-1">
-            {{ scoutNpubError }}
-          </div>
         </div>
-        
+
         <div class="flex gap-2">
-          <button 
-            @click="closeScoutModal" 
+          <button
+            @click="closeScoutModal"
             class="btn-secondary flex-1"
           >
             Cancel
           </button>
-          <button 
-            @click="startScoutFromModal" 
-            :disabled="!scoutNpubValid"
+          <button
+            @click="startScoutFromModal"
+            :disabled="!selectedScoutProfile"
             class="btn-scout flex-1"
-            :class="{'opacity-50 cursor-not-allowed': !scoutNpubValid}"
+            :class="{'opacity-50 cursor-not-allowed': !selectedScoutProfile}"
           >
             Start Scouting
           </button>
@@ -689,6 +674,7 @@ import ScoutModeView from './views/ScoutModeView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
+import ProfileSearchInput from './components/ProfileSearchInput.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -706,7 +692,8 @@ export default {
     ScoutModeView,
     CopyButton,
     Nip46Connection,
-    ClientAuthorizationModal
+    ClientAuthorizationModal,
+    ProfileSearchInput
   },
   data() {
     return {
@@ -745,43 +732,15 @@ export default {
       },
       // Scout Mode state
       isScoutMode: false,
-      scoutNpub: '',
-      scoutNpubError: '',
       scoutModeLoading: false,
       scoutTarget: null,
-      showScoutModal: false
+      showScoutModal: false,
+      selectedScoutProfile: null // Stores selected profile from ProfileSearchInput
     }
   },
   computed: {
     currentView() {
       return this.views[this.activeView];
-    },
-    scoutNpubValid() {
-      if (!this.scoutNpub.trim()) {
-        this.scoutNpubError = '';
-        return false;
-      }
-      
-      try {
-        // Validate npub format
-        if (!this.scoutNpub.startsWith('npub1')) {
-          this.scoutNpubError = 'Must start with "npub1"';
-          return false;
-        }
-        
-        if (this.scoutNpub.length !== 63) {
-          this.scoutNpubError = 'Invalid npub length';
-          return false;
-        }
-        
-        // Try to decode the npub
-        nip19.decode(this.scoutNpub.trim());
-        this.scoutNpubError = '';
-        return true;
-      } catch (error) {
-        this.scoutNpubError = 'Invalid npub format';
-        return false;
-      }
     }
   },
   methods: {
@@ -796,94 +755,91 @@ export default {
         }
       }
     },
+    handleLoginScoutProfileSelected(profile) {
+      console.log('📝 Login scout profile selected:', profile);
+      this.selectedScoutProfile = profile;
+    },
+    handleModalScoutProfileSelected(profile) {
+      console.log('📝 Modal scout profile selected:', profile);
+      this.selectedScoutProfile = profile;
+    },
     showScoutModeMenu() {
       // For signed-in users, show Scout Mode modal
       this.showScoutModal = true;
-      this.scoutNpub = '';
-      this.scoutNpubError = '';
+      this.selectedScoutProfile = null;
+
+      // Clear the input when modal opens
+      this.$nextTick(() => {
+        this.$refs.modalScoutInput?.clear();
+      });
     },
     closeScoutModal() {
       this.showScoutModal = false;
-      this.scoutNpub = '';
-      this.scoutNpubError = '';
+      this.selectedScoutProfile = null;
+
+      // Clear the input
+      this.$refs.modalScoutInput?.clear();
     },
     async startScoutFromModal() {
-      if (this.scoutNpubValid) {
-        this.showScoutModal = false;
+      if (!this.selectedScoutProfile) {
+        console.log('❌ No profile selected, returning');
+        return;
+      }
 
-        // If already in Scout Mode, force a complete reset by exiting and re-entering
-        if (this.isScoutMode) {
-          console.log('🔄 Already in Scout Mode, doing complete reset...');
+      this.showScoutModal = false;
 
-          // Force shutdown and reset scout service
-          await scoutService.forceShutdown();
-          await scoutService.reset();
+      // If already in Scout Mode, force a complete reset by exiting and re-entering
+      if (this.isScoutMode) {
+        console.log('🔄 Already in Scout Mode, doing complete reset...');
 
-          // Temporarily exit scout mode to force component remount
-          this.isScoutMode = false;
-          this.scoutTarget = null;
+        // Force shutdown and reset scout service
+        await scoutService.forceShutdown();
+        await scoutService.reset();
 
-          // Wait for Vue to process the state change
-          await this.$nextTick();
+        // Temporarily exit scout mode to force component remount
+        this.isScoutMode = false;
+        this.scoutTarget = null;
 
-          // Now start scout mode with new target
-          await this.startScoutMode();
-        } else {
-          // Not in Scout Mode yet, start normally
-          await this.startScoutMode();
-        }
+        // Wait for Vue to process the state change
+        await this.$nextTick();
+
+        // Now start scout mode with new target
+        await this.startScoutMode();
+      } else {
+        // Not in Scout Mode yet, start normally
+        await this.startScoutMode();
       }
     },
     async startScoutMode() {
       console.log('🔍 Start Scout Mode clicked!');
-      console.log('Scout npub valid:', this.scoutNpubValid);
-      console.log('Scout npub:', this.scoutNpub);
-      
-      if (!this.scoutNpubValid) {
-        console.log('❌ Npub not valid, returning');
+      console.log('Selected scout profile:', this.selectedScoutProfile);
+
+      if (!this.selectedScoutProfile) {
+        console.log('❌ No profile selected, returning');
         return;
       }
-      
+
       this.scoutModeLoading = true;
-      
+
       try {
-        // Decode the npub to get the pubkey
-        const decoded = nip19.decode(this.scoutNpub.trim());
-        const targetPubkey = decoded.data;
-        
-        console.log('✅ Decoded pubkey:', targetPubkey);
-        
-        // Fetch user profile to get name/display_name
-        try {
-          const profileData = await nostrService.getProfileMetadata([targetPubkey]);
-          const profile = profileData.get(targetPubkey);
-          
-          // Store scout target info with profile data
-          this.scoutTarget = {
-            npub: this.scoutNpub.trim(),
-            pubkey: targetPubkey,
-            name: profile?.name,
-            display_name: profile?.display_name,
-            picture: profile?.picture
-          };
-        } catch (error) {
-          console.warn('Could not fetch profile data:', error);
-          // Fallback without profile data
-          this.scoutTarget = {
-            npub: this.scoutNpub.trim(),
-            pubkey: targetPubkey
-          };
-        }
-        
+        // Use the profile data from ProfileSearchInput
+        this.scoutTarget = {
+          npub: this.selectedScoutProfile.npub,
+          pubkey: this.selectedScoutProfile.pubkey,
+          name: this.selectedScoutProfile.name,
+          display_name: this.selectedScoutProfile.display_name,
+          picture: this.selectedScoutProfile.picture
+        };
+
         // Switch to scout mode
         this.isScoutMode = true;
-        
+
         console.log('🔍 Starting Scout Mode for:', this.scoutTarget);
         console.log('isScoutMode:', this.isScoutMode);
-        
+
       } catch (error) {
         console.error('Failed to start Scout Mode:', error);
-        this.scoutNpubError = 'Failed to process npub';
+        alert('Failed to start Scout Mode. Please try again.');
       } finally {
         this.scoutModeLoading = false;
       }
@@ -891,11 +847,15 @@ export default {
     async exitScoutMode() {
       // Force shutdown all scout activity and connections
       await scoutService.forceShutdown();
-      
+
       this.isScoutMode = false;
       this.scoutTarget = null;
-      this.scoutNpub = '';
-      this.scoutNpubError = '';
+      this.selectedScoutProfile = null;
+
+      // Clear the inputs
+      this.$refs.loginScoutInput?.clear();
+      this.$refs.modalScoutInput?.clear();
+
       this.activeView = 'dashboard';
     },
     updateScoutTarget(newTarget) {

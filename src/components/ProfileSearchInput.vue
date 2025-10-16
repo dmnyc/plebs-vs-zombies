@@ -186,12 +186,21 @@ export default {
           this.showDropdown = false;
         }
       } else if (value.length >= 2) {
-        // Username search
+        // Username search with progressive results
         this.searching = true;
         this.showDropdown = true;
+        this.suggestions = []; // Clear previous results
 
         try {
-          const results = await profileSearchService.debouncedSearch(value, 10);
+          // Progressive callback to show results as they arrive
+          const onResult = (profile) => {
+            // Add profile to suggestions as soon as it's found
+            this.suggestions.push(profile);
+          };
+
+          const results = await profileSearchService.debouncedSearch(value, 15, onResult);
+
+          // Update with final results (in case any were added after callback)
           this.suggestions = results;
 
           if (results.length === 0) {
