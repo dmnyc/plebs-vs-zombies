@@ -15,12 +15,13 @@ import { nip19 } from 'nostr-tools';
 // LEADERBOARD DATA - Update this with your participants (supports up to 50)
 const participants = [
     { npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", zombiesKilled: 1772, processedEventIds: ["6f73ab007fc0611e5fd423544d57d3cc9bf0c5d0a7671cf8c530197dc689a660","83905efec74001b0847303d762933c45fdc6a2d0a9ee253905ebb2ee84871fd5"] },
-    { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466, processedEventIds: [] },
+    { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466, processedEventIds: [], manualProfile: { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", picture: "https://primaldata.s3.us-east-005.backblazeb2.com/cache/1/3a/7f/13a7f1a0f7b6e0f68410a43aafa0a5322152698017284fb845a546c01548cf7d.gif" } },
     { npub: "npub1faaxjg39cmycqfmgghz8tsat0qvnnnkmaaf6fvpx8lxr63qgtu2s5j7tj3", zombiesKilled: 1429, processedEventIds: ["a9912068576943c1c1789b46ab0cae20b33ef01d10fbc917647f15eb11024915"] },
     { npub: "npub1yejzp928cg48s3q857v8lnmmcqypmsrvmn9e3mruvx2nkntncm2qumhgha", zombiesKilled: 1281, processedEventIds: ["6c800b30903ba287b99ceb1d1e0aa1aada50a1cfc240ab0b290641bebdf1425f"] },
     { npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", zombiesKilled: 675, processedEventIds: [] },
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
     { npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", zombiesKilled: 439, processedEventIds: ["dc98599624fdb92b17b3d039970b0040c444749477183003d9cf0acae39148d8","957d2af72fb5b94ba31fb96f846e4884035175d43530a8f523d3f91b96c7a174"] },
+    { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: ["519ce8927efc40817b401406afa372d8d1adf9353f5cb6d9f257108a4d6cdb88"], manualProfile: { name: "₿33Zy ₿", handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg" } },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320, processedEventIds: [] },
     { npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", zombiesKilled: 298, processedEventIds: [] },
     { npub: "npub1qn4ylq6s79tz4gwkphq8q4sltwurs6s36xsq2u8aw3qd5ggwzufsw3s3yz", zombiesKilled: 272, processedEventIds: ["f3899a9bbbcd893c7e36734f94acbd209b2f9f47483118cdf045ffc0f9a70f71"] },
@@ -92,10 +93,19 @@ async function fetchProfiles() {
     });
 
     console.log('🔗 Connecting to relays...');
-    await ndk.connect();
+
+    // Start connection but don't wait for all relays - they connect in background
+    ndk.connect().catch(error => {
+        console.warn('⚠️ Some relays failed to connect (non-blocking):', error.message);
+    });
 
     // Give relays time to connect
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Check how many relays connected
+    const connectedRelays = Array.from(ndk?.pool?.relays?.values() || [])
+        .filter(r => r.connectivity?.status === 1);
+    console.log(`📡 Connected to ${connectedRelays.length}/${RELAYS.length} relays\n`);
 
     // Convert npubs to hex pubkeys
     const pubkeys = participants.map(p => {
@@ -110,13 +120,31 @@ async function fetchProfiles() {
 
     console.log(`📡 Fetching profiles for ${pubkeys.length} participants...\n`);
 
-    // Fetch profile events (kind 0)
-    const profileEvents = await ndk.fetchEvents({
-        kinds: [0],
-        authors: pubkeys
-    });
+    // Fetch profile events (kind 0) with timeout
+    const FETCH_TIMEOUT = 15000; // 15 seconds
+    let profileEvents;
 
-    console.log(`✅ Found ${profileEvents.size} profile events\n`);
+    try {
+        profileEvents = await Promise.race([
+            ndk.fetchEvents({
+                kinds: [0],
+                authors: pubkeys
+            }, {
+                closeOnEose: true
+            }),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Profile fetch timed out')), FETCH_TIMEOUT)
+            )
+        ]);
+        console.log(`✅ Found ${profileEvents.size} profile events\n`);
+    } catch (error) {
+        if (error.message.includes('timed out')) {
+            console.warn(`⚠️ Profile fetch timed out after ${FETCH_TIMEOUT/1000}s, continuing with partial results...\n`);
+            profileEvents = new Set(); // Empty set if timeout
+        } else {
+            throw error;
+        }
+    }
 
     // Build profile map
     const profileMap = new Map();
@@ -138,16 +166,30 @@ async function fetchProfiles() {
     const enrichedParticipants = participants.map(p => {
         const decoded = nip19.decode(p.npub);
         const pubkey = decoded.data;
-        const profile = profileMap.get(pubkey);
 
-        let name, handle;
+        // Use manual profile if specified, otherwise fetch from relays
+        let profile, name, handle, picture, manuallyFixed;
 
-        if (profile) {
-            name = profile.displayName || profile.name || truncateNpub(p.npub);
-            handle = profile.nip05 || p.npub;
+        if (p.manualProfile) {
+            // Use manually specified profile data
+            name = p.manualProfile.name;
+            handle = p.manualProfile.handle;
+            picture = p.manualProfile.picture;
+            manuallyFixed = true;
+            profile = true; // Mark as having profile
         } else {
-            name = truncateNpub(p.npub);
-            handle = p.npub;
+            // Use fetched profile
+            profile = profileMap.get(pubkey);
+
+            if (profile) {
+                name = profile.displayName || profile.name || truncateNpub(p.npub);
+                handle = profile.nip05 || p.npub;
+                picture = profile.picture || null;
+            } else {
+                name = truncateNpub(p.npub);
+                handle = p.npub;
+                picture = null;
+            }
         }
 
         return {
@@ -155,8 +197,9 @@ async function fetchProfiles() {
             handle,
             zombiesKilled: p.zombiesKilled,
             npub: p.npub,
-            picture: profile?.picture || null,
-            hasProfile: !!profile
+            picture,
+            hasProfile: !!profile,
+            ...(manuallyFixed && { manuallyFixed: true })
         };
     });
 
@@ -180,7 +223,8 @@ async function fetchProfiles() {
     enrichedParticipants.forEach((p, i) => {
         const comma = i < enrichedParticipants.length - 1 ? ',' : '';
         const picture = p.picture ? `"${p.picture}"` : 'null';
-        console.log(`    { name: "${p.name}", handle: "${p.handle}", npub: "${p.npub}", picture: ${picture}, zombiesKilled: ${p.zombiesKilled} }${comma}`);
+        const manuallyFixedFlag = p.manuallyFixed ? ', manuallyFixed: true' : '';
+        console.log(`    { name: "${p.name}", handle: "${p.handle}", npub: "${p.npub}", picture: ${picture}, zombiesKilled: ${p.zombiesKilled}${manuallyFixedFlag} }${comma}`);
     });
     console.log('];\n');
 

@@ -96,22 +96,57 @@ async function fetchEvent(eventId, relayHints = []) {
     });
 
     console.log(`🔗 Connecting to ${relaysToUse.length} relays...`);
-    await ndk.connect();
 
-    // Give relays time to connect
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Fetch the specific event
-    const event = await ndk.fetchEvent({
-        ids: [eventId]
+    // Start connection but don't wait for all relays - they connect in background
+    ndk.connect().catch(error => {
+        console.warn('⚠️ Some relays failed to connect (non-blocking):', error.message);
     });
 
-    if (!event) {
-        throw new Error('Event not found on any relay');
-    }
+    // Give relays a brief moment to establish initial connections
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    console.log('✅ Event found!\n');
-    return event;
+    // Check how many relays connected
+    const connectedRelays = Array.from(ndk?.pool?.relays?.values() || [])
+        .filter(r => r.connectivity?.status === 1);
+    console.log(`📡 Connected to ${connectedRelays.length}/${relaysToUse.length} relays`);
+
+    // Fetch the specific event with timeout
+    const FETCH_TIMEOUT = 10000; // 10 seconds
+
+    console.log(`⏳ Searching for event across relays (timeout: ${FETCH_TIMEOUT/1000}s)...`);
+
+    try {
+        const event = await Promise.race([
+            ndk.fetchEvent({
+                ids: [eventId]
+            }),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Event fetch timed out after 10 seconds')), FETCH_TIMEOUT)
+            )
+        ]);
+
+        if (!event) {
+            // Provide helpful error with suggestions
+            const suggestions = [
+                '\nPossible reasons:',
+                '  1. The event does not exist on any of the configured relays',
+                '  2. The note ID might be incorrect',
+                '  3. The event may have been deleted',
+                '  4. Try using a nevent (with relay hints) instead of note1',
+                '\nConfigured relays:',
+                ...relaysToUse.map(r => `  - ${r}`)
+            ];
+            throw new Error('Event not found on any relay.\n' + suggestions.join('\n'));
+        }
+
+        console.log('✅ Event found!\n');
+        return event;
+    } catch (error) {
+        if (error.message.includes('timed out')) {
+            throw new Error(`Event not found: fetch timed out after ${FETCH_TIMEOUT/1000}s.\n\nThe event may not exist on any of the configured relays.\nTry providing relay hints using a nevent instead of note1.`);
+        }
+        throw error;
+    }
 }
 
 /**
