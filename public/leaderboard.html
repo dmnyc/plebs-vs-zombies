@@ -559,6 +559,14 @@ See: /COMPETITION-OCTOBER-2025.md
     <script>
         // LEADERBOARD DATA - October 2025 Challenge Results (displays up to top 50)
         // Fetched from Nostr relays - profiles enriched with real names, NIP-05 identifiers, and profile pictures
+        //
+        // ⚠️ IMPORTANT: This array is automatically sorted by zombiesKilled (line 621)
+        // When updating scores:
+        // 1. Find the participant by npub (use Ctrl+F to search for their npub)
+        // 2. Update ONLY their zombiesKilled number
+        // 3. Do NOT manually reorder the array - the sort() on line 621 handles ordering
+        // 4. Do NOT delete entries unless the participant withdrew from the competition
+        //
         const participants = [
     { name: "Tico 🇨🇷", handle: "tico@primal.net", npub: "npub148ut8u4vr8xqd4gefhg6eyc5636p5zthw3zfse2njfkezegczers59ty0w", picture: "https://21millonesbtc.com/wp-content/uploads/2022/07/BITCOIN-BEACH-1024x682.jpg", zombiesKilled: 2935 },
     { name: "Worlds Gone Mad", handle: "WorldsGoneMad@NostrAddress.com", npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", picture: "https://m.primal.net/NcWJ.jpg", zombiesKilled: 1772 },
@@ -567,6 +575,7 @@ See: /COMPETITION-OCTOBER-2025.md
     { name: "Squirrelfriend", handle: "squirrelfriend@iris.to", npub: "npub1yejzp928cg48s3q857v8lnmmcqypmsrvmn9e3mruvx2nkntncm2qumhgha", picture: "https://nostr.build/i/nostr.build_9f466342f6e756077269624747db72d8cc256648de0629d1bd50c8f238b43dc5.jpg", zombiesKilled: 1281 },
     { name: "Dan Wedge", handle: "wedgesocial@nostrplebs.com", npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", picture: "https://image.nostr.build/85eb04d33e33c89e3d82cc788a897b9c315b92bccf11d717697e67bd5a27577b.jpg", zombiesKilled: 675 },
     { name: "IntuitiveGuy☯️", handle: "intuitiveguy@nostrplebs.com", npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", picture: "https://i.nostr.build/nb9628.gif", zombiesKilled: 645 },
+    { name: "oadissin", handle: "oadissin@rizful.com", npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", picture: "https://m.primal.net/Jabw.png", zombiesKilled: 452 },
     { name: "wip", handle: "bitpanter@hodl.ar", npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", picture: "https://m.primal.net/Hnce.webp", zombiesKilled: 439 },
     { name: "₿33Zy ₿", handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg", zombiesKilled: 384 },
     { name: "Antihumano", handle: "antihumano@hodl.ar", npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", picture: "https://image.nostr.build/b8826ca8d29051e33c322f37cde954a555618958591b0233c7386e701a143f7f.jpg", zombiesKilled: 320 },
@@ -582,7 +591,6 @@ See: /COMPETITION-OCTOBER-2025.md
     { name: "armstrys", handle: "armstrys@nostr.directory", npub: "npub1eq94yj8maree90pm53gfr76wdc44su3cwcqmly848xfrv6es6usqg4er58", picture: "https://profilepics.nostur.com/profilepic_v1/f68aed7375e6d0f7df85213c50610cfe7a2ad8613d873e52ceead7b8cff5c698/profilepic.jpg?1721488305", zombiesKilled: 135 },
     { name: "7fqx", handle: "7fqx@ditto.pub", npub: "npub1njst6azswskk5gp3ns8r6nr8nj0qg65acu8gaa2u9yz7yszjxs9s6k7fqx", picture: "https://image.nostr.build/c8cae713d2f3da367554badb3904fc4a88c15730250be4d657d690833dd17ff0.jpg", zombiesKilled: 132 },
     { name: "Shirley Baby", handle: "shirleybaby@NostrAddress.com", npub: "npub15m4qhqdrzsvu4u0v7992u657nqn56sw2l658a5f2zq7fk9klnd0srukzau", picture: "https://m.primal.net/PnOP.jpg", zombiesKilled: 126 },
-    { name: "oadissin", handle: "oadissin@rizful.com", npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", picture: "https://m.primal.net/Jabw.png", zombiesKilled: 126 },
     { name: "Hanshan", handle: "hanshan@nostrplebs.com", npub: "npub1lxzaxzge0jq9u9cecucctdt5lslwgp7hcxmp2l0wn8r2ecjenwasu6svxa", picture: "https://i.nostr.build/O7wQX0AuGaWED9Bg.webp", zombiesKilled: 104 },
     { name: "negr0", handle: "negr0@hodl.ar", npub: "npub1yrffsyxk5hujkpz6mcpwhwkujqmdwswvdp4sqs2ug26zxmly45hsfpn8p0", picture: "https://blossom.primal.net/33a0f59924e67dbbef84d81190bf70f6c38cdc1f6dc34472f0014c86e191feb9.jpg", zombiesKilled: 97 },
     { name: "SuiGenerisJohn", handle: "johnlaw@getalby.com", npub: "npub1v7k63c6y2vktlqhsuupywt3yc7ykursujc34at964f9cv9s9y9csjutfk0", picture: "https://blossom.primal.net/424448903c92794391ed44b2433bea14b1537cda4e70272c279ab8f0a4a2ddc2.jpg", zombiesKilled: 97 },
