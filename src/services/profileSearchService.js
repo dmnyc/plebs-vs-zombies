@@ -1,5 +1,6 @@
 import { nip19 } from 'nostr-tools';
 import nostrService from './nostrService';
+import primalCacheService from './primalCacheService';
 
 // DEPRECATED: This cache will be removed once Vertex API is integrated
 // Currently used as fallback when Primal cache is unavailable
@@ -9,9 +10,9 @@ import wellKnownProfilesData from '../data/wellKnownProfiles.json';
  * Service for searching and caching Nostr profiles
  *
  * Search Strategy (in order):
- * 1. Primal cache API (primary) - Fast, comprehensive search
+ * 1. Primal cache API (primary) - Fast, comprehensive search (~100-300ms)
  * 2. Well-known profiles cache (deprecated fallback) - Will be removed when Vertex is integrated
- * 3. Direct relay search (last resort) - Slow but works offline
+ * 3. Direct relay search (last resort) - Slow but works offline (5-15s)
  *
  * Supports npub, nprofile, and username search with autocomplete
  */
@@ -27,6 +28,10 @@ class ProfileSearchService {
     // These are popular Nostr accounts that might not appear in recent relay events
     // This will be replaced by Vertex API integration
     this.wellKnownProfiles = wellKnownProfilesData;
+
+    // Primal cache settings
+    this.usePrimalCache = true; // Enable/disable Primal cache
+    this.primalCacheTimeout = 3000; // 3 second timeout for Primal
   }
 
   /**
@@ -110,7 +115,12 @@ class ProfileSearchService {
 
   /**
    * Search for profiles by name or display_name
-   * Uses client-side filtering of recent profile metadata events
+   *
+   * Strategy:
+   * 1. Try Primal cache API (fast, comprehensive)
+   * 2. Fall back to well-known profiles cache (instant, limited)
+   * 3. Fall back to relay search (slow, comprehensive)
+   *
    * @param {string} query - Search query
    * @param {number} limit - Maximum results to return
    * @param {Function} onResult - Optional callback for progressive results (result) => void
@@ -129,6 +139,54 @@ class ProfileSearchService {
     }
 
     try {
+      // Strategy 1: Try Primal cache first (if enabled)
+      if (this.usePrimalCache) {
+        try {
+          console.log(`🔍 Searching Primal cache for "${query}"...`);
+          const primalResults = await Promise.race([
+            primalCacheService.searchUsers(query, limit),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Primal timeout')), this.primalCacheTimeout)
+            )
+          ]);
+
+          if (primalResults && primalResults.length > 0) {
+            console.log(`✅ Primal cache returned ${primalResults.length} results`);
+
+            // Parse profile events and add npub
+            const profiles = primalResults
+              .map(event => {
+                const profile = primalCacheService.parseProfileEvent(event);
+                if (profile) {
+                  // Filter out mostr.pub bridged profiles (Mastodon bridge)
+                  if (profile.nip05 && profile.nip05.includes('mostr.pub')) {
+                    return null;
+                  }
+
+                  profile.npub = nip19.npubEncode(profile.pubkey);
+                  // Cache the profile
+                  this.cacheProfile(profile.pubkey, profile);
+
+                  // Emit progressively if callback provided
+                  if (onResult) {
+                    onResult(profile);
+                  }
+                }
+                return profile;
+              })
+              .filter(p => p !== null);
+
+            // Cache and return results
+            this.cacheSearchResults(cacheKey, profiles);
+            return profiles;
+          }
+        } catch (primalError) {
+          console.warn('⚠️ Primal cache search failed, falling back:', primalError.message);
+          // Fall through to next strategy
+        }
+      }
+
+      // Strategy 2: Fall back to well-known profiles + relay search
       // Ensure NDK is initialized (works without signer for public data)
       let ndk = nostrService.ndk;
 
