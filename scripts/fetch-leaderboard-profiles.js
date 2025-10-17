@@ -14,14 +14,14 @@ import { nip19 } from 'nostr-tools';
 
 // LEADERBOARD DATA - Update this with your participants (supports up to 50)
 const participants = [
+    { npub: "npub148ut8u4vr8xqd4gefhg6eyc5636p5zthw3zfse2njfkezegczers59ty0w", zombiesKilled: 2935, processedEventIds: ["049e67e15340b6df7698e72f2e50d4c818a7484ed937154c054077d4fdbd9338"] },
     { npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", zombiesKilled: 1772, processedEventIds: ["6f73ab007fc0611e5fd423544d57d3cc9bf0c5d0a7671cf8c530197dc689a660","83905efec74001b0847303d762933c45fdc6a2d0a9ee253905ebb2ee84871fd5"] },
-    { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466, processedEventIds: [], manualProfile: { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", picture: "https://primaldata.s3.us-east-005.backblazeb2.com/cache/1/3a/7f/13a7f1a0f7b6e0f68410a43aafa0a5322152698017284fb845a546c01548cf7d.gif" } },
+    { npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", zombiesKilled: 1466, processedEventIds: ["85d7b66daacd38e40950968fa858fd8fca72a91e8b4726622aaaf5111df95a55"] },
     { npub: "npub1faaxjg39cmycqfmgghz8tsat0qvnnnkmaaf6fvpx8lxr63qgtu2s5j7tj3", zombiesKilled: 1429, processedEventIds: ["a9912068576943c1c1789b46ab0cae20b33ef01d10fbc917647f15eb11024915"] },
     { npub: "npub1yejzp928cg48s3q857v8lnmmcqypmsrvmn9e3mruvx2nkntncm2qumhgha", zombiesKilled: 1281, processedEventIds: ["6c800b30903ba287b99ceb1d1e0aa1aada50a1cfc240ab0b290641bebdf1425f"] },
     { npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", zombiesKilled: 675, processedEventIds: [] },
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
     { npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", zombiesKilled: 439, processedEventIds: ["dc98599624fdb92b17b3d039970b0040c444749477183003d9cf0acae39148d8","957d2af72fb5b94ba31fb96f846e4884035175d43530a8f523d3f91b96c7a174"] },
-    { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: ["519ce8927efc40817b401406afa372d8d1adf9353f5cb6d9f257108a4d6cdb88"], manualProfile: { name: "₿33Zy ₿", handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg" } },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320, processedEventIds: [] },
     { npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", zombiesKilled: 298, processedEventIds: [] },
     { npub: "npub1qn4ylq6s79tz4gwkphq8q4sltwurs6s36xsq2u8aw3qd5ggwzufsw3s3yz", zombiesKilled: 272, processedEventIds: ["f3899a9bbbcd893c7e36734f94acbd209b2f9f47483118cdf045ffc0f9a70f71"] },
@@ -67,7 +67,8 @@ const participants = [
     { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub14hz3xluls73nc8eyvy6fljm6tf8zt0xkxpgxngch36txfv24ycvs622r7l", zombiesKilled: 5, processedEventIds: [] },
     { npub: "npub1rsqajguwyds0zne9qqy33n55cd6dg68zrkwyj7y8l69me04yc79qf53rt4", zombiesKilled: 4, processedEventIds: [] },
-    { npub: "npub1m4ny6hjqzepn4rxknuq94c2gpqzr29ufkkw7ttcxyak7v43n6vvsajc2jl", zombiesKilled: 4, processedEventIds: [] }
+    { npub: "npub1m4ny6hjqzepn4rxknuq94c2gpqzr29ufkkw7ttcxyak7v43n6vvsajc2jl", zombiesKilled: 4, processedEventIds: [] },
+    { npub: "npub1eejrfpegp2j5quvjrx960c9a8k9avsvufsglj7ecw3xuz32cpygqc8fmhw", zombiesKilled: 1, processedEventIds: ["6683925f69581380a3676caf76e7abac408418371fac3d171c1f76c358ff39c5"] }
 ];
 
 // Nostr relays to query
