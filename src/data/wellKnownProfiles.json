@@ -1,0 +1,560 @@
+[
+  {
+    "npub": "npub1q3sle0kvfsehgsuexttt3ugjd8xdklxfwwkh559wxckmzddywnws6cd26p",
+    "names": [
+      "alex gleason",
+      "alex",
+      "gleason",
+      "soapbox"
+    ],
+    "note": "Soapbox, Ditto, Rebased developer"
+  },
+  {
+    "npub": "npub1xtscya34g58tk0z605fvr788k263gsu6cy9x0mhnm87echrgufzsevkk5s",
+    "names": [
+      "fiatjaf"
+    ],
+    "note": "Nostr protocol developer"
+  },
+  {
+    "npub": "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m",
+    "names": [
+      "jack",
+      "jack dorsey",
+      "dorsey"
+    ],
+    "note": "Twitter co-founder"
+  },
+  {
+    "npub": "npub1a2cww4kn9wqte4ry70vyfwqyqvpswksna27rtxd8vty6c74era8sdcw83a",
+    "names": [
+      "odell",
+      "matt odell",
+      "matt"
+    ],
+    "note": "Bitcoin advocate, podcaster"
+  },
+  {
+    "npub": "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6",
+    "names": [
+      "ben arc",
+      "ben",
+      "benarc"
+    ],
+    "note": "LNbits developer"
+  },
+  {
+    "npub": "npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z",
+    "names": [
+      "nvk",
+      "coinkite"
+    ],
+    "note": "Coinkite founder"
+  },
+  {
+    "npub": "npub1hu3hdctm5nkzd8gslnyedfr5ddz3z547jqcl5j88g4fame2jd08qh6h8nh",
+    "names": [
+      "rabble"
+    ],
+    "note": "Nos.social developer"
+  },
+  {
+    "npub": "npub1g53mukxnjkcmr94fhryzkqutdz2ukq4ks0gvy5af25rgmwsl4ngq43drvk",
+    "names": [
+      "carla",
+      "carla kirk-cohen"
+    ],
+    "note": "Lightning developer"
+  },
+  {
+    "npub": "npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx",
+    "names": [
+      "hodlonaut",
+      "hodl"
+    ],
+    "note": "Bitcoin cat meme legend"
+  },
+  {
+    "npub": "npub1dergggklka99wwrs92yz8wdjs952h2ux2ha2ed598ngwu9w7a6fsh9xzpc",
+    "names": [
+      "cameri"
+    ],
+    "note": "Relay developer"
+  },
+  {
+    "npub": "npub1l2vyh47mk2p0qlsku7hg0vn29faehy9hy34ygaclpn66ukqp3afqutajft",
+    "names": [
+      "mike dilger",
+      "mikedilger"
+    ],
+    "note": "Gossip client developer"
+  },
+  {
+    "npub": "npub1r0rs5q2gk0e3dk3nlc7gnu378ec6cnlenqp8a3cjhyzu6f8k5sgs4sq9ac",
+    "names": [
+      "miljan",
+      "miljan primal"
+    ],
+    "note": "Primal developer"
+  },
+  {
+    "npub": "npub1cj8znuztfqkvq89pl8hceph0svvvqk0qay6nydgk9uyq7fhpfsgsqwrz4u",
+    "names": [
+      "saylor",
+      "michael saylor",
+      "msaylor"
+    ],
+    "note": "MicroStrategy CEO"
+  },
+  {
+    "npub": "npub1az9xj85cmxv8e9j9y80lvqp97crsqdu2fpu3srwthd99qfu9qsgstam8y8",
+    "names": [
+      "rockstar dev",
+      "rockstardev"
+    ],
+    "note": "BTCPay Server developer"
+  },
+  {
+    "npub": "npub1u8lnhlw5usp3t9vmpz60ejpyt649z33hu82wc2hpv6m5xdqmuxhs46turz",
+    "names": [
+      "preston pysh",
+      "preston"
+    ],
+    "note": "Bitcoin advocate, podcaster"
+  },
+  {
+    "npub": "npub1s33sw4x0p8fvr4vaxa2hqsrh5ztjy3q4e0f356y8vhn90jmhfjhsrtz9e3",
+    "names": [
+      "max hillebrand",
+      "max",
+      "hillebrand"
+    ],
+    "note": "Wasabi Wallet developer"
+  },
+  {
+    "npub": "npub1cn4t4cd78nm900qc2hhqte5aa8c9njm6qkfzw95tszufwcwtcnsq7g3vle",
+    "names": [
+      "craig raw",
+      "craig"
+    ],
+    "note": "Sparrow Wallet developer"
+  },
+  {
+    "npub": "npub1wmr34t36fy03m8hvgl96zl3znndyzyaqhwmwdtshwmtkg03fetaqhjg240",
+    "names": [
+      "rabble nos",
+      "nos"
+    ],
+    "note": "Nos client developer"
+  },
+  {
+    "npub": "npub1jlrs53pkdfjnts29kveljul2sm0actt6n8dxrrzqcersttvcuv3qdjynqn",
+    "names": [
+      "john carvalho",
+      "carvalho",
+      "carvalho jr",
+      "bitrefill"
+    ],
+    "note": "Synonym, Bitrefill CEO"
+  },
+  {
+    "npub": "npub18ams6ewn5aj2n3wt2qawzglx9mr4nzksxhvrdc4gzrecw7n5tvjqctp424",
+    "names": [
+      "pablof7z",
+      "pablo"
+    ],
+    "note": "Highlighter, NDK developer"
+  },
+  {
+    "npub": "npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z",
+    "names": [
+      "vitor pamplona",
+      "vitorpamplona",
+      "vitor"
+    ],
+    "note": "Amethyst developer"
+  },
+  {
+    "npub": "npub1l3e2uj7dzs226s7q9utf9ghml8f3mcv7252hd69nhg2z62updklqv8zq2r",
+    "names": [
+      "bearetta ‍",
+      "bearetta"
+    ],
+    "note": "#czechstr #praha Punk tradwife and witch with energy so opposing modern tech tha"
+  },
+  {
+    "npub": "npub1rx26azek6ytn8h9qdrhrnd7rxeyy4w6hdft0ymuerwenzv42w70qjdvw0x",
+    "names": [
+      "xnostr"
+    ],
+    "note": "Sync your tweets to nostr"
+  },
+  {
+    "npub": "npub1jjmn7wwhz0aat6d7czxwnqz4ula490smzx3ayvuxxpey493ua8lsmd2ph5",
+    "names": [
+      "classical music"
+    ],
+    "note": "An amateur's corner"
+  },
+  {
+    "npub": "npub13cnlldwfhwxd6qf34hnwlfya2m2qrd2zfk0alxnrup6d2fasw9wqxwkzpe",
+    "names": [
+      "bit  ish",
+      "gug"
+    ],
+    "note": "Fucked up my profile FML"
+  },
+  {
+    "npub": "npub10hj9rg5gds5x2gk0z0s2jlqnq04jg7g30aj2t5pqzdaaztfactgsnze5ny",
+    "names": [
+      "nostrvalley"
+    ],
+    "note": "Bringing Nostr to Happy Valley, Pennsylvania #NostrValley"
+  },
+  {
+    "npub": "npub1kuc70777tsvj67fl75s2dmy376t97hv05xmyuyshzzy6vhj5q5jstv0eyw",
+    "names": [
+      "gbks",
+      "christoph ono"
+    ],
+    "note": "Designer & developer. Helping improve bitcoin design with many others at https:/"
+  },
+  {
+    "npub": "npub1n6xaj8fpapnaa3rys69g6862ylqwzy798ce090kq5lrwykkja82sv7pnh9",
+    "names": [
+      "sondre",
+      "sondre | satoshiconsult.com"
+    ],
+    "note": "Founder, CEO and Chairman of nostr:npub1rznlzpg529u8j39a8qe7tapsygd54qp5qyr5jyue"
+  },
+  {
+    "npub": "npub1fkluklzamwpyn7w8awxzrcqe7z8mldlvthk4gz9kz3vsh6udz62s9qj48l",
+    "names": [
+      "freedomtech"
+    ],
+    "note": "Break free from the tyrannical grasps of Big Brother, Silicon Valley and Big Tec"
+  },
+  {
+    "npub": "npub1v63yslhw8yldt42sudksd32mkq9q6v0j88qx5ht2e7d2cvr5v6qsqsqned",
+    "names": [
+      "purpurato"
+    ],
+    "note": "a quiet statement against central banking"
+  },
+  {
+    "npub": "npub168u2cl8m4s9htdym5yref7tpkghw96lngc0d8cxqyc400f02sdjs3q68qx",
+    "names": [
+      "michael sparks   ‍",
+      "michaels"
+    ],
+    "note": "Location: Middle Tennessee, USA \n\n Homesteader, entrepreneur and all around goof"
+  },
+  {
+    "npub": "npub14hlzw4sywt23drreaqs8ruf00dsrnnv5hfnyu49g2hpheq836umssur6nl",
+    "names": [
+      "lauren",
+      "lauren of light",
+      "laurenoflight"
+    ],
+    "note": "Bitcoin only \nSovereignty begins in the soul 🧘🏼‍♀️\nLight in the darkness ☀️\nNo"
+  },
+  {
+    "npub": "npub14skfs2ecexh20y2eqn6paqweqex4lw48q0xqa6va5hxscdpncxwqyujz2n",
+    "names": [
+      "z000p"
+    ],
+    "note": "🍌🐒"
+  },
+  {
+    "npub": "npub16utsqtqyl7l4tzuhhhntwp38vw62tqr2q3dlzjajcwy83a9hdjtsse7x95",
+    "names": [
+      "keneash"
+    ],
+    "note": "Hillbilly philosopher. Seeking excellence. I build things."
+  },
+  {
+    "npub": "npub1p7g986pc56qmvryplgzka0fsrpuwlk6mxk3h686w4e46n74e56qqhz88vk",
+    "names": [
+      "bitcoin-charlotte",
+      "bitcoin charlotte",
+      "hodl"
+    ],
+    "note": "Bitcoin Charlotte is a local Bitcoin community established block 249,503. With 2"
+  },
+  {
+    "npub": "npub10gnxrjh757zl6xd6wycf8wenph53glmahnayuk3xh74plam2wu8qy8mjy2",
+    "names": [
+      "yippiebeans",
+      "kai"
+    ],
+    "note": "Freedom | Building | Truth |\n🧡🌽🔥🔐\ncollaborative bitcoin security & inheritan"
+  },
+  {
+    "npub": "npub1a6l5edvat67qntcesvj5ma702uykwuzm47ck9t92kcg3p4qfx67qkvqtta",
+    "names": [
+      "observer",
+      "bitcoin observer"
+    ],
+    "note": "All sats zapped to this profile go directly to opensats. Traveled back in time t"
+  },
+  {
+    "npub": "npub1djnweltmaestmw98qg69jw7ghduckamrz94tlnw09keqse3cc0kqlvzkwy",
+    "names": [
+      "djz",
+      "dan"
+    ],
+    "note": ""
+  },
+  {
+    "npub": "npub18p66zmyh3q2rgejqencuz6dduuggdn7arg4eqn6x44jerxyy2mys670x7y",
+    "names": [
+      "arvin"
+    ],
+    "note": "OpenSats.org ⚡️ BitLyrics.co"
+  },
+  {
+    "npub": "npub1zthqxtczmyvrxen7l4l4jczrs3zp4at0t53sx0ydjnx08haut0qsaamyra",
+    "names": [
+      "sides"
+    ],
+    "note": "npub1uxftssgccuxlyrm02k0utpx0w6ezpfr5y9ml4d09japce37xcj9s7eqhkv"
+  },
+  {
+    "npub": "npub1jzd5utx9s38suxmpjd3e8mme6u8act9ztpw3lwgg4qtc69gfrvjqhhpezd",
+    "names": [
+      "ankh- morpok"
+    ],
+    "note": "Bitcoin, Terry Pratchett, 🇵🇸 "
+  },
+  {
+    "npub": "npub1wvtljy7rmeeeaqat9hwxwq9g7h90ghavtgpvd2yxk400ndlrf4qsytjhd0",
+    "names": [
+      "azz",
+      "azza"
+    ],
+    "note": "Christian. Bitcoiner 🇦🇺 #AUSTrich\n\nSilent payments \nsp1qq05897wj9atx9l0d0k3u8z"
+  },
+  {
+    "npub": "npub1rq2qfzp8un60f6vw88h0craqnqqpw5av39wjrmfaappv0ga7da7sa9nwx7",
+    "names": [
+      "axhoff",
+      "𝕒𝕩𝕙𝕠𝕗𝕗  alexander"
+    ],
+    "note": "Explorer of the sky, technology, business and self • eu/acc"
+  },
+  {
+    "npub": "npub1e72vwwpyw9gxuf58nrgmyywy7vfd74r9pasapwn2lte7hc2nt4qqtjy4y3",
+    "names": [
+      "fmmmbl",
+      "mheinz"
+    ],
+    "note": "#Bitcoin"
+  },
+  {
+    "npub": "npub1plgn59w3xjq85khq203vveet7w0yvque9t626ecd8mpkvt0v8zxsrp9sfu",
+    "names": [
+      "nostr"
+    ],
+    "note": ""
+  },
+  {
+    "npub": "npub1vemf09ljxzeanx2ht7wzzenphchw3yvjzzp6a4pdp8k8v6qj58xs43mz3k",
+    "names": [
+      "elzeta",
+      "el zeta"
+    ],
+    "note": "EGG MAXXIN GANG 🥚 🔥 \n\nI talk about Architecture -Leon Krier "
+  },
+  {
+    "npub": "npub1vsmh0r2t6ewglryvfu79mzx69ze6v8qpaqr6e5pgc4krtwjnd5tsqpzk4u",
+    "names": [
+      "lu"
+    ],
+    "note": "Lic. Diseño Multimedial | Diseñadora UX/UI | UX research  | UX writing  | Intera"
+  },
+  {
+    "npub": "npub15qd4hgnyyym5y5zy9cxj87twdf9uus57q96u6pmf4kx9shw44zfqgngj2x",
+    "names": [
+      "architecture daily"
+    ],
+    "note": "Your daily dose of architecture."
+  },
+  {
+    "npub": "npub1pm5z0gmw3wcvl3yreuv8y7q3stz2zmzc4jar4ckhk927qdcwjwuq3txe07",
+    "names": [
+      "hal"
+    ],
+    "note": "i'm sorry dave."
+  },
+  {
+    "npub": "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum",
+    "names": [
+      "worldsgonemad",
+      "worlds gone mad"
+    ],
+    "note": "Catholic man with a love of tech"
+  },
+  {
+    "npub": "npub1t5atsakzq63h45asjn3qhlpeg80nlgs6zkkgafmddyvywdufv6dqxfahcl",
+    "names": [
+      "francismars",
+      "francis mars"
+    ],
+    "note": "https://www.francismars.com • bringing Bitcoin to the people with chainduel.net "
+  },
+  {
+    "npub": "npub1l4h67834gddzsejkaj0cu27hzmtuz6xqxk9vhr9nnm5wetssf4uqz30k5l",
+    "names": [
+      "trippyfam",
+      "trippy fam"
+    ],
+    "note": "Mountain sustainability 101. Regenerative farming with a psychedelic influence a"
+  },
+  {
+    "npub": "npub1svtfvwaz8h5jv35dax2es402xz4q8ev2grmw9wuzee93umzmuc8s8nvqld",
+    "names": [
+      "abtcstrategy",
+      "a bitcoin strategy",
+      "abitcoinstrategy"
+    ],
+    "note": "A gamified interactive application that shows retail investors why Bitcoin is a "
+  },
+  {
+    "npub": "npub1ftt05tgku25m2akgvw6v7aqy5ux5mseqcrzy05g26ml43xf74nyqsredsh",
+    "names": [
+      "redshift"
+    ],
+    "note": "building Freedom AI Tech aka Routstr"
+  },
+  {
+    "npub": "npub1u37h8rhgm9f95d90lpk2afw8h4t75kf6w8vmga2zz9jsx3atzpuqlmw8vy",
+    "names": [
+      "evan"
+    ],
+    "note": "Building https://routstr.com"
+  },
+  {
+    "npub": "npub1zx0uydq67a62k5vhjcsvh0qvedk9ht9gz9t56et6j9k7wayj809qjghdct",
+    "names": [
+      "logan"
+    ],
+    "note": "Lawyer | bitcoin | host of the Think Bitcoin Podcast\n"
+  },
+  {
+    "npub": "npub13c0u5tuqr3vecks73saww2g4jzf3gvm3fh7pnplw7z7p4g0amp2q2ktzdl",
+    "names": [
+      "thinkbitcoinpod",
+      "think bitcoin podcast"
+    ],
+    "note": "As bitcoiners, we’re doing more than fixing the money. We’re ushering in a new e"
+  },
+  {
+    "npub": "npub1xwmyzp64xx03kw9ecd7fzsj3e9dgwah6an0rdng0cc6ux4dswwjs28pyyc",
+    "names": [
+      "peruvian_bull",
+      "roberto rios (peruvian bull)"
+    ],
+    "note": "A Roman Bull Head from 147 AD. finance & monetary economics. Link in bio for all"
+  },
+  {
+    "npub": "npub1e0enl3026x6tz987shmzfz03dtymdyfvm8hg55d5tftm63v2cw3qe20npn",
+    "names": [
+      "tandry laksana",
+      "tandrylaksana"
+    ],
+    "note": "Islam is my Sky and ₿itcoin is my Ground"
+  },
+  {
+    "npub": "npub1twg6ajypacxd209suhjwz9658dfk48j37u9mtyzh8lykaax6xt0s4wy42h",
+    "names": [
+      "bitcoinmonk",
+      "bitcoin monk"
+    ],
+    "note": "God bless bitcoin."
+  },
+  {
+    "npub": "npub1yfy0upgc5s802gqn40vcvq4lkugs6h65f4pl2ml92ghxyu6c9ldsxq3tu8",
+    "names": [
+      "bitcoin4all",
+      "tallbrian"
+    ],
+    "note": "I wrote a kids book that you can only buy with Bitcoin called The Winds Of Uncer"
+  },
+  {
+    "npub": "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr",
+    "names": [
+      "₿33zy ₿"
+    ],
+    "note": "Winged NSEC"
+  },
+  {
+    "npub": "npub19aw7qqpahp8v64zfz2p4p3nv07mra8gzkfgdsjhcfarrutumemcstpfsmu",
+    "names": [
+      "sean",
+      "21sean"
+    ],
+    "note": ""
+  },
+  {
+    "npub": "npub1c6dhrhzkflwr2zkdmlujnujawgp2c9rsep6gscyt6mvcusnt5a3srnzmx3",
+    "names": [
+      "essencial"
+    ],
+    "note": "Vegan Holistic Nutritionist & only High Vide Foods\nEnergy Light Worker & Channel"
+  },
+  {
+    "npub": "npub1vjxq75czca0nswp2f5kgtfyzhynuccdjs29q098rd3kv09k7s6nq39hh7v",
+    "names": [
+      "l's workbench",
+      "bmaxi89"
+    ],
+    "note": "9-to-5 by day, aspirant woodworker by night!\n#NostrItalia🇮🇹"
+  },
+  {
+    "npub": "npub1mkv2kz95x7f5ugcl75tmnqjca75u393ec29k2y5cpuylzgc52ukscheypk",
+    "names": [
+      "jsmaster",
+      "magnum"
+    ],
+    "note": "I write and I code. I stack in bitcoin when I can. I still have a day job. \nhttp"
+  },
+  {
+    "npub": "npub16rp6e6xq0e3sndag4duu7a65e4sy69dmcswdl4hmsgnz92yu8ftqx9s4w8",
+    "names": [
+      "orangehorizon",
+      "orange horizon"
+    ],
+    "note": "Beeswax Candles 🕯️🐝  (15k sats)\nZinc Sun Block ☀️ (17k sats)\nMade w/ all Natur"
+  },
+  {
+    "npub": "npub1e5tfhk8m65teu25dfx8lcvwn4c8ypqjl72u2sh4rt8zy2kss0j5qct7mh9",
+    "names": [
+      "rené aaron",
+      "reneaaron"
+    ],
+    "note": "❓ Ask me about #Bitcoin | ⚡ Bullish on Lightning | 🧡 Passionate about buidling "
+  },
+  {
+    "npub": "npub1zwphufj02nwm9fy0hr8879l74ky7kqz50lz8wdyeu79gsa7zz3esu2s3t5",
+    "names": [
+      "boseph.online",
+      "boseph"
+    ],
+    "note": "maker of petrus.app & pay.boseph.online\nstreamer on cozy.tv/boseph"
+  },
+  {
+    "npub": "npub14wfmy6lntjnvnddplpdeqexzkk0qkuerlp5wwr92s0awmhnap7lqlrlexf",
+    "names": [
+      "cody w."
+    ],
+    "note": "#img #internetmoneygang \n🌍🌲🏝️✈️💰💻🎒🛰️🥡☕️🌃\n₿ ₿ ₿"
+  },
+  {
+    "npub": "npub1vqfwt6k4rtwwpt3wqkg6yxr4lzsflr9edx4ehgty5d4tz7hjpt9szmawwd",
+    "names": [
+      "roman simon",
+      "re4mat0r"
+    ],
+    "note": "On Warrior's Path. Thinker, explorer. Do water fasts (21 days is my max). Eat on"
+  }
+]

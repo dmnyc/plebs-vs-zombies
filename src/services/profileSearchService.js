@@ -1,8 +1,19 @@
 import { nip19 } from 'nostr-tools';
 import nostrService from './nostrService';
+import primalCacheService from './primalCacheService';
+
+// DEPRECATED: This cache will be removed once Vertex API is integrated
+// Currently used as fallback when Primal cache is unavailable
+import wellKnownProfilesData from '../data/wellKnownProfiles.json';
 
 /**
  * Service for searching and caching Nostr profiles
+ *
+ * Search Strategy (in order):
+ * 1. Primal cache API (primary) - Fast, comprehensive search (~100-300ms)
+ * 2. Well-known profiles cache (deprecated fallback) - Will be removed when Vertex is integrated
+ * 3. Direct relay search (last resort) - Slow but works offline (5-15s)
+ *
  * Supports npub, nprofile, and username search with autocomplete
  */
 class ProfileSearchService {
@@ -12,6 +23,15 @@ class ProfileSearchService {
     this.maxCacheSize = 100;
     this.searchDebounceMs = 400; // Balanced debounce for responsive UX
     this.searchTimeoutId = null;
+
+    // DEPRECATED: Load well-known profiles from JSON file
+    // These are popular Nostr accounts that might not appear in recent relay events
+    // This will be replaced by Vertex API integration
+    this.wellKnownProfiles = wellKnownProfilesData;
+
+    // Primal cache settings
+    this.usePrimalCache = true; // Enable/disable Primal cache
+    this.primalCacheTimeout = 3000; // 3 second timeout for Primal
   }
 
   /**
@@ -95,7 +115,12 @@ class ProfileSearchService {
 
   /**
    * Search for profiles by name or display_name
-   * Uses client-side filtering of recent profile metadata events
+   *
+   * Strategy:
+   * 1. Try Primal cache API (fast, comprehensive)
+   * 2. Fall back to well-known profiles cache (instant, limited)
+   * 3. Fall back to relay search (slow, comprehensive)
+   *
    * @param {string} query - Search query
    * @param {number} limit - Maximum results to return
    * @param {Function} onResult - Optional callback for progressive results (result) => void
@@ -114,6 +139,54 @@ class ProfileSearchService {
     }
 
     try {
+      // Strategy 1: Try Primal cache first (if enabled)
+      if (this.usePrimalCache) {
+        try {
+          console.log(`🔍 Searching Primal cache for "${query}"...`);
+          const primalResults = await Promise.race([
+            primalCacheService.searchUsers(query, limit),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Primal timeout')), this.primalCacheTimeout)
+            )
+          ]);
+
+          if (primalResults && primalResults.length > 0) {
+            console.log(`✅ Primal cache returned ${primalResults.length} results`);
+
+            // Parse profile events and add npub
+            const profiles = primalResults
+              .map(event => {
+                const profile = primalCacheService.parseProfileEvent(event);
+                if (profile) {
+                  // Filter out mostr.pub bridged profiles (Mastodon bridge)
+                  if (profile.nip05 && profile.nip05.includes('mostr.pub')) {
+                    return null;
+                  }
+
+                  profile.npub = nip19.npubEncode(profile.pubkey);
+                  // Cache the profile
+                  this.cacheProfile(profile.pubkey, profile);
+
+                  // Emit progressively if callback provided
+                  if (onResult) {
+                    onResult(profile);
+                  }
+                }
+                return profile;
+              })
+              .filter(p => p !== null);
+
+            // Cache and return results
+            this.cacheSearchResults(cacheKey, profiles);
+            return profiles;
+          }
+        } catch (primalError) {
+          console.warn('⚠️ Primal cache search failed, falling back:', primalError.message);
+          // Fall through to next strategy
+        }
+      }
+
+      // Strategy 2: Fall back to well-known profiles + relay search
       // Ensure NDK is initialized (works without signer for public data)
       let ndk = nostrService.ndk;
 
@@ -130,85 +203,163 @@ class ProfileSearchService {
 
       console.log(`Searching profiles for "${query}"...`);
 
-      // Fetch recent profile metadata events (kind 0)
-      // Use subscription approach with generous limit for comprehensive results
-      const fetchLimit = 2000; // Fetch more events for better coverage
+      // Strategy: Client-side filtering with optimized relay queries
+      // NIP-50 is not widely supported, so we use client-side filtering
+      // with a large enough sample size to find common profiles
+
       const resultsLimit = limit;
-
-      const filter = {
-        kinds: [0],
-        limit: fetchLimit
-      };
-
-      console.log('🔍 Fetching events from relays...');
-
-      // Use subscription that filters and emits results progressively
       const profiles = [];
       const seenPubkeys = new Set();
       const queryLower = query.toLowerCase();
-      let eventCount = 0;
 
-      await new Promise((resolve, reject) => {
-        // Longer timeout since we're fetching more events
+      // First, check well-known profiles for matches
+      const wellKnownMatches = this.wellKnownProfiles.filter(wk =>
+        wk.names.some(name => name.includes(queryLower) || queryLower.includes(name))
+      );
+
+      // Fetch metadata for well-known matches
+      for (const wkProfile of wellKnownMatches) {
+        try {
+          const parsed = this.parseIdentifier(wkProfile.npub);
+          if (parsed && !seenPubkeys.has(parsed.pubkey)) {
+            // Try to fetch metadata, but create minimal profile if unavailable
+            let profile = await this.fetchProfile(parsed.pubkey);
+
+            if (!profile) {
+              // Create minimal profile from well-known data
+              profile = {
+                pubkey: parsed.pubkey,
+                npub: wkProfile.npub,
+                name: wkProfile.names[0], // Use first name from well-known list
+                display_name: wkProfile.names[0],
+                picture: null,
+                nip05: null,
+                about: wkProfile.note || ''
+              };
+            }
+
+            profiles.push(profile);
+            seenPubkeys.add(parsed.pubkey);
+
+            // Emit progressively
+            if (onResult) {
+              onResult(profile);
+            }
+          }
+        } catch (error) {
+          console.debug('Failed to fetch well-known profile:', error);
+        }
+      }
+
+      console.log(`📌 Found ${profiles.length} well-known profile matches`);
+
+      // If we already have enough results from well-known profiles, return early
+      if (profiles.length >= resultsLimit) {
+        console.log(`✅ Returning ${profiles.length} well-known profiles`);
+        this.cacheSearchResults(cacheKey, profiles);
+        return profiles;
+      }
+
+      // Fetch a large sample of profile events
+      console.log('🔍 Fetching additional profile events from relays...');
+
+      // Strategy: Request more events per relay by not setting a global limit
+      // Instead, let each relay return its limit
+      const filter = {
+        kinds: [0],
+        limit: 10000 // Higher limit to get more diverse profiles
+      };
+
+      let eventCount = 0;
+      const searchTimeout = 15000; // 15 second timeout to allow more events
+
+      await new Promise((resolve) => {
         const timeout = setTimeout(() => {
-          console.log(`⏱️ Timeout reached after ${eventCount} events, found ${profiles.length} matches`);
+          console.log(`⏱️ Search timeout after ${eventCount} events, found ${profiles.length} matches`);
           resolve();
-        }, 12000); // 12 second timeout for larger fetch
+        }, searchTimeout);
 
         const subscription = ndk.subscribe(filter, { closeOnEose: true });
 
         subscription.on('event', (event) => {
           eventCount++;
 
-          // Filter and emit results progressively as events arrive
-          if (!seenPubkeys.has(event.pubkey) && profiles.length < resultsLimit) {
-            try {
-              const content = JSON.parse(event.content);
-              const name = (content.name || '').toLowerCase();
-              const displayName = (content.display_name || '').toLowerCase();
-              const nip05 = (content.nip05 || '').toLowerCase();
+          // Skip if already seen or have enough results
+          if (seenPubkeys.has(event.pubkey) || profiles.length >= resultsLimit) {
+            return;
+          }
 
-              // Check if query matches name, display_name, or nip05
-              if (name.includes(queryLower) ||
-                  displayName.includes(queryLower) ||
-                  nip05.includes(queryLower)) {
+          try {
+            const content = JSON.parse(event.content);
+            const name = (content.name || '').toLowerCase();
+            const displayName = (content.display_name || '').toLowerCase();
+            const nip05 = (content.nip05 || '').toLowerCase();
 
-                const profile = {
-                  pubkey: event.pubkey,
-                  name: content.name,
-                  display_name: content.display_name,
-                  picture: content.picture,
-                  nip05: content.nip05,
-                  about: content.about,
-                  npub: nip19.npubEncode(event.pubkey)
-                };
-
-                profiles.push(profile);
-                seenPubkeys.add(event.pubkey);
-                this.cacheProfile(event.pubkey, profile);
-
-                // Emit result progressively if callback provided
-                if (onResult) {
-                  onResult(profile);
-                }
-
-                // Stop subscription early if we have enough results
-                if (profiles.length >= resultsLimit) {
-                  subscription.stop();
-                  clearTimeout(timeout);
-                  console.log(`✅ Found ${profiles.length} matches, stopping search early`);
-                  resolve();
-                }
-              }
-            } catch (parseError) {
-              console.debug('Failed to parse profile event:', parseError);
+            // Filter out mostr.pub bridged profiles
+            if (nip05.includes('mostr.pub')) {
+              return;
             }
+
+            // Check if query matches name, display_name, or nip05
+            // Use multiple matching strategies for better results
+            const queryWords = queryLower.split(/\s+/); // Split on whitespace
+            const nameWords = name.split(/\s+/);
+            const displayNameWords = displayName.split(/\s+/);
+
+            // Match if:
+            // 1. Direct substring match in name, display_name, or nip05
+            // 2. All query words appear in name or display_name (for multi-word queries)
+            // 3. Query matches start of any word in name or display_name
+
+            const hasDirectMatch = name.includes(queryLower) ||
+                                  displayName.includes(queryLower) ||
+                                  nip05.includes(queryLower);
+
+            const hasWordMatch = queryWords.every(qWord =>
+              nameWords.some(nWord => nWord.includes(qWord)) ||
+              displayNameWords.some(dWord => dWord.includes(qWord))
+            );
+
+            const hasStartMatch = nameWords.some(nWord => nWord.startsWith(queryLower)) ||
+                                 displayNameWords.some(dWord => dWord.startsWith(queryLower));
+
+            if (hasDirectMatch || hasWordMatch || hasStartMatch) {
+
+              const profile = {
+                pubkey: event.pubkey,
+                name: content.name,
+                display_name: content.display_name,
+                picture: content.picture,
+                nip05: content.nip05,
+                about: content.about,
+                npub: nip19.npubEncode(event.pubkey)
+              };
+
+              profiles.push(profile);
+              seenPubkeys.add(event.pubkey);
+              this.cacheProfile(event.pubkey, profile);
+
+              // Emit progressively
+              if (onResult) {
+                onResult(profile);
+              }
+
+              // Stop early if we have enough results
+              if (profiles.length >= resultsLimit) {
+                subscription.stop();
+                clearTimeout(timeout);
+                console.log(`✅ Found ${profiles.length} matches, stopping early`);
+                resolve();
+              }
+            }
+          } catch (parseError) {
+            console.debug('Failed to parse profile event:', parseError);
           }
         });
 
         subscription.on('eose', () => {
           clearTimeout(timeout);
-          console.log(`📥 EOSE reached after ${eventCount} events, found ${profiles.length} matches`);
+          console.log(`📥 EOSE after ${eventCount} events, found ${profiles.length} matches`);
           resolve();
         });
 
@@ -221,9 +372,96 @@ class ProfileSearchService {
 
       console.log(`Found ${profiles.length} profiles matching "${query}"`);
 
-      // Cache search results
+      // Cache and return results
       this.cacheSearchResults(cacheKey, profiles);
       return profiles;
+
+      // OLD NIP-50 approach (keeping for reference but not using)
+      // NIP-50 is not widely supported by relays
+      /*
+      console.log('🔍 Attempting NIP-50 search...');
+      try {
+        const nip50Filter = {
+          kinds: [0],
+          search: query,
+          limit: resultsLimit * 2 // Request more to account for filtering
+        };
+
+        // Use a promise with timeout for NIP-50 search
+        const nip50SearchPromise = new Promise(async (resolve) => {
+          const events = new Set();
+          const subscription = ndk.subscribe(nip50Filter, { closeOnEose: true });
+
+          subscription.on('event', (event) => {
+            events.add(event);
+          });
+
+          subscription.on('eose', () => {
+            console.log(`📥 NIP-50 search EOSE: ${events.size} events`);
+            resolve(events);
+          });
+
+          // Timeout after 5 seconds for NIP-50
+          setTimeout(() => {
+            subscription.stop();
+            console.log(`⏱️ NIP-50 search timeout: ${events.size} events`);
+            resolve(events);
+          }, 5000);
+        });
+
+        const nip50Events = await nip50SearchPromise;
+        console.log(`📥 NIP-50 search returned ${nip50Events.size} events`);
+
+        for (const event of nip50Events) {
+          if (seenPubkeys.has(event.pubkey)) continue;
+
+          try {
+            const content = JSON.parse(event.content);
+            const nip05 = (content.nip05 || '').toLowerCase();
+
+            // Filter out mostr.pub bridged profiles
+            if (nip05.includes('mostr.pub')) {
+              continue;
+            }
+
+            const profile = {
+              pubkey: event.pubkey,
+              name: content.name,
+              display_name: content.display_name,
+              picture: content.picture,
+              nip05: content.nip05,
+              about: content.about,
+              npub: nip19.npubEncode(event.pubkey)
+            };
+
+            profiles.push(profile);
+            seenPubkeys.add(event.pubkey);
+            this.cacheProfile(event.pubkey, profile);
+
+            // Emit progressively
+            if (onResult) {
+              onResult(profile);
+            }
+
+            if (profiles.length >= resultsLimit) {
+              break;
+            }
+          } catch (parseError) {
+            console.debug('Failed to parse NIP-50 event:', parseError);
+          }
+        }
+
+        console.log(`✅ NIP-50 search found ${profiles.length} profiles`);
+
+        // If we found enough results, return early
+        if (profiles.length >= resultsLimit) {
+          this.cacheSearchResults(cacheKey, profiles);
+          return profiles;
+        }
+      } catch (nip50Error) {
+        console.warn('⚠️ NIP-50 search failed or not supported:', nip50Error.message);
+      }
+      */
     } catch (error) {
       if (error.message === 'Search timeout') {
         console.warn('Profile search timed out, returning empty results');
