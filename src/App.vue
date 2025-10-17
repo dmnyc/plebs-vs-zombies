@@ -436,19 +436,23 @@
                   ref="loginScoutInput"
                   placeholder="Search by username or paste npub/nprofile..."
                   @profile-selected="handleLoginScoutProfileSelected"
+                  @input-changed="handleScoutInputChanged"
                 />
               </div>
 
               <button
                 @click="startScoutMode"
-                :disabled="!selectedScoutProfile || scoutModeLoading"
+                :disabled="!scoutInputValue || scoutModeLoading"
                 class="btn-secondary w-full flex items-center justify-center gap-2"
-                :class="{'opacity-50 cursor-not-allowed': !selectedScoutProfile || scoutModeLoading}"
+                :class="{'opacity-50 cursor-not-allowed': !scoutInputValue || scoutModeLoading}"
               >
                 <span v-if="scoutModeLoading">🔍</span>
                 <span v-else>🏹</span>
                 {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
               </button>
+              <div v-if="scoutInputError" class="text-red-400 text-xs mt-1">
+                {{ scoutInputError }}
+              </div>
             </div>
 
             <div class="mt-4 p-3 bg-gray-800 rounded-lg">
@@ -639,6 +643,7 @@
             placeholder="Search by username or paste npub/nprofile..."
             :auto-focus="true"
             @profile-selected="handleModalScoutProfileSelected"
+            @input-changed="handleScoutInputChanged"
           />
         </div>
 
@@ -651,12 +656,15 @@
           </button>
           <button
             @click="startScoutFromModal"
-            :disabled="!selectedScoutProfile"
+            :disabled="!scoutInputValue"
             class="btn-scout flex-1"
-            :class="{'opacity-50 cursor-not-allowed': !selectedScoutProfile}"
+            :class="{'opacity-50 cursor-not-allowed': !scoutInputValue}"
           >
             Start Scouting
           </button>
+        </div>
+        <div v-if="scoutInputError" class="text-red-400 text-xs mt-2">
+          {{ scoutInputError }}
         </div>
       </div>
     </div>
@@ -735,7 +743,9 @@ export default {
       scoutModeLoading: false,
       scoutTarget: null,
       showScoutModal: false,
-      selectedScoutProfile: null // Stores selected profile from ProfileSearchInput
+      selectedScoutProfile: null, // Stores selected profile from ProfileSearchInput
+      scoutInputValue: '', // Tracks input value for button enable/disable
+      scoutInputError: '' // Error message for validation
     }
   },
   computed: {
@@ -758,15 +768,31 @@ export default {
     handleLoginScoutProfileSelected(profile) {
       console.log('📝 Login scout profile selected:', profile);
       this.selectedScoutProfile = profile;
+      this.scoutInputError = ''; // Clear any errors when profile is selected
     },
     handleModalScoutProfileSelected(profile) {
       console.log('📝 Modal scout profile selected:', profile);
       this.selectedScoutProfile = profile;
+      this.scoutInputError = ''; // Clear any errors when profile is selected
+    },
+    handleScoutInputChanged(value) {
+      this.scoutInputValue = value;
+      this.scoutInputError = ''; // Clear error when user types
+      // Clear selected profile if input changes significantly
+      if (this.selectedScoutProfile && value !== this.selectedScoutProfile.npub) {
+        const currentDisplay = this.selectedScoutProfile.display_name ||
+                              this.selectedScoutProfile.name || '';
+        if (value !== currentDisplay) {
+          this.selectedScoutProfile = null;
+        }
+      }
     },
     showScoutModeMenu() {
       // For signed-in users, show Scout Mode modal
       this.showScoutModal = true;
       this.selectedScoutProfile = null;
+      this.scoutInputValue = '';
+      this.scoutInputError = '';
 
       // Clear the input when modal opens
       this.$nextTick(() => {
@@ -776,16 +802,32 @@ export default {
     closeScoutModal() {
       this.showScoutModal = false;
       this.selectedScoutProfile = null;
+      this.scoutInputValue = '';
+      this.scoutInputError = '';
 
       // Clear the input
       this.$refs.modalScoutInput?.clear();
     },
     async startScoutFromModal() {
-      if (!this.selectedScoutProfile) {
-        console.log('❌ No profile selected, returning');
-        return;
+      console.log('🔍 Start Scout From Modal clicked!');
+      this.scoutInputError = '';
+
+      let profile = this.selectedScoutProfile;
+
+      // If no profile selected from dropdown, validate and fetch from input
+      if (!profile) {
+        const result = await this.$refs.modalScoutInput.validateAndFetch();
+
+        if (!result.valid) {
+          this.scoutInputError = result.error;
+          return;
+        }
+
+        profile = result.profile;
       }
 
+      // Store the profile for startScoutMode to use
+      this.selectedScoutProfile = profile;
       this.showScoutModal = false;
 
       // If already in Scout Mode, force a complete reset by exiting and re-entering
@@ -812,34 +854,44 @@ export default {
     },
     async startScoutMode() {
       console.log('🔍 Start Scout Mode clicked!');
-      console.log('Selected scout profile:', this.selectedScoutProfile);
-
-      if (!this.selectedScoutProfile) {
-        console.log('❌ No profile selected, returning');
-        return;
-      }
-
+      this.scoutInputError = '';
       this.scoutModeLoading = true;
 
       try {
-        // Use the profile data from ProfileSearchInput
+        let profile = this.selectedScoutProfile;
+
+        // If no profile selected from dropdown, validate and fetch from input
+        if (!profile) {
+          const result = await this.$refs.loginScoutInput.validateAndFetch();
+
+          if (!result.valid) {
+            this.scoutInputError = result.error;
+            this.scoutModeLoading = false;
+            return;
+          }
+
+          profile = result.profile;
+        }
+
+        console.log('✅ Profile to scout:', profile);
+
+        // Use the profile data
         this.scoutTarget = {
-          npub: this.selectedScoutProfile.npub,
-          pubkey: this.selectedScoutProfile.pubkey,
-          name: this.selectedScoutProfile.name,
-          display_name: this.selectedScoutProfile.display_name,
-          picture: this.selectedScoutProfile.picture
+          npub: profile.npub,
+          pubkey: profile.pubkey,
+          name: profile.name,
+          display_name: profile.display_name,
+          picture: profile.picture
         };
 
         // Switch to scout mode
         this.isScoutMode = true;
 
         console.log('🔍 Starting Scout Mode for:', this.scoutTarget);
-        console.log('isScoutMode:', this.isScoutMode);
 
       } catch (error) {
         console.error('Failed to start Scout Mode:', error);
-        alert('Failed to start Scout Mode. Please try again.');
+        this.scoutInputError = 'Failed to start Scout Mode. Please try again.';
       } finally {
         this.scoutModeLoading = false;
       }
@@ -851,6 +903,8 @@ export default {
       this.isScoutMode = false;
       this.scoutTarget = null;
       this.selectedScoutProfile = null;
+      this.scoutInputValue = '';
+      this.scoutInputError = '';
 
       // Clear the inputs
       this.$refs.loginScoutInput?.clear();

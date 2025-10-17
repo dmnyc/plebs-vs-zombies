@@ -64,13 +64,16 @@
           <!-- Profile info -->
           <div class="flex-grow min-w-0">
             <div class="font-medium text-white truncate">
-              {{ profile.display_name || profile.name || 'Anonymous' }}
+              {{ profile.display_name || profile.name || 'Unknown Profile' }}
             </div>
             <div v-if="profile.nip05" class="text-xs text-gray-400 truncate">
               {{ profile.nip05 }}
             </div>
             <div v-else class="font-mono text-xs text-gray-500 truncate">
               {{ formatNpub(profile.npub) }}
+            </div>
+            <div v-if="!profile.name && !profile.display_name" class="text-xs text-yellow-400 mt-0.5">
+              Profile metadata not available
             </div>
           </div>
         </div>
@@ -114,6 +117,12 @@ export default {
       validationState: null, // 'valid', 'error', null
       selectedProfile: null
     };
+  },
+  watch: {
+    // Emit input value changes so parent can enable/disable buttons
+    inputValue(newValue) {
+      this.$emit('input-changed', newValue.trim());
+    }
   },
   computed: {
     inputClass() {
@@ -166,15 +175,37 @@ export default {
               this.validationMessage = '✅ Valid profile identifier';
               this.validationState = 'valid';
             } else {
-              this.suggestions = [];
-              this.validationMessage = '⚠️ Profile not found';
-              this.validationState = 'error';
+              // Profile metadata not found, but npub is valid - create minimal profile
+              const { nip19 } = await import('nostr-tools');
+              const minimalProfile = {
+                pubkey: parsed.pubkey,
+                npub: nip19.npubEncode(parsed.pubkey),
+                name: null,
+                display_name: null,
+                picture: null,
+                nip05: null,
+                about: null
+              };
+              this.suggestions = [minimalProfile];
+              this.validationMessage = '✅ Valid npub (profile metadata not found, but you can still proceed)';
+              this.validationState = 'valid';
             }
           } catch (error) {
             console.error('Failed to fetch profile:', error);
-            this.suggestions = [];
-            this.validationMessage = '❌ Failed to fetch profile';
-            this.validationState = 'error';
+            // Even on error, if we have a valid npub format, allow proceeding
+            const { nip19 } = await import('nostr-tools');
+            const minimalProfile = {
+              pubkey: parsed.pubkey,
+              npub: nip19.npubEncode(parsed.pubkey),
+              name: null,
+              display_name: null,
+              picture: null,
+              nip05: null,
+              about: null
+            };
+            this.suggestions = [minimalProfile];
+            this.validationMessage = '✅ Valid npub format (could not fetch metadata, but you can still proceed)';
+            this.validationState = 'valid';
           } finally {
             this.searching = false;
           }
@@ -255,7 +286,9 @@ export default {
     },
     selectProfile(profile) {
       this.selectedProfile = profile;
-      this.inputValue = profile.display_name || profile.name || profile.npub;
+      // Show npub if no name/display_name (don't truncate - we need the full npub for validation)
+      const displayText = profile.display_name || profile.name || profile.npub;
+      this.inputValue = displayText;
       this.showDropdown = false;
       this.highlightedIndex = -1;
       this.validationMessage = '✅ Profile selected';
@@ -280,6 +313,67 @@ export default {
     },
     focus() {
       this.$refs.input?.focus();
+    },
+    getValue() {
+      return this.inputValue.trim();
+    },
+    getSelectedProfile() {
+      return this.selectedProfile;
+    },
+    async validateAndFetch() {
+      const value = this.inputValue.trim();
+
+      if (!value) {
+        return { valid: false, error: 'Please enter a username or npub' };
+      }
+
+      // Check if it's an npub or nprofile
+      if (value.startsWith('npub1') || value.startsWith('nprofile1')) {
+        const parsed = profileSearchService.parseIdentifier(value);
+
+        if (!parsed) {
+          return { valid: false, error: 'Invalid npub/nprofile format' };
+        }
+
+        // Valid format, try to fetch profile
+        try {
+          const profile = await profileSearchService.fetchProfile(parsed.pubkey, parsed.relays);
+
+          if (profile) {
+            return { valid: true, profile };
+          } else {
+            // Create minimal profile
+            const { nip19 } = await import('nostr-tools');
+            const minimalProfile = {
+              pubkey: parsed.pubkey,
+              npub: nip19.npubEncode(parsed.pubkey),
+              name: null,
+              display_name: null,
+              picture: null,
+              nip05: null,
+              about: null
+            };
+            return { valid: true, profile: minimalProfile };
+          }
+        } catch (error) {
+          console.error('Failed to fetch profile:', error);
+          // Still return minimal profile on error
+          const { nip19 } = await import('nostr-tools');
+          const minimalProfile = {
+            pubkey: parsed.pubkey,
+            npub: nip19.npubEncode(parsed.pubkey),
+            name: null,
+            display_name: null,
+            picture: null,
+            nip05: null,
+            about: null
+          };
+          return { valid: true, profile: minimalProfile };
+        }
+      }
+
+      // Not an npub, must be a username - user should select from dropdown
+      return { valid: false, error: 'Please select a profile from the search results or enter a valid npub/nprofile' };
     }
   },
   mounted() {
