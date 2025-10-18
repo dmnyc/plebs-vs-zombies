@@ -46,7 +46,7 @@
               <span v-else class="text-gray-400">Never</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-gray-300">Zombie Score:</span>
+              <span class="text-gray-300">Zombie Score™:</span>
               <span 
                 class="font-bold"
                 :class="{

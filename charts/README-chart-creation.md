@@ -1,4 +1,4 @@
-# Zombie Score Chart Creation Guide
+# Zombie Score™ Chart Creation Guide
 
 ## Overview
 This document explains how to create zombie-themed data visualization charts for Plebs vs. Zombies Scout Mode analytics.
@@ -87,7 +87,7 @@ const data = {
 
 ```html
 <!-- Update page elements -->
-<title>PLEBS VS. ZOMBIES - Zombie Score Analysis (NEW_DATE_RANGE)</title>
+<title>PLEBS VS. ZOMBIES - Zombie Score™ Analysis (NEW_DATE_RANGE)</title>
 <div class="date-range">📅 NEW_DATE_RANGE</div>
 <div class="data-note">📊 Analysis based on X Scout Mode scans during this period</div>
 ```

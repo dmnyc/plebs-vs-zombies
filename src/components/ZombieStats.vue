@@ -45,7 +45,7 @@
         <div class="flex mb-2 items-center justify-between">
           <div>
             <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-zombie-green bg-zombie-dark">
-              Zombie Score
+              Zombie Score™
             </span>
           </div>
           <div class="text-right">

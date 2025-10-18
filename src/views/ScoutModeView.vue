@@ -197,7 +197,7 @@
                 <span class="font-bold text-lg">{{ scoutResults?.totalZombies || 0 }}</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-green-300">Zombie Score:</span>
+                <span class="text-green-300">Zombie Score™:</span>
                 <span class="font-bold text-lg">{{ scoutResults?.zombieScore || 0 }}%</span>
               </div>
             </div>
@@ -322,13 +322,13 @@
           </div>
           <div class="bg-gray-800 p-4 rounded-lg text-center">
             <div class="text-2xl font-bold text-green-400">{{ scoutResults.zombieScore }}%</div>
-            <div class="text-sm text-gray-400">Zombie Score</div>
+            <div class="text-sm text-gray-400">Zombie Score™</div>
           </div>
         </div>
 
-        <!-- Zombie Score Visualization -->
+        <!-- Zombie Score™ Visualization -->
         <div class="mb-6">
-          <h4 class="text-lg font-semibold mb-3">Zombie Score Breakdown</h4>
+          <h4 class="text-lg font-semibold mb-3">Zombie Score™ Breakdown</h4>
           <div class="flex gap-1 mb-2">
             <span 
               v-for="(square, index) in scoreBarSquares" 
@@ -352,7 +352,7 @@
           <!-- "This is me!" toggle with prominent callout -->
           <div class="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
             <div class="text-yellow-400 text-sm font-medium mb-2">
-              Sharing your own Zombie Score? Check this box!
+              Sharing your own Zombie Score™? Check this box!
             </div>
             <label class="inline-flex items-center gap-2 cursor-pointer">
               <div class="text-yellow-400 text-lg">👉</div>
@@ -694,7 +694,7 @@ export default {
 
 My Zombie Count is: ${zombieCount}
 
-My Zombie Score is ${zombieScore}%!
+My Zombie Score™ is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
@@ -704,7 +704,7 @@ https://plebsvszombies.cc`;
 
 Your Zombie Count is: ${zombieCount}
 
-Your Zombie Score is ${zombieScore}%!
+Your Zombie Score™ is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹

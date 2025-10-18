@@ -62,14 +62,14 @@
               <span class="font-bold text-lg">{{ purgeStats.fresh }}</span>
             </div>
           </div>
-          
-          <!-- Zombie Score -->
+
+          <!-- Zombie Score™ -->
           <div class="mt-4 pt-4 border-t border-gray-700">
             <div class="flex justify-between items-center mb-2">
-              <span class="text-gray-300">Zombie Score:</span>
+              <span class="text-gray-300">Zombie Score™:</span>
               <span class="text-lg font-bold text-zombie-green">{{ zombieScore }}%</span>
             </div>
-            <!-- Visual Zombie Score bar -->
+            <!-- Visual Zombie Score™ bar -->
             <div class="flex gap-1">
               <span 
                 v-for="(square, index) in scoreBarSquares" 
@@ -388,7 +388,7 @@ export default {
 
 💀 MAXIMUM CARNAGE ACHIEVED! 💀
 
-My Zombie Score was ${this.zombieScore}%! What's yours?
+My Zombie Score™ was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
@@ -428,7 +428,7 @@ https://plebsvszombies.cc`;
 
       return `${message}
 
-My Zombie Score was ${this.zombieScore}%! What's yours?
+My Zombie Score™ was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
 
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
