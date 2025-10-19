@@ -13,6 +13,8 @@ import NDK from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 
 // LEADERBOARD DATA - Update this with your participants (supports up to 50)
+// ⚠️ IMPORTANT: Some entries have manualProfile to preserve profile data that relays can't find
+// DO NOT REMOVE entries with manualProfile - they will be lost from the leaderboard!
 const participants = [
     { npub: "npub148ut8u4vr8xqd4gefhg6eyc5636p5zthw3zfse2njfkezegczers59ty0w", zombiesKilled: 2935, processedEventIds: ["049e67e15340b6df7698e72f2e50d4c818a7484ed937154c054077d4fdbd9338"] },
     { npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", zombiesKilled: 1772, processedEventIds: ["6f73ab007fc0611e5fd423544d57d3cc9bf0c5d0a7671cf8c530197dc689a660","83905efec74001b0847303d762933c45fdc6a2d0a9ee253905ebb2ee84871fd5"] },
@@ -23,6 +25,8 @@ const participants = [
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
     { npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", zombiesKilled: 452, processedEventIds: ["6566c29081add24d27c69a8b5ef99dbacb3873471b7d2d340538edf79cfc4920","4b00da1c015be2e51aad52009f7a0fc7e5ebfc654dfa7ccef3aec8519445cb04","5ac3e135f0d11e7df75a6a59110998e8af214c88f7fffc502411de602c506b55"] },
     { npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", zombiesKilled: 439, processedEventIds: ["dc98599624fdb92b17b3d039970b0040c444749477183003d9cf0acae39148d8","957d2af72fb5b94ba31fb96f846e4884035175d43530a8f523d3f91b96c7a174"] },
+    // ⚠️ DO NOT REMOVE: ₿33Zy ₿ has manualProfile because relays can't find their profile
+    { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: [], manualProfile: { name: "₿33Zy ₿", handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg" } },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320, processedEventIds: [] },
     { npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", zombiesKilled: 298, processedEventIds: [] },
     { npub: "npub1qn4ylq6s79tz4gwkphq8q4sltwurs6s36xsq2u8aw3qd5ggwzufsw3s3yz", zombiesKilled: 272, processedEventIds: ["f3899a9bbbcd893c7e36734f94acbd209b2f9f47483118cdf045ffc0f9a70f71"] },
@@ -30,12 +34,12 @@ const participants = [
     { npub: "npub1q33jywkl8r0e5g48lvrenxnr3lw59kzrw4e7p0cecslqzwc56eesjymqu0", zombiesKilled: 242, processedEventIds: [] },
     { npub: "npub1mgvmt553uphdpxa9gk79xejq3hyzh2xfa8uh6vh236nq78mvh74q8tr9yd", zombiesKilled: 207, processedEventIds: [] },
     { npub: "npub16secklpnqey3el04fy2drfftsz5k26zlwdsnz84wtul2luwj8fdsugjdxk", zombiesKilled: 191, processedEventIds: [] },
+    { npub: "npub15m4qhqdrzsvu4u0v7992u657nqn56sw2l658a5f2zq7fk9klnd0srukzau", zombiesKilled: 190, processedEventIds: ["8fe11e124bc932a7627903a60d8bb456268d2907dacfc393e8b3b4f045a18708"] },
     { npub: "npub1xswmtflr4yclfyy4mq4y4nynnnu2vu5nk8jp0875khq9gnz0cthsc0p4xw", zombiesKilled: 176, processedEventIds: [] },
     { npub: "npub1qqqqqqz7nhdqz3uuwmzlflxt46lyu7zkuqhcapddhgz66c4ddynswreecw", zombiesKilled: 160, processedEventIds: [] },
     { npub: "npub1vsmh0r2t6ewglryvfu79mzx69ze6v8qpaqr6e5pgc4krtwjnd5tsqpzk4u", zombiesKilled: 152, processedEventIds: [] },
     { npub: "npub1eq94yj8maree90pm53gfr76wdc44su3cwcqmly848xfrv6es6usqg4er58", zombiesKilled: 135, processedEventIds: [] },
     { npub: "npub1njst6azswskk5gp3ns8r6nr8nj0qg65acu8gaa2u9yz7yszjxs9s6k7fqx", zombiesKilled: 132, processedEventIds: [] },
-    { npub: "npub15m4qhqdrzsvu4u0v7992u657nqn56sw2l658a5f2zq7fk9klnd0srukzau", zombiesKilled: 126, processedEventIds: [] },
     { npub: "npub1lxzaxzge0jq9u9cecucctdt5lslwgp7hcxmp2l0wn8r2ecjenwasu6svxa", zombiesKilled: 104, processedEventIds: [] },
     { npub: "npub1yrffsyxk5hujkpz6mcpwhwkujqmdwswvdp4sqs2ug26zxmly45hsfpn8p0", zombiesKilled: 97, processedEventIds: [] },
     { npub: "npub1v7k63c6y2vktlqhsuupywt3yc7ykursujc34at964f9cv9s9y9csjutfk0", zombiesKilled: 97, processedEventIds: [] },
@@ -63,11 +67,13 @@ const participants = [
     { npub: "npub1mwce4c8qa2zn9zw9f372syrc9dsnqmyy3jkcmpqkzaze0slj94dqu6nmwy", zombiesKilled: 12, processedEventIds: [] },
     { npub: "npub1ptwv0m9uytzkz3k5te3y9j9k46f5r4h4ts5gdh0qzfp88qn2tgsshc2nu0", zombiesKilled: 10, processedEventIds: [] },
     { npub: "npub1kgh77xxt7hhtt4u528hecnx69rhagla8jj3tclgyf9wvkxa6dc0szxkuut", zombiesKilled: 10, processedEventIds: [] },
+    { npub: "npub1m2jphmdkskgnvwl5gplksl9e0zwv2sldqf9mwlpz6tyymz84g9fsqr3wgu", zombiesKilled: 9, processedEventIds: ["81471956fa649d26f79cec08ab9c9194a94c0661fa9feaed87ccec0755240882"] },
     { npub: "npub1slmplexzafjdny6w6ucjqrqugx5ldh0dg2v58r3ksld63h6atw5szx9sfh", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub14hz3xluls73nc8eyvy6fljm6tf8zt0xkxpgxngch36txfv24ycvs622r7l", zombiesKilled: 5, processedEventIds: [] },
     { npub: "npub1rsqajguwyds0zne9qqy33n55cd6dg68zrkwyj7y8l69me04yc79qf53rt4", zombiesKilled: 4, processedEventIds: [] },
     { npub: "npub1m4ny6hjqzepn4rxknuq94c2gpqzr29ufkkw7ttcxyak7v43n6vvsajc2jl", zombiesKilled: 4, processedEventIds: [] },
+    { npub: "npub1dlkff8vcdwcty9hs3emc43yks8y7pr0tnn7jewvt63ph077sw48s4cc4qc", zombiesKilled: 3, processedEventIds: ["3d6f8787e2bf1d0adfc93611c72c3e6e42f460bef6a397809df60fc5cc946d6e"] },
     { npub: "npub1eejrfpegp2j5quvjrx960c9a8k9avsvufsglj7ecw3xuz32cpygqc8fmhw", zombiesKilled: 1, processedEventIds: ["6683925f69581380a3676caf76e7abac408418371fac3d171c1f76c358ff39c5"] }
 ];
 
