@@ -250,8 +250,13 @@ async function fetchProfiles() {
     process.exit(0);
 }
 
-// Run the script
-fetchProfiles().catch(error => {
-    console.error('❌ Error fetching profiles:', error);
-    process.exit(1);
-});
+// Run the script if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+    fetchProfiles().catch(error => {
+        console.error('❌ Error fetching profiles:', error);
+        process.exit(1);
+    });
+}
+
+// Export participants array for use by other scripts
+export { participants };
