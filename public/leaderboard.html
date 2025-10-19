@@ -748,6 +748,28 @@ See: /COMPETITION-OCTOBER-2025.md
                     }, 100 + ((index + 1) * 150));
                 }
             });
+
+            // Add "more participants" message if there are more than 50
+            const remainingCount = participants.length - MAX_DISPLAY;
+            if (remainingCount > 0) {
+                const moreMessage = document.createElement('div');
+                moreMessage.className = 'info-note';
+                moreMessage.style.margin = '40px 0 0 0';
+                moreMessage.innerHTML = `🏹 And ${remainingCount} more zombie-killing pleb${remainingCount === 1 ? '' : 's'} who didn't make it into the top 50!`;
+
+                // Add entrance animation
+                moreMessage.style.opacity = '0';
+                moreMessage.style.transform = 'translateY(30px)';
+
+                leaderboardContainer.appendChild(moreMessage);
+
+                // Animate entry
+                setTimeout(() => {
+                    moreMessage.style.transition = 'all 0.6s ease-out';
+                    moreMessage.style.opacity = '1';
+                    moreMessage.style.transform = 'translateY(0)';
+                }, 100 + (displayedParticipants.length * 150));
+            }
         }
 
         // Add interactive effects
