@@ -14,6 +14,7 @@
  * Examples:
  *   node scripts/extract-from-note.js note1j2nrek2hgxqpjl6dfuq3vlvxggrw2j8lckhyy3xhlugmmmr9rf0q8vmxdm
  *   node scripts/extract-from-note.js nevent1qqs0kffj6lzarcemqd4acdlnkdsczzyt29kdjngrz3896jvxmdz5qmgprdmhxue69uhhg6r9vehhyetnwshxummnw3erztnrdakj7mk5wrd
+ *   node scripts/extract-from-note.js nostr:note1j2nrek2hgxqpjl6dfuq3vlvxggrw2j8lckhyy3xhlugmmmr9rf0q8vmxdm
  */
 
 import NDK from '@nostr-dev-kit/ndk';
@@ -60,7 +61,12 @@ function extractZombieCount(content) {
  */
 function decodeNoteId(noteId) {
     try {
-        const decoded = nip19.decode(noteId);
+        // Strip "nostr:" prefix if present
+        const cleanedNoteId = noteId.startsWith('nostr:')
+            ? noteId.substring(6)
+            : noteId;
+
+        const decoded = nip19.decode(cleanedNoteId);
 
         if (decoded.type === 'note') {
             // Simple note1... format - just event ID
@@ -88,8 +94,18 @@ function decodeNoteId(noteId) {
 async function fetchEvent(eventId, relayHints = []) {
     console.log(`🔍 Fetching event ${eventId.substring(0, 8)}...`);
 
-    // Use relay hints if provided, otherwise use default relays
-    const relaysToUse = relayHints.length > 0 ? [...relayHints, ...RELAYS] : RELAYS;
+    // Use relay hints if provided (they're event-specific), with a couple default relays as backup
+    // This prevents timeout issues when nevent has many relay hints
+    let relaysToUse;
+    if (relayHints.length > 0) {
+        // Prioritize relay hints, add only 2-3 default relays as backup
+        const backupRelays = RELAYS.slice(0, 2);
+        relaysToUse = [...relayHints, ...backupRelays];
+        console.log(`📍 Using ${relayHints.length} relay hint(s) + ${backupRelays.length} backup(s)`);
+    } else {
+        // No hints, use all default relays
+        relaysToUse = RELAYS;
+    }
 
     const ndk = new NDK({
         explicitRelayUrls: relaysToUse
@@ -103,7 +119,9 @@ async function fetchEvent(eventId, relayHints = []) {
     });
 
     // Give relays a brief moment to establish initial connections
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Reduced from 3s to 2s for faster queries, especially with relay hints
+    const connectionWait = relayHints.length > 0 ? 1500 : 2000;
+    await new Promise(resolve => setTimeout(resolve, connectionWait));
 
     // Check how many relays connected
     const connectedRelays = Array.from(ndk?.pool?.relays?.values() || [])
@@ -111,7 +129,8 @@ async function fetchEvent(eventId, relayHints = []) {
     console.log(`📡 Connected to ${connectedRelays.length}/${relaysToUse.length} relays`);
 
     // Fetch the specific event with timeout
-    const FETCH_TIMEOUT = 10000; // 10 seconds
+    // Increased timeout to 15s for better reliability
+    const FETCH_TIMEOUT = 15000; // 15 seconds
 
     console.log(`⏳ Searching for event across relays (timeout: ${FETCH_TIMEOUT/1000}s)...`);
 
@@ -244,6 +263,7 @@ async function main() {
         console.log('Examples:');
         console.log('  node scripts/extract-from-note.js note1j2nrek2hgxqpjl6dfuq3vlvxggrw2j8lckhyy3xhlugmmmr9rf0q8vmxdm');
         console.log('  node scripts/extract-from-note.js nevent1qqs0kffj6lzarcemqd4acdlnkdsczzyt29kdjngrz3896jvxmdz5qmgprdmhxue69uhhg6r9vehhyetnwshxummnw3erztnrdakj7mk5wrd');
+        console.log('  node scripts/extract-from-note.js nostr:note1j2nrek2hgxqpjl6dfuq3vlvxggrw2j8lckhyy3xhlugmmmr9rf0q8vmxdm');
         process.exit(1);
     }
 

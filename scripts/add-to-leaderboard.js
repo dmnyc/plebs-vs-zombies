@@ -12,6 +12,7 @@
  * Examples:
  *   node scripts/add-to-leaderboard.js note1abc...
  *   node scripts/add-to-leaderboard.js note1abc... nevent1xyz... note1def...
+ *   node scripts/add-to-leaderboard.js nostr:note1abc...
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -144,8 +145,9 @@ async function main() {
     if (args.length === 0) {
         console.error('❌ Error: No note IDs provided\n');
         console.log('Usage: node scripts/add-to-leaderboard.js <note-id-1> [note-id-2] ...\n');
-        console.log('Example:');
+        console.log('Examples:');
         console.log('  node scripts/add-to-leaderboard.js note1abc... nevent1xyz...');
+        console.log('  node scripts/add-to-leaderboard.js nostr:note1abc...');
         process.exit(1);
     }
 
