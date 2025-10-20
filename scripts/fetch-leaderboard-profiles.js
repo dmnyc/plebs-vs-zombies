@@ -38,6 +38,7 @@ const participants = [
     { npub: "npub1xswmtflr4yclfyy4mq4y4nynnnu2vu5nk8jp0875khq9gnz0cthsc0p4xw", zombiesKilled: 176, processedEventIds: [] },
     { npub: "npub1qqqqqqz7nhdqz3uuwmzlflxt46lyu7zkuqhcapddhgz66c4ddynswreecw", zombiesKilled: 160, processedEventIds: [] },
     { npub: "npub1vsmh0r2t6ewglryvfu79mzx69ze6v8qpaqr6e5pgc4krtwjnd5tsqpzk4u", zombiesKilled: 152, processedEventIds: [] },
+    { npub: "npub1q92nwwk8ndllkr6cdslxswt0n6pdgmm6lecpd4rwm89ydw37r0kslptxrw", zombiesKilled: 139, processedEventIds: ["c77182430793f0a316f43086f366ea64effb9b08b5548827e037e296bb47630d"] },
     { npub: "npub1eq94yj8maree90pm53gfr76wdc44su3cwcqmly848xfrv6es6usqg4er58", zombiesKilled: 135, processedEventIds: [] },
     { npub: "npub1njst6azswskk5gp3ns8r6nr8nj0qg65acu8gaa2u9yz7yszjxs9s6k7fqx", zombiesKilled: 132, processedEventIds: [] },
     { npub: "npub1lxzaxzge0jq9u9cecucctdt5lslwgp7hcxmp2l0wn8r2ecjenwasu6svxa", zombiesKilled: 104, processedEventIds: [] },
@@ -86,6 +87,55 @@ const RELAYS = [
     'wss://nostr.wine'
 ];
 
+// Protected entries that must NEVER be removed
+// These entries have manualProfile and cannot be fetched from relays
+const PROTECTED_ENTRIES = [
+    {
+        npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr",
+        zombiesKilled: 384,
+        processedEventIds: [],
+        manualProfile: {
+            name: "₿33Zy ₿",
+            handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr",
+            picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg"
+        }
+    }
+];
+
+// Validate that protected entries are present
+function validateProtectedEntries() {
+    const missingEntries = [];
+
+    for (const protectedEntry of PROTECTED_ENTRIES) {
+        const exists = participants.some(p => p.npub === protectedEntry.npub);
+        if (!exists) {
+            missingEntries.push(protectedEntry);
+        }
+    }
+
+    if (missingEntries.length > 0) {
+        console.error('⚠️  WARNING: Protected entries are missing from participants array!');
+        console.error('⚠️  These entries will be automatically restored:\n');
+        missingEntries.forEach(entry => {
+            console.error(`   - ${entry.manualProfile.name} (${entry.npub.substring(0, 16)}...)`);
+        });
+        console.error('');
+
+        // Auto-restore missing entries by inserting them in the correct position (sorted by zombiesKilled)
+        for (const missing of missingEntries) {
+            // Find insertion point to maintain sort order
+            const insertIndex = participants.findIndex(p => p.zombiesKilled < missing.zombiesKilled);
+            if (insertIndex === -1) {
+                participants.push(missing);
+            } else {
+                participants.splice(insertIndex, 0, missing);
+            }
+            console.log(`✅ Restored: ${missing.manualProfile.name} (${missing.zombiesKilled} kills)`);
+        }
+        console.log('');
+    }
+}
+
 // Helper function to truncate npub for fallback display
 function truncateNpub(npub) {
     return npub.substring(0, 10) + '...' + npub.substring(npub.length - 6);
@@ -93,6 +143,9 @@ function truncateNpub(npub) {
 
 // Main function
 async function fetchProfiles() {
+    // Validate protected entries before doing anything
+    validateProtectedEntries();
+
     console.log('🔍 Fetching profiles from Nostr relays...\n');
 
     // Initialize NDK
