@@ -25,7 +25,7 @@ const participants = [
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
     { npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", zombiesKilled: 642, processedEventIds: ["6566c29081add24d27c69a8b5ef99dbacb3873471b7d2d340538edf79cfc4920","4b00da1c015be2e51aad52009f7a0fc7e5ebfc654dfa7ccef3aec8519445cb04","5ac3e135f0d11e7df75a6a59110998e8af214c88f7fffc502411de602c506b55","fbbee69cdf4e93479d1890c3aeddd2b8504ce5f09ae60d5d4a016258c1d93a57"] },
     { npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", zombiesKilled: 439, processedEventIds: ["dc98599624fdb92b17b3d039970b0040c444749477183003d9cf0acae39148d8","957d2af72fb5b94ba31fb96f846e4884035175d43530a8f523d3f91b96c7a174"] },
-    { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: [], manualProfile: { name: "₿33Zy ₿", handle: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg" } },
+    { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: [], manualProfile: {"name":"₿33Zy ₿","handle":"npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr","picture":"https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg"} },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320, processedEventIds: [] },
     { npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", zombiesKilled: 298, processedEventIds: [] },
     { npub: "npub1qn4ylq6s79tz4gwkphq8q4sltwurs6s36xsq2u8aw3qd5ggwzufsw3s3yz", zombiesKilled: 272, processedEventIds: ["f3899a9bbbcd893c7e36734f94acbd209b2f9f47483118cdf045ffc0f9a70f71"] },
@@ -49,6 +49,7 @@ const participants = [
     { npub: "npub1jgn3dnnntuatzae2nqkhg2zp54tqxk3t6zpzljf8x9h7le89gagsxrwwl3", zombiesKilled: 67, processedEventIds: ["05e86cf209e767cb939433908ef1868ab79ceaf43cf2aacb26ab19e99dbbbc6d","32195de99a5195259166bac6c250e7b496d3b64a0b9dc140ebd699034be652ac","9f99bfe02604b44149dec7f24584506976f4c90faf2d9162fe28ba38b93d132b"] },
     { npub: "npub1vp8fdcyejd4pqjyrjk9sgz68vuhq7pyvnzk8j0ehlljvwgp8n6eqsrnpsw", zombiesKilled: 62, processedEventIds: [] },
     { npub: "npub1m6x20f4n7uc5ayvjr4xut6g4ldau90fjz202d9nrythl5jq9p3xq579dnn", zombiesKilled: 59, processedEventIds: ["c8c9cd0934530343d6bda98e1a5469c647800b1afd51ef3d98b18197dbcf0cba"] },
+    { npub: "npub10ukkl43wsl324tvz2mgmlmslq8h0zdndpsyvfwm5kzqpger3pysse6a3ya", zombiesKilled: 40, processedEventIds: ["7417252bc02ec21b06908e15b963961a8e654c199a01853678484b4bb07bf13f"] },
     { npub: "npub157dmyq6ehpra5xatrn0sssz03qe0y6k69v02xmzyqcrf0h0xxf5qxaw6u8", zombiesKilled: 34, processedEventIds: [] },
     { npub: "npub1qntwuu24q5lq0g94sz522nzaa646s3gtzklngazxymvl0zdcyzps889v2d", zombiesKilled: 31, processedEventIds: [] },
     { npub: "npub19z9asfqjplh52ql3f9rc30706gwjxktgdyp3ap6sv08rvruzr3tsk4ylst", zombiesKilled: 30, processedEventIds: [] },
@@ -58,7 +59,6 @@ const participants = [
     { npub: "npub1vgldyxx7syc30qm9v7padnnfpdfp4zwymsyl9ztzuklaf7j5jfyspk36wu", zombiesKilled: 24, processedEventIds: [] },
     { npub: "npub190queyng2pmx0jfw5rkx4fjjl3u0zxz6nlyaja53p2n0ydupr6jsdnqt8q", zombiesKilled: 21, processedEventIds: [] },
     { npub: "npub1nz4y6dxnt0kzvgyhyvwnqklpennhv20dgly4c5gnpx4aa6ns08vqr8kkgx", zombiesKilled: 20, processedEventIds: [] },
-    { npub: "npub10ukkl43wsl324tvz2mgmlmslq8h0zdndpsyvfwm5kzqpger3pysse6a3ya", zombiesKilled: 20, processedEventIds: [] },
     { npub: "npub12u56mxg60cxt3zt3emfrfp6czptep4g3vzsfkgksmreeefmzmcgsuye0ve", zombiesKilled: 20, processedEventIds: [] },
     { npub: "npub1uzt238htjzpq39dxmltlx60vxym9fetk9czz6kddq6fhvkf4z3usy9qtrh", zombiesKilled: 19, processedEventIds: [] },
     { npub: "npub1cd6syy4q0rha3kzdz2yw5782y4yj9snvzd8rcxjy6e9kldcmpeuq6dw96r", zombiesKilled: 19, processedEventIds: ["ad2b54ed215d65c2807050f487979a752e726ee3c2b3653d49fa71f6ad863149"] },
@@ -68,6 +68,7 @@ const participants = [
     { npub: "npub1ptwv0m9uytzkz3k5te3y9j9k46f5r4h4ts5gdh0qzfp88qn2tgsshc2nu0", zombiesKilled: 10, processedEventIds: [] },
     { npub: "npub1kgh77xxt7hhtt4u528hecnx69rhagla8jj3tclgyf9wvkxa6dc0szxkuut", zombiesKilled: 10, processedEventIds: [] },
     { npub: "npub1m2jphmdkskgnvwl5gplksl9e0zwv2sldqf9mwlpz6tyymz84g9fsqr3wgu", zombiesKilled: 9, processedEventIds: ["81471956fa649d26f79cec08ab9c9194a94c0661fa9feaed87ccec0755240882"] },
+    { npub: "npub1luh5e4uxus45xgm5njg4zlk8htezmlgrtdapqxl2swmw9096e52sgjlqgz", zombiesKilled: 7, processedEventIds: ["c869de420de9e0916838283efd7b3c55f6379671be0206439070d16dc754e2d1"] },
     { npub: "npub1slmplexzafjdny6w6ucjqrqugx5ldh0dg2v58r3ksld63h6atw5szx9sfh", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub14hz3xluls73nc8eyvy6fljm6tf8zt0xkxpgxngch36txfv24ycvs622r7l", zombiesKilled: 5, processedEventIds: [] },
@@ -102,7 +103,7 @@ const PROTECTED_ENTRIES = [
 ];
 
 // Validate that protected entries are present
-function validateProtectedEntries() {
+async function validateProtectedEntries() {
     const missingEntries = [];
 
     for (const protectedEntry of PROTECTED_ENTRIES) {
@@ -114,7 +115,7 @@ function validateProtectedEntries() {
 
     if (missingEntries.length > 0) {
         console.error('⚠️  WARNING: Protected entries are missing from participants array!');
-        console.error('⚠️  These entries will be automatically restored:\n');
+        console.error('⚠️  These entries will be automatically restored and saved:\n');
         missingEntries.forEach(entry => {
             console.error(`   - ${entry.manualProfile.name} (${entry.npub.substring(0, 16)}...)`);
         });
@@ -132,7 +133,52 @@ function validateProtectedEntries() {
             console.log(`✅ Restored: ${missing.manualProfile.name} (${missing.zombiesKilled} kills)`);
         }
         console.log('');
+
+        // Persist the corrected participants array back to the file
+        await persistProtectedEntries();
     }
+}
+
+// Persist protected entries back to the source file
+async function persistProtectedEntries() {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const scriptPath = __filename;
+
+    console.log('💾 Persisting protected entries to source file...\n');
+
+    // Read the current file
+    let fileContent = fs.readFileSync(scriptPath, 'utf-8');
+
+    // Generate the new participants array string
+    let participantsStr = 'const participants = [\n';
+    participants.forEach((p, i) => {
+        const comma = i < participants.length - 1 ? ',' : '';
+
+        // Format the entry
+        let entryStr = `    { npub: "${p.npub}", zombiesKilled: ${p.zombiesKilled}, processedEventIds: ${JSON.stringify(p.processedEventIds || [])}`;
+
+        if (p.manualProfile) {
+            entryStr += `, manualProfile: ${JSON.stringify(p.manualProfile)}`;
+        }
+
+        entryStr += ` }${comma}`;
+        participantsStr += entryStr + '\n';
+    });
+    participantsStr += '];';
+
+    // Replace the participants array in the file
+    const participantsRegex = /const participants = \[[\s\S]*?\];/;
+    fileContent = fileContent.replace(participantsRegex, participantsStr);
+
+    // Write back to file
+    fs.writeFileSync(scriptPath, fileContent, 'utf-8');
+
+    console.log('✅ Protected entries saved to source file\n');
 }
 
 // Helper function to truncate npub for fallback display
@@ -143,7 +189,7 @@ function truncateNpub(npub) {
 // Main function
 async function fetchProfiles() {
     // Validate protected entries before doing anything
-    validateProtectedEntries();
+    await validateProtectedEntries();
 
     console.log('🔍 Fetching profiles from Nostr relays...\n');
 
