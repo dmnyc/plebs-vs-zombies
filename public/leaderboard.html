@@ -645,13 +645,15 @@ See: /COMPETITION-OCTOBER-2025.md
         // 3. Do NOT manually reorder the array - the sort() on line 621 handles ordering
         // 4. Do NOT delete entries unless the participant withdrew from the competition
         //
+        // DISQUALIFICATION: Set disqualified: true to remove from leaderboard
+        //
         const participants = [
     { name: "Tico 🇨🇷", handle: "tico@primal.net", npub: "npub148ut8u4vr8xqd4gefhg6eyc5636p5zthw3zfse2njfkezegczers59ty0w", picture: "https://21millonesbtc.com/wp-content/uploads/2022/07/BITCOIN-BEACH-1024x682.jpg", zombiesKilled: 2935 },
     { name: "Worlds Gone Mad", handle: "WorldsGoneMad@NostrAddress.com", npub: "npub1ppl78tdsjs53x2ldewg0zdvwz9ufsz36tynt5pkd74s6feell59s6ejlum", picture: "https://m.primal.net/NcWJ.jpg", zombiesKilled: 2261 },
     { name: "The Bitcoin Street Journal", handle: "_@thebitcoinstreetjournal.com", npub: "npub1qnmamgyup683z9ehn40jrdgryjhn8qlpntwzqsrk8r80n3xspdrq4r245g", picture: "https://i.nostr.build/sAziVgTaqx4GPTDt.png", zombiesKilled: 1466 },
     { name: "HavelFun", handle: "henningd@iris.to", npub: "npub1faaxjg39cmycqfmgghz8tsat0qvnnnkmaaf6fvpx8lxr63qgtu2s5j7tj3", picture: "https://nostr.build/i/3d3965a052ac60a0272c2fd73cb3900fcaf6dfa46996d81765e0c3b0534ab664.jpg", zombiesKilled: 1429 },
     { name: "Squirrelfriend", handle: "squirrelfriend@iris.to", npub: "npub1yejzp928cg48s3q857v8lnmmcqypmsrvmn9e3mruvx2nkntncm2qumhgha", picture: "https://nostr.build/i/nostr.build_9f466342f6e756077269624747db72d8cc256648de0629d1bd50c8f238b43dc5.jpg", zombiesKilled: 1281 },
-    { name: "oadissin", handle: "oadissin@rizful.com", npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", picture: "https://m.primal.net/Jabw.png", zombiesKilled: 832 },
+    { name: "oadissin", handle: "oadissin@rizful.com", npub: "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu", picture: "https://m.primal.net/Jabw.png", zombiesKilled: 832, disqualified: true },
     { name: "Dan Wedge", handle: "wedgesocial@nostrplebs.com", npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", picture: "https://image.nostr.build/85eb04d33e33c89e3d82cc788a897b9c315b92bccf11d717697e67bd5a27577b.jpg", zombiesKilled: 675 },
     { name: "IntuitiveGuy☯️", handle: "intuitiveguy@nostrplebs.com", npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", picture: "https://i.nostr.build/nb9628.gif", zombiesKilled: 645 },
     { name: "wip", handle: "bitpanter@hodl.ar", npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", picture: "https://m.primal.net/Hnce.webp", zombiesKilled: 439 },
@@ -708,16 +710,19 @@ See: /COMPETITION-OCTOBER-2025.md
     { name: "chamber32", handle: "chamber32@iris.to", npub: "npub1eejrfpegp2j5quvjrx960c9a8k9avsvufsglj7ecw3xuz32cpygqc8fmhw", picture: "https://nostr.build/i/f4c19615b44ae325162ae307756ead1fa494a47120dd126b01cd56c2a8ce8122.jpg", zombiesKilled: 1 }
 ];
 
+        // Filter out disqualified participants
+        const eligibleParticipants = participants.filter(p => !p.disqualified);
+
         // Sort participants by zombies killed (descending)
-        participants.sort((a, b) => b.zombiesKilled - a.zombiesKilled);
+        eligibleParticipants.sort((a, b) => b.zombiesKilled - a.zombiesKilled);
 
         // Limit to top 50 for display
         const MAX_DISPLAY = 50;
-        const displayedParticipants = participants.slice(0, MAX_DISPLAY);
+        const displayedParticipants = eligibleParticipants.slice(0, MAX_DISPLAY);
 
-        // Calculate statistics (using all participants)
-        const totalParticipants = participants.length;
-        const totalZombiesKilled = participants.reduce((sum, p) => sum + p.zombiesKilled, 0);
+        // Calculate statistics (using all eligible participants)
+        const totalParticipants = eligibleParticipants.length;
+        const totalZombiesKilled = eligibleParticipants.reduce((sum, p) => sum + p.zombiesKilled, 0);
         const avgZombiesKilled = totalParticipants > 0 ? Math.round(totalZombiesKilled / totalParticipants) : 0;
 
         // Update stats
@@ -830,7 +835,7 @@ See: /COMPETITION-OCTOBER-2025.md
             });
 
             // Add "more participants" message if there are more than 50
-            const remainingCount = participants.length - MAX_DISPLAY;
+            const remainingCount = eligibleParticipants.length - MAX_DISPLAY;
             if (remainingCount > 0) {
                 const moreMessage = document.createElement('div');
                 moreMessage.className = 'info-note';
