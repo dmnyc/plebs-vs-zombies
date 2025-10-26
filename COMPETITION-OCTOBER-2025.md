@@ -185,6 +185,17 @@ If you prefer manual removal:
 - Keep competition logic isolated
 - Document all changes thoroughly
 
+### Competition Page Anchor Links
+The competition page (`/public/competition.html`) includes anchor links for all major sections:
+- `#sponsor` - Sponsor section
+- `#prizes` - Prize pool section
+- `#how-to-enter` - How to enter instructions
+- `#rules` - Competition rules
+- `#anti-cheating` - Anti-cheating policy (can be shared directly)
+- `#what-are-zombies` - What are zombies explanation
+
+Example: `https://plebsvszombies.cc/competition#anti-cheating`
+
 ---
 
 ## Archive Location (After Removal)
