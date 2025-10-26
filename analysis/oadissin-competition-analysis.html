@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competition Analysis - When Zombie Hunting Goes Too Far</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(31, 41, 55, 0.8);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(107, 114, 128, 0.2);
+        }
+
+        .title {
+            font-family: 'Creepster', cursive;
+            font-size: 3rem;
+            background: linear-gradient(45deg, #10b981, #f59e0b, #ef4444);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 3s ease infinite;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.2));
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .info-box h2 {
+            font-family: 'Creepster', cursive;
+            font-size: 2rem;
+            color: #fbbf24;
+            margin-bottom: 15px;
+        }
+
+        .info-box p {
+            color: #d1d5db;
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        .emoji-line {
+            font-size: 2.5rem;
+            margin: 20px 0;
+            letter-spacing: 15px;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 450px;
+            margin: 40px 0;
+            background: rgba(17, 24, 39, 0.6);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(107, 114, 128, 0.2);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+            border: 2px solid rgba(16, 185, 129, 0.4);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card.warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2));
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #10b981;
+            margin: 10px 0;
+        }
+
+        .stat-card.warning .stat-value {
+            color: #fbbf24;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(107, 114, 128, 0.3);
+        }
+
+        th {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            font-weight: 700;
+        }
+
+        tr.backup-row {
+            background: rgba(59, 130, 246, 0.1);
+            font-weight: 600;
+        }
+
+        tr.notable {
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .section-header {
+            font-family: 'Creepster', cursive;
+            font-size: 2rem;
+            color: #10b981;
+            margin: 40px 0 20px;
+            text-align: center;
+        }
+
+        .explanation-box {
+            background: rgba(17, 24, 39, 0.6);
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .explanation-box h3 {
+            color: #10b981;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .explanation-box p {
+            color: #d1d5db;
+            line-height: 1.6;
+        }
+
+        .verdict-box {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15));
+            border: 3px solid rgba(245, 158, 11, 0.5);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        .verdict-box h2 {
+            font-family: 'Creepster', cursive;
+            font-size: 2.5rem;
+            color: #fbbf24;
+            margin-bottom: 20px;
+        }
+
+        .verdict-box ul {
+            text-align: left;
+            display: inline-block;
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .verdict-box li {
+            margin: 12px 0;
+            font-size: 1.1rem;
+            color: #d1d5db;
+        }
+
+        .verdict-box li:before {
+            content: "🧟 ";
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            color: #6b7280;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(107, 114, 128, 0.2);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">When Zombie Hunting Goes TOO Far</h1>
+        <div class="emoji-line">🧟‍♂️ 📈 🤔 📊 🎯</div>
+
+        <div class="subtitle">
+            <strong>Competition Review for User: oadissin</strong><br>
+            Top Zombie Challenge - October 2025<br>
+            Analysis Date: October 26, 2025
+        </div>
+
+        <div class="info-box">
+            <h2>Plot Twist: The Zombies Multiplied!</h2>
+            <p>
+                Looks like someone got a <em>little too enthusiastic</em> about finding zombies! 🧟‍♂️💀<br>
+                Instead of clearing out the undead, new zombies kept... appearing? 🤨
+            </p>
+            <p style="margin-top: 15px; font-size: 1rem;">
+                We reviewed the backup files and found some <strong>interesting patterns</strong> that suggest<br>
+                a fundamental misunderstanding of how the competition works.
+            </p>
+        </div>
+
+        <h2 class="section-header">📊 The Data Story</h2>
+        <p style="text-align: center; color: #9ca3af; margin-bottom: 20px;">
+            Blue dots = calculated from posts | Orange squares = confirmed by backup files
+        </p>
+
+        <div class="chart-container">
+            <canvas id="followsChart"></canvas>
+        </div>
+
+        <div class="explanation-box">
+            <h3>🤔 Wait... Why Did the Numbers Go UP?</h3>
+            <p>
+                In Plebs vs. Zombies, the goal is to <strong>remove</strong> zombies from your follow list.
+                Your follow count should go <strong>down</strong> after each purge, not up!
+                The backup files show the follow count increased by thousands between purges,
+                which means new follows were being added rather than removed.
+            </p>
+            <p style="margin-top: 10px;">
+                It's like trying to win a "clean your room" contest by bringing in MORE stuff from the garage.
+                Technically you're handling more items, but... that's not quite the spirit of the challenge! 😅
+            </p>
+        </div>
+
+        <h2 class="section-header">🧟 The Zombie Percentage Plot Twist</h2>
+
+        <div class="chart-container">
+            <canvas id="zombieChart"></canvas>
+        </div>
+
+        <div class="explanation-box">
+            <h3>📈 The Percentage That Shouldn't Rise</h3>
+            <p>
+                The zombie percentage started at 4% and climbed all the way to 32%.
+                For regular Nostr users actively following real people, this number should go <strong>down</strong> over time
+                as you remove inactive accounts.
+            </p>
+            <p style="margin-top: 10px;">
+                An <em>increasing</em> zombie percentage suggests that most of the new follows being added were...
+                well, already zombies! It's like restocking a zombie apocalypse instead of surviving one. 🧟‍♂️📈
+            </p>
+        </div>
+
+        <h2 class="section-header">📋 Complete Timeline</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Event</th>
+                    <th>Kills Posted</th>
+                    <th>Zombie %</th>
+                    <th>Follow Count</th>
+                    <th>Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Oct 12</td>
+                    <td>Early purge</td>
+                    <td>44</td>
+                    <td>4%</td>
+                    <td>~1,100</td>
+                    <td>-</td>
+                </tr>
+                <tr class="notable">
+                    <td>Oct 15-17</td>
+                    <td>Multiple purges</td>
+                    <td>126-199</td>
+                    <td>9-10%</td>
+                    <td>~1,260-2,211</td>
+                    <td>Growing</td>
+                </tr>
+                <tr class="backup-row">
+                    <td>Oct 19</td>
+                    <td>📦 Backup file</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><strong>2,813</strong></td>
+                    <td>✅ Confirmed</td>
+                </tr>
+                <tr class="backup-row">
+                    <td>Oct 20</td>
+                    <td>📦 Backup file</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><strong>2,662</strong></td>
+                    <td>-151 (normal)</td>
+                </tr>
+                <tr>
+                    <td>Oct 21</td>
+                    <td>Posted purge</td>
+                    <td>190</td>
+                    <td>7%</td>
+                    <td>~2,714</td>
+                    <td>Looked normal</td>
+                </tr>
+                <tr class="backup-row notable">
+                    <td>Oct 20 PM</td>
+                    <td>📦 Backup file</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><strong>4,167</strong></td>
+                    <td>+1,505 🤔</td>
+                </tr>
+                <tr class="backup-row notable">
+                    <td>Oct 23</td>
+                    <td>📦 Backup file</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><strong>6,689</strong></td>
+                    <td>+2,522 🤔</td>
+                </tr>
+                <tr class="notable">
+                    <td>Oct 25</td>
+                    <td>Posted purges</td>
+                    <td>1,052 → 3,107</td>
+                    <td>20% → 32%</td>
+                    <td>~9,709 (calculated)</td>
+                    <td>Still growing! 😅</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2 class="section-header">🎯 Key Observations</h2>
+
+        <div class="stats-grid">
+            <div class="stat-card warning">
+                <div class="stat-label">Follow Growth</div>
+                <div class="stat-value">+7,209</div>
+                <div class="stat-label">From 1,100 → 9,709</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-label">Zombie % Change</div>
+                <div class="stat-value">4% → 32%</div>
+                <div class="stat-label">Should go down, not up!</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Backup Files</div>
+                <div class="stat-value">5</div>
+                <div class="stat-label">Reviewed in detail</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Purge Posts</div>
+                <div class="stat-value">9</div>
+                <div class="stat-label">From Nostr timeline</div>
+            </div>
+        </div>
+
+        <div class="explanation-box">
+            <h3>🎮 How The Game Actually Works</h3>
+            <p>
+                <strong>Plebs vs. Zombies</strong> is designed to help you <em>clean up</em> your follow list by finding and removing dormant accounts (zombies).
+                The goal is to make your list leaner and more active, not to grow it exponentially!
+            </p>
+            <p style="margin-top: 10px;">
+                <strong>How competition scoring works:</strong><br>
+                • You scan YOUR existing follow list for zombies<br>
+                • You purge the zombies you don't want to follow anymore<br>
+                • Your kill count = zombies you removed from your <em>actual</em> follow list<br>
+                • The competition rewards cleaning up real zombie problems, not creating them!
+            </p>
+        </div>
+
+        <div class="verdict-box">
+            <h2>🏁 Final Decision</h2>
+            <p style="font-size: 1.2rem; color: #d1d5db; margin-bottom: 20px;">
+                After reviewing all the data, we believe there was a fundamental<br>
+                <strong style="color: #fbbf24;">misunderstanding of how the game and competition work</strong>.
+            </p>
+            <ul>
+                <li>The pattern shows follows being added instead of removed</li>
+                <li>The zombie percentage kept rising instead of falling</li>
+                <li>The math suggests the follow list grew by 7,000+ in two weeks</li>
+                <li>This doesn't match legitimate zombie hunting behavior</li>
+            </ul>
+            <p style="font-size: 1.15rem; margin-top: 25px; color: #fbbf24; line-height: 1.8;">
+                Since we can't determine the original intent, we're removing this entry<br>
+                from prize eligibility to keep the competition fair for everyone else.<br><br>
+                <strong>Thanks for your understanding!</strong> 🎯
+            </p>
+        </div>
+
+        <div class="info-box">
+            <h2>📜 How The Competition Works</h2>
+            <p>
+                To keep the competition fair for all participants:<br>
+                <strong>You compete by removing zombies from your REAL follow list, not by adding more follows!</strong>
+            </p>
+            <p style="margin-top: 15px;">
+                The goal is to clean up your existing network by identifying and removing dormant accounts.<br>
+                Happy zombie hunting! 🏹🧟‍♂️
+            </p>
+        </div>
+
+        <div class="footer">
+            <p><strong>Analysis completed: October 26, 2025</strong></p>
+            <p>Based on 5 backup files and 9 public Nostr events</p>
+            <p style="margin-top: 15px;">Plebs vs. Zombies - Keeping Nostr lean and zombie-free! 🧟‍♂️⚡</p>
+        </div>
+    </div>
+
+    <script>
+        // Follows Timeline Chart
+        const followsCtx = document.getElementById('followsChart').getContext('2d');
+        new Chart(followsCtx, {
+            type: 'line',
+            data: {
+                labels: ['Oct 12', 'Oct 15', 'Oct 17', 'Oct 19', 'Oct 19\nbackup', 'Oct 20\nbackup', 'Oct 21', 'Oct 20\nbackup', 'Oct 23\nbackup', 'Oct 25'],
+                datasets: [
+                    {
+                        label: 'Calculated from Posts',
+                        data: [1100, 1260, 2211, 2500, null, null, 2714, null, null, 9709],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 7,
+                        pointBackgroundColor: '#3b82f6',
+                        fill: false,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Confirmed by Backup Files',
+                        data: [null, null, null, null, 2813, 2662, null, 4167, 6689, null],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                        borderWidth: 3,
+                        pointRadius: 9,
+                        pointStyle: 'rect',
+                        pointBackgroundColor: '#f59e0b',
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Follow Count Timeline - Notice the upward trend? 🤔',
+                        color: '#10b981',
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    legend: {
+                        labels: { color: '#9ca3af' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(107, 114, 128, 0.2)' },
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return value.toLocaleString();
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { color: 'rgba(107, 114, 128, 0.2)' },
+                        ticks: { color: '#9ca3af' }
+                    }
+                }
+            }
+        });
+
+        // Zombie Percentage Chart
+        const zombieCtx = document.getElementById('zombieChart').getContext('2d');
+        new Chart(zombieCtx, {
+            type: 'line',
+            data: {
+                labels: ['Oct 12', 'Oct 15', 'Oct 17', 'Oct 19', 'Oct 21', 'Oct 25 AM', 'Oct 25 PM'],
+                datasets: [{
+                    label: 'Zombie Percentage',
+                    data: [4, 10, 9, 13, 7, 20, 32],
+                    borderColor: '#fbbf24',
+                    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                    borderWidth: 3,
+                    pointRadius: 8,
+                    pointBackgroundColor: ['#10b981', '#f59e0b', '#f59e0b', '#f59e0b', '#10b981', '#ef4444', '#ef4444'],
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Zombie Percentage Over Time - This should go DOWN! 📉',
+                        color: '#10b981',
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 35,
+                        grid: { color: 'rgba(107, 114, 128, 0.2)' },
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { color: 'rgba(107, 114, 128, 0.2)' },
+                        ticks: { color: '#9ca3af' }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -41,6 +41,7 @@ dist-ssr
 
 # Screenshots and investigation files
 screenshots/
+temp/
 zombie-investigation.js
 zombie-comparison-analysis.md
 dev-notes.md
