@@ -20,6 +20,12 @@ import { execSync } from 'child_process';
 import readline from 'readline';
 import { extractFromNote } from './extract-from-note.js';
 
+// Disqualified users - these npubs should be blocked from being added to the leaderboard
+// This list must match the DISQUALIFIED_USERS list in fetch-leaderboard-profiles.js
+const DISQUALIFIED_USERS = [
+    "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu"  // oadissin - zombie count inflation
+];
+
 /**
  * Prompt user for confirmation
  */
@@ -240,6 +246,16 @@ async function main() {
     const skippedEvents = [];
 
     for (const data of consolidatedData) {
+        // Block disqualified users from being added or updated
+        if (DISQUALIFIED_USERS.includes(data.npub)) {
+            skippedEvents.push({
+                npub: data.npub,
+                authorName: data.authorName,
+                reason: 'User is disqualified'
+            });
+            continue;
+        }
+
         const existingParticipant = currentParticipants.find(p => p.npub === data.npub);
         if (existingParticipant) {
             // Filter out already-processed events

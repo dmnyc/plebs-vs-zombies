@@ -37,6 +37,7 @@ const participants = [
     { npub: "npub1xswmtflr4yclfyy4mq4y4nynnnu2vu5nk8jp0875khq9gnz0cthsc0p4xw", zombiesKilled: 176, processedEventIds: [] },
     { npub: "npub1qqqqqqz7nhdqz3uuwmzlflxt46lyu7zkuqhcapddhgz66c4ddynswreecw", zombiesKilled: 160, processedEventIds: [] },
     { npub: "npub1vsmh0r2t6ewglryvfu79mzx69ze6v8qpaqr6e5pgc4krtwjnd5tsqpzk4u", zombiesKilled: 152, processedEventIds: [] },
+    { npub: "npub1mvenvvmenmmlnkajjeate0kk27mvvatcgk0jhs4a3r2cg2nql92qzsgn3v", zombiesKilled: 149, processedEventIds: ["bb2bdea1bc7035193b4235d65f4529b5b6b6b8bd7405cb4808bfc6b614746f99"] },
     { npub: "npub1q92nwwk8ndllkr6cdslxswt0n6pdgmm6lecpd4rwm89ydw37r0kslptxrw", zombiesKilled: 139, processedEventIds: ["c77182430793f0a316f43086f366ea64effb9b08b5548827e037e296bb47630d"] },
     { npub: "npub1eq94yj8maree90pm53gfr76wdc44su3cwcqmly848xfrv6es6usqg4er58", zombiesKilled: 135, processedEventIds: [] },
     { npub: "npub1njst6azswskk5gp3ns8r6nr8nj0qg65acu8gaa2u9yz7yszjxs9s6k7fqx", zombiesKilled: 132, processedEventIds: [] },
@@ -71,6 +72,7 @@ const participants = [
     { npub: "npub1luh5e4uxus45xgm5njg4zlk8htezmlgrtdapqxl2swmw9096e52sgjlqgz", zombiesKilled: 7, processedEventIds: ["c869de420de9e0916838283efd7b3c55f6379671be0206439070d16dc754e2d1"] },
     { npub: "npub1slmplexzafjdny6w6ucjqrqugx5ldh0dg2v58r3ksld63h6atw5szx9sfh", zombiesKilled: 6, processedEventIds: [] },
     { npub: "npub1cwhy4k8qd2guyqz8t45u4yzyp4k4fhnjn573ukh6e77mde2dgm9s2lujc5", zombiesKilled: 6, processedEventIds: [] },
+    { npub: "npub1r4f400ekc57sjg05v883nxpjmfudjgutf95d8dgc2pgazx7lpffqaf063p", zombiesKilled: 6, processedEventIds: ["87fff782f1fa271ebf29469d6f8e3b1efabf028d9c32b9e8a775ce845cbeee0e"] },
     { npub: "npub14hz3xluls73nc8eyvy6fljm6tf8zt0xkxpgxngch36txfv24ycvs622r7l", zombiesKilled: 5, processedEventIds: [] },
     { npub: "npub1rsqajguwyds0zne9qqy33n55cd6dg68zrkwyj7y8l69me04yc79qf53rt4", zombiesKilled: 4, processedEventIds: [] },
     { npub: "npub1m4ny6hjqzepn4rxknuq94c2gpqzr29ufkkw7ttcxyak7v43n6vvsajc2jl", zombiesKilled: 4, processedEventIds: [] },
@@ -100,6 +102,12 @@ const PROTECTED_ENTRIES = [
             picture: "https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg"
         }
     }
+];
+
+// Disqualified users - these npubs are marked as disqualified in the output
+// They are kept in the participants array for record-keeping but flagged as ineligible
+const DISQUALIFIED_USERS = [
+    "npub1tmdt7ksm2pl5cftdpnt6fmslnvtjdsy4wdm73krxcamk7stupuhs92flxu"  // oadissin - zombie count inflation
 ];
 
 // Validate that protected entries are present
@@ -330,7 +338,8 @@ async function fetchProfiles() {
         const comma = i < enrichedParticipants.length - 1 ? ',' : '';
         const picture = p.picture ? `"${p.picture}"` : 'null';
         const manuallyFixedFlag = p.manuallyFixed ? ', manuallyFixed: true' : '';
-        console.log(`    { name: "${p.name}", handle: "${p.handle}", npub: "${p.npub}", picture: ${picture}, zombiesKilled: ${p.zombiesKilled}${manuallyFixedFlag} }${comma}`);
+        const disqualifiedFlag = DISQUALIFIED_USERS.includes(p.npub) ? ', disqualified: true' : '';
+        console.log(`    { name: "${p.name}", handle: "${p.handle}", npub: "${p.npub}", picture: ${picture}, zombiesKilled: ${p.zombiesKilled}${manuallyFixedFlag}${disqualifiedFlag} }${comma}`);
     });
     console.log('];\n');
 
