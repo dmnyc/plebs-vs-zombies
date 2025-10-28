@@ -25,6 +25,7 @@ const participants = [
     { npub: "npub1dgpt04w4c88wc0g262xaw8zvlm4mvwtmjhl0tn2sxtyjywsn6q4qt8ka3a", zombiesKilled: 675, processedEventIds: [] },
     { npub: "npub13pnmakf738yn6rv2ex9jgs7924renmderyp5d9rtztsr7ymxg3gqej06vw", zombiesKilled: 645, processedEventIds: ["7149f2f101cd73596d52091de3e8b2755b44a99edbfb6e84a71134b007da80d6"] },
     { npub: "npub1a73m8zj2u2y8ha5v83z0dga9290zhjtjhj3nkdjkgtkas6d2vw3s6dr5h4", zombiesKilled: 439, processedEventIds: ["dc98599624fdb92b17b3d039970b0040c444749477183003d9cf0acae39148d8","957d2af72fb5b94ba31fb96f846e4884035175d43530a8f523d3f91b96c7a174"] },
+    { npub: "npub1j5mx4f7dmgje62ccx5wzzvymm7rhhpul5tk93u2553cf2t3f9n5qva89ur", zombiesKilled: 408, processedEventIds: ["ff923b88ecba60be0be023e6a9f1003da111c4fbea445bde84de23b24e1d3cd8"] },
     { npub: "npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr", zombiesKilled: 384, processedEventIds: [], manualProfile: {"name":"₿33Zy ₿","handle":"npub1g9uxfl9ucrksgem38ne533qrmkv3g8wezzx4urhutactyxfzz7wsafz3nr","picture":"https://image.nostr.build/667e1acd8834a2f3eb3cf22fe96bbc778d848d19f9c3e36d8eb00cef53bf47dc.jpg"} },
     { npub: "npub1yllm60xfppclx6udwg2205pmhlrzhsppc2qgm3lz73tcy8skqheql2rwqs", zombiesKilled: 320, processedEventIds: [] },
     { npub: "npub1q46m7q7zv8qe2zqffhhjnj558fdtzjxy7akr0x9ytwa3zc4zhpus0m8rmu", zombiesKilled: 298, processedEventIds: [] },
