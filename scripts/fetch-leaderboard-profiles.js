@@ -42,6 +42,7 @@ const participants = [
     { npub: "npub1q92nwwk8ndllkr6cdslxswt0n6pdgmm6lecpd4rwm89ydw37r0kslptxrw", zombiesKilled: 139, processedEventIds: ["c77182430793f0a316f43086f366ea64effb9b08b5548827e037e296bb47630d"] },
     { npub: "npub1eq94yj8maree90pm53gfr76wdc44su3cwcqmly848xfrv6es6usqg4er58", zombiesKilled: 135, processedEventIds: [] },
     { npub: "npub1njst6azswskk5gp3ns8r6nr8nj0qg65acu8gaa2u9yz7yszjxs9s6k7fqx", zombiesKilled: 132, processedEventIds: [] },
+    { npub: "npub1n4c06ulcaegh396gc8g4mcss0gexdgc05wc89zq9xl8z8dfe2xjsgulmpg", zombiesKilled: 126, processedEventIds: ["7f23010865470194a4b766be9edcee5488fa9edf6214f98be3405ab75485af57"] },
     { npub: "npub1dmahfent0mtlh8ahhzu0ztslhw470azcyw3n599vvrxfysfg25mqurhrpq", zombiesKilled: 123, processedEventIds: ["a0f9d8ce064eefce0f36b19c74cbe89177520056d8555e2c4c4b15ca9a79697f"] },
     { npub: "npub1fyfeedhr0l6mf98uxphx8xwkez90k469lq7770h3g9c0hjmpfftq9hln3q", zombiesKilled: 112, processedEventIds: ["e8d93532d9c3e63cc4fc32e68e723a04c26a1fc73621fb537a4246f602a8f007"] },
     { npub: "npub1lxzaxzge0jq9u9cecucctdt5lslwgp7hcxmp2l0wn8r2ecjenwasu6svxa", zombiesKilled: 104, processedEventIds: [] },
