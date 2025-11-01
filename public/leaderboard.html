@@ -647,10 +647,8 @@ See: /COMPETITION-OCTOBER-2025.md
             if (diffDays > 0) {
                 const dayText = diffDays === 1 ? 'DAY' : 'DAYS';
                 countdownElement.textContent = `⏰ ${diffDays} ${dayText} LEFT! ⏰`;
-            } else if (diffDays === 0) {
-                countdownElement.textContent = `⏰ FINAL DAY! ⏰`;
             } else {
-                countdownElement.textContent = `🏁 COMPETITION ENDED 🏁`;
+                countdownElement.textContent = `🏆 WINNERS ANNOUNCED 🏆`;
             }
         }
 
