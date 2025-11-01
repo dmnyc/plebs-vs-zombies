@@ -267,70 +267,6 @@
 
       <!-- Login Screen -->
       <div v-else-if="!isConnected">
-        <!-- [TEMPORARY - October 2025 Competition] Top Zombie Challenge Banner -->
-        <!-- REMOVE AFTER: October 31, 2025 -->
-        <div v-if="showCompetitionBanner" class="max-w-4xl mx-auto mb-6">
-          <div class="relative bg-gradient-to-r from-purple-900/90 via-red-900/90 to-orange-900/90 border-2 border-yellow-500 rounded-lg p-6 shadow-2xl">
-            <!-- Close Button -->
-            <button
-              @click="showCompetitionBanner = false"
-              class="absolute top-3 right-3 text-gray-300 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/30 transition-colors"
-              aria-label="Close banner"
-            >
-              ×
-            </button>
-
-            <!-- Banner Content -->
-            <div class="text-center">
-              <div class="text-4xl mb-3">🏆💀⚡</div>
-              <h2 class="text-2xl sm:text-3xl font-bold text-yellow-400 mb-2">
-                TOP ZOMBIE CHALLENGE - OCTOBER 2025
-              </h2>
-              <p class="text-gray-200 text-lg mb-4">
-                The hunt is ON! Compete for over <strong class="text-yellow-400">100K sats</strong> in prizes!
-              </p>
-
-              <div class="flex flex-col sm:flex-row gap-3 justify-center items-center mb-4">
-                <a
-                  href="/competition.html"
-                  target="_blank"
-                  class="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-6 py-3 rounded-lg transition-colors shadow-lg"
-                >
-                  🎯 Competition Rules
-                </a>
-                <a
-                  href="/leaderboard.html"
-                  target="_blank"
-                  class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3 rounded-lg transition-colors shadow-lg"
-                >
-                  📊 View Leaderboard
-                </a>
-              </div>
-
-              <!-- Sponsor Credit -->
-              <div class="flex items-center justify-center gap-2 py-3 px-4 bg-black/30 rounded-lg mb-3 mx-auto max-w-md">
-                <span class="text-gray-300 text-sm font-medium">Sponsored by</span>
-                <a
-                  href="https://rizful.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src="/rizful_logo_white.png"
-                    alt="Rizful"
-                    class="h-6 w-auto"
-                  />
-                </a>
-              </div>
-
-              <p class="text-gray-300 text-sm">
-                Sign in to start hunting zombies and claim your spot on the leaderboard!
-              </p>
-            </div>
-          </div>
-        </div>
-
         <!-- Login Card -->
         <div class="card max-w-2xl mx-auto my-12">
           <div class="text-center mb-8">
@@ -713,7 +649,6 @@ export default {
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
       forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
-      showCompetitionBanner: true, // [TEMPORARY - October 2025] Show competition banner
       isConnecting: false, // Track connection state for visual feedback
       zapModal: {
         show: false,

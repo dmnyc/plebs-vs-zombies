@@ -347,7 +347,7 @@
             📢 Share Scout Report
           </h4>
           
-          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap break-long-strings">{{ shareMessage }}</div>
+          <div class="bg-gray-700 p-3 rounded text-sm font-mono mb-3 whitespace-pre-wrap break-long-strings" v-html="formattedShareMessage"></div>
 
           <!-- "This is me!" toggle with prominent callout -->
           <div class="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
@@ -710,6 +710,25 @@ ${this.scoreBarEmojis.join('')}
 Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
 https://plebsvszombies.cc`;
       }
+    },
+    formattedShareMessage() {
+      // Format the share message for display with styled mentions
+      // Replace the full npub with a styled @username for better UX
+      if (!this.shareMessage) return '';
+
+      const developerNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
+      let formatted = this.shareMessage
+        .replace(new RegExp(`nostr:${developerNpub}`, 'g'), '<span style="color: #8e30eb; font-weight: 500;">@plebsvszombies</span>');
+
+      // Also replace the target npub with their @username if this is not "my report"
+      if (!this.isMyReport && this.scoutTarget?.npub && this.targetUsername) {
+        formatted = formatted.replace(
+          new RegExp(`nostr:${this.scoutTarget.npub}`, 'g'),
+          `<span style="color: #8e30eb; font-weight: 500;">@${this.targetUsername}</span>`
+        );
+      }
+
+      return formatted.replace(/\n/g, '<br>');
     },
     scoreBarSquares() {
       if (!this.scoutResults) return [];

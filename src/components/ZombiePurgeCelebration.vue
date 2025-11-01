@@ -82,45 +82,17 @@
           </div>
         </div>
 
-        <!-- [TEMPORARY - October 2025 Competition] START -->
-        <!-- Competition Announcement Banner (shown before posting) -->
-        <div v-if="!posted" class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-600/50 rounded-lg p-4 mb-4">
-          <div class="flex items-start gap-3">
-            <div class="text-2xl flex-shrink-0">🏆</div>
-            <div class="flex-1 min-w-0">
-              <h3 class="text-yellow-400 font-bold text-base mb-1">Enter the Top Zombie Challenge!</h3>
-              <p class="text-gray-300 text-sm mb-2">
-                Share your results to enter October's competition. Over 100K sats in prizes across the top 10 hunters, sponsored by <strong>Rizful</strong>!
-              </p>
-              <a
-                href="/competition"
-                target="_blank"
-                class="text-sm text-yellow-400 hover:text-yellow-300 underline font-semibold"
-              >
-                View Competition Details & Prizes →
-              </a>
-            </div>
-          </div>
-        </div>
-        <!-- [TEMPORARY - October 2025 Competition] END -->
-
         <!-- Social Share Message -->
         <div class="bg-gray-900 rounded-lg p-4">
           <div class="text-center mb-3">
-            <h4 class="text-base font-bold text-yellow-400 mb-1">
-              📢 SHARE YOUR RESULTS
+            <h4 class="text-lg font-bold text-yellow-400">
+              📢 Share Your Victory!
             </h4>
-            <p class="text-lg font-bold text-zombie-green">
-              ENTER TO WIN UP TO 42,000 SATS
-            </p>
-            <p class="text-sm font-semibold text-gray-300 mt-1">
-              FROM RIZFUL.COM
-            </p>
           </div>
 
           <!-- Generated Message -->
           <div class="bg-gray-800 border border-gray-600 rounded-lg p-4 mb-4">
-            <div class="text-sm font-mono leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">{{ shareMessage }}</div>
+            <div class="text-sm font-mono leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere" v-html="formattedShareMessage"></div>
           </div>
           
           <!-- Action Buttons -->
@@ -142,48 +114,13 @@
               {{ posting ? 'Posting...' : posted ? 'Posted to Nostr!' : 'Post to Nostr' }}
             </button>
 
-            <!-- [TEMPORARY - October 2025 Competition] -->
-            <!-- HIDDEN: Copy button disabled during competition to ensure participants use "Post to Nostr" -->
-            <!-- TO REVERT: Uncomment the button below after October 31, 2025 -->
-            <!--
-            <button
-              @click="copyToClipboard"
-              class="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-300 py-2 transition-colors"
-            >
-              <span v-if="copied">✅</span>
-              <span v-else>📋</span>
-              {{ copied ? 'Copied!' : 'Copy Message' }}
-            </button>
-            -->
           </div>
           
           <p class="text-xs text-gray-500 mt-2 text-center">
             <span v-if="!posted">Posting will create a public note on Nostr using your connected account</span>
-            <span v-else>Your victory has been shared! You can still copy the message to share elsewhere.</span>
+            <span v-else>Your victory has been shared!</span>
           </p>
         </div>
-
-        <!-- [TEMPORARY - October 2025 Competition] START -->
-        <!-- Competition Announcement Banner (shown after posting) -->
-        <div v-if="posted" class="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-2 border-yellow-600/50 rounded-lg p-4">
-          <div class="flex items-start gap-3">
-            <div class="text-2xl flex-shrink-0">🏆</div>
-            <div class="flex-1 min-w-0">
-              <h3 class="text-yellow-400 font-bold text-sm mb-1">You're Entered in the Top Zombie Challenge!</h3>
-              <p class="text-gray-300 text-xs mb-2">
-                Your {{ totalPurged }} zombie kills count toward October's competition. Over 100K sats in prizes across the top 10 hunters, sponsored by <strong>Rizful</strong>!
-              </p>
-              <a
-                href="/competition"
-                target="_blank"
-                class="text-xs text-yellow-400 hover:text-yellow-300 underline font-semibold"
-              >
-                View Competition Details & Prizes →
-              </a>
-            </div>
-          </div>
-        </div>
-        <!-- [TEMPORARY - October 2025 Competition] END -->
 
         <!-- Follow Recommendations -->
         <div class="bg-gradient-to-r from-purple-900 to-blue-900 rounded-lg p-4">
@@ -434,6 +371,13 @@ ${this.scoreBarEmojis.join('')}
 Follow nostr:${this.developerNpub} and join the hunt at: 🏹
 https://plebsvszombies.cc`;
     },
+    formattedShareMessage() {
+      // Format the share message for display with styled mentions
+      // Replace the full npub with a styled @username for better UX
+      return this.shareMessage
+        .replace(new RegExp(`nostr:${this.developerNpub}`, 'g'), '<span style="color: #8e30eb; font-weight: 500;">@plebsvszombies</span>')
+        .replace(/\n/g, '<br>');
+    },
     scoreBarSquares() {
       // Create HTML-based colored squares for the UI display
       const squares = [];
@@ -525,12 +469,17 @@ https://plebsvszombies.cc`;
           await nostrService.connectExtension();
         }
 
+        // Decode the developer npub to get pubkey for tagging
+        const { nip19 } = await import('nostr-tools');
+        const { data: developerPubkey } = nip19.decode(this.developerNpub);
+
         // Create note event
         const event = {
           kind: 1, // Note
           created_at: Math.floor(Date.now() / 1000),
           tags: [
             ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+            ['p', developerPubkey, '', 'plebsvszombies'],
             ['t', 'PlebsVsZombies'],
             ['t', 'nostr'],
             ['t', 'zombiehunting']
