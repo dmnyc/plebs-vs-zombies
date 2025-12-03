@@ -1252,10 +1252,10 @@ class NostrService {
     const results = await Promise.allSettled(publishPromises);
     const successful = results.filter(r => r.status === 'fulfilled' && r.value).length;
     const failed = results.filter(r => r.status === 'rejected').length;
-    
+
     console.log(`Publish results: ${successful} successful, ${failed} failed`);
-    
-    return { successful, failed, total: this.relays.length };
+
+    return { successful, failed, total: relaysToUse.length };
   }
   
   async backupFollowList() {
