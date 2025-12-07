@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<!--
+
+The Resurrector - Standalone Nostr Profile Resurrection Tool
+
+Based on: https://github.com/Yonle/undelete-my-nostr
+Part of: Plebs vs. Zombies (https://plebsvszombies.cc)
+
+How Nostr account deletion works:
+You send metadata about your profile, but you put "deleted: true" on it, like this:
+
+{
+  "name": "Your Name",
+  "about": "Your bio",
+  "deleted": true // <--- This marks the account as deleted
+}
+
+This tool works by:
+1. Sending an Event Deletion event (kind 5) about the conflicting deleted profile event
+2. Optionally publishing a new clean profile without the deleted flag
+
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>The Resurrector | Undelete Your Nostr Profile</title>
+  <meta name="description" content="Bring your deleted Nostr profile back to life! Works with browser extensions or nsec." />
+
+  <!-- Google Fonts - matching main app -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Configure Tailwind to match the main app
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'zombie-green': '#5cdb5c',
+            'zombie-dark': '#2c3531',
+            'pleb-gold': '#ffd700',
+            'pleb-blue': '#1e90ff',
+            'pleb-purple': '#8e30eb',
+          },
+          fontFamily: {
+            'horror': ['"Creepster"', 'cursive'],
+            'main': ['"Inter"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background: #111827;
+      color: #e5e7eb;
+      font-family: 'Inter', sans-serif;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Creepster', cursive;
+      color: #5cdb5c;
+    }
+
+    .zombie-green {
+      color: #5cdb5c;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: #5cdb5c;
+      color: #2c3531;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #4ade80;
+    }
+
+    .btn-secondary {
+      background: #374151;
+      color: #e5e7eb;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #4b5563;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .card {
+      background: #2c3531;
+      border: 1px solid #374151;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    input[type="password"],
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 0.5rem;
+      color: #e5e7eb;
+      font-size: 0.875rem;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #10b981;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .log-info { color: #9ca3af; }
+    .log-success { color: #10b981; }
+    .log-warning { color: #fbbf24; }
+    .log-error { color: #ef4444; }
+
+    /* Lightning Animation - from Primal Spark */
+    .lightning-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      transition: background 0.2s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: visible;
+      opacity: 0;
+    }
+
+    .lightning-container.active {
+      opacity: 1;
+    }
+
+    .lightning-svg {
+      position: absolute;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+      left: 50%;
+      transform: translateX(-50%);
+      overflow: visible;
+    }
+
+    .rayo {
+      stroke-linecap: round;
+      opacity: 0;
+      animation: aparecer 0.2s ease-out, desvanecer 0.6s ease-in 0.2s;
+      fill: none;
+    }
+
+    @keyframes aparecer {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes desvanecer {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    .flash {
+      animation: flash 0.2s;
+    }
+
+    @keyframes flash {
+      0% { background: rgba(255, 255, 255, 0.3); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+
+<body class="p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="text-6xl mb-4 flex items-center justify-center gap-2">
+        <span style="display: inline-block; transform: scaleX(-1);">⚡</span>
+        <span>🧟‍♂️</span>
+        <span>⚡</span>
+      </div>
+      <h1 class="text-4xl font-bold mb-2 zombie-green">The Resurrector</h1>
+      <p class="text-gray-300 mb-4">Bring your deleted Nostr profile back to life!</p>
+      <p class="text-sm text-gray-400">
+        Part of <a href="https://plebsvszombies.cc" class="zombie-green hover:underline" target="_blank">Plebs vs. Zombies</a>
+      </p>
+    </div>
+
+    <!-- Security Warning -->
+    <div class="card bg-yellow-900/20 border-yellow-600/50">
+      <div class="flex items-start gap-3">
+        <div class="text-2xl">🔒</div>
+        <div class="flex-1">
+          <h3 class="text-lg font-medium text-yellow-400 mb-2">Security Notice</h3>
+          <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
+            <li><strong>Preferred:</strong> Use a browser extension (NIP-07) like Alby or nos2x</li>
+            <li><strong>Fallback:</strong> If you must use an nsec, it never leaves your browser</li>
+            <li><strong>Privacy:</strong> All operations happen locally - no data sent to any server</li>
+            <li><strong>Open Source:</strong> You can inspect the code below or on <a href="https://github.com/dmnyc/plebs-vs-zombies" class="zombie-green hover:underline" target="_blank">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="card bg-gray-800/50">
+      <div class="flex items-start gap-3">
+        <div class="text-2xl">💡</div>
+        <div class="flex-1">
+          <h3 class="text-lg font-medium text-blue-400 mb-2">How It Works</h3>
+          <p class="text-sm text-gray-300 mb-2">
+            Nostr accounts are "deleted" by setting a <code class="bg-gray-900 px-1 rounded text-yellow-300">"deleted": true</code> flag in your profile metadata. The Resurrector:
+          </p>
+          <ol class="text-sm text-gray-300 list-decimal list-inside space-y-1">
+            <li>Scans for profile events with the deleted flag</li>
+            <li>Sends a deletion event (kind 5) to remove the deleted profile</li>
+            <li>Publishes a clean version of your profile without the deleted flag</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- Authentication Method -->
+    <div class="card">
+      <h2 class="text-2xl font-bold mb-4">Step 1: Choose Authentication Method</h2>
+
+      <div class="space-y-3 mb-4">
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+          <input
+            type="radio"
+            name="authMethod"
+            value="npub"
+            id="auth-npub"
+            class="mt-1"
+            checked
+          />
+          <div class="flex-1">
+            <div class="font-medium text-blue-400">Check Any Profile (npub)</div>
+            <div class="text-sm text-gray-400">Read-only scan - can't resurrect without authentication</div>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
+          <input
+            type="radio"
+            name="authMethod"
+            value="extension"
+            id="auth-extension"
+            class="mt-1"
+          />
+          <div class="flex-1">
+            <div class="font-medium text-green-400">Browser Extension (Recommended)</div>
+            <div class="text-sm text-gray-400">Use Alby, nos2x, or other NIP-07 extensions - can resurrect</div>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-yellow-500 transition-colors">
+          <input
+            type="radio"
+            name="authMethod"
+            value="nsec"
+            id="auth-nsec"
+            class="mt-1"
+          />
+          <div class="flex-1">
+            <div class="font-medium text-yellow-400">Private Key (nsec/hex)</div>
+            <div class="text-sm text-gray-400">Only if you don't have access to an extension - can resurrect</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Npub Input (shown by default) -->
+      <div id="npub-input-section" class="mb-4">
+        <label class="block text-sm font-medium mb-2">Public Key (npub)</label>
+        <input
+          type="text"
+          id="npub-input"
+          placeholder="npub1... or hex pubkey"
+          class="mb-2"
+        />
+        <p class="text-xs text-blue-400">ℹ️ Read-only mode - you can scan but not resurrect without signing</p>
+      </div>
+
+      <!-- Nsec Input (hidden by default) -->
+      <div id="nsec-input-section" class="hidden mb-4">
+        <label class="block text-sm font-medium mb-2">Private Key (nsec or hex)</label>
+        <input
+          type="password"
+          id="nsec-input"
+          placeholder="nsec1... or hex private key"
+          class="mb-2"
+        />
+        <p class="text-xs text-yellow-400">⚠️ Your private key never leaves this browser window</p>
+      </div>
+
+      <!-- Relay List -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-2">Nostr Relays (one per line)</label>
+        <textarea
+          id="relay-input"
+          rows="5"
+          placeholder="wss://relay.damus.io&#10;wss://relay.nostr.band&#10;wss://nos.lol&#10;wss://relay.primal.net"
+        ></textarea>
+        <p class="text-xs text-gray-400 mt-1">Relays will be auto-filled from your extension if available</p>
+      </div>
+    </div>
+
+    <!-- Update Profile Section -->
+    <div class="card">
+      <h2 class="text-2xl font-bold mb-4">Step 2: Update Profile Metadata</h2>
+      <p class="text-sm text-gray-400 mb-4">
+        Many clients filter out profiles with minimal metadata. Fill this out to ensure your profile is visible on Primal, Yakihonne, etc.
+      </p>
+
+      <div class="space-y-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Display Name</label>
+          <input
+            type="text"
+            id="profile-name"
+            placeholder="Your name"
+            class="w-full"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">About / Bio</label>
+          <textarea
+            id="profile-about"
+            rows="3"
+            placeholder="A short bio about yourself"
+            class="w-full"
+          ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Profile Picture URL (optional)</label>
+          <input
+            type="text"
+            id="profile-picture"
+            placeholder="https://example.com/avatar.jpg"
+            class="w-full"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Banner Image URL (optional)</label>
+          <input
+            type="text"
+            id="profile-banner"
+            placeholder="https://example.com/banner.jpg"
+            class="w-full"
+          />
+        </div>
+      </div>
+
+      <button onclick="updateProfile()" class="btn btn-primary w-full mb-4" id="update-profile-btn">
+        ✏️ Update Profile Metadata
+      </button>
+    </div>
+
+    <!-- Main Actions Section -->
+    <div class="card">
+      <h2 class="text-2xl font-bold mb-4">Step 3: Fix Your Profile</h2>
+
+      <div class="bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-lg mb-4">
+        <p class="text-sm text-gray-400">
+          💡 <strong class="text-yellow-400">Quick Fix:</strong> Click <strong>Force Resurrection</strong> to automatically fix deleted profiles and publish a clean version that works with Primal, Yakihonne, and other clients.
+        </p>
+      </div>
+
+      <div class="flex gap-3 mb-4 flex-wrap">
+        <button onclick="forceResurrection()" class="btn btn-primary w-full sm:w-auto" id="force-btn" style="background: #d97706; font-size: 1.1rem; padding: 1rem 2rem;">
+          ⚡ Force Resurrection (Recommended)
+        </button>
+
+        <button onclick="clearLogs()" class="btn btn-secondary">
+          🗑️ Clear Logs
+        </button>
+      </div>
+    </div>
+
+    <!-- Advanced Tools (Collapsible) -->
+    <div class="card bg-gray-800/30">
+      <details>
+        <summary class="text-lg font-medium cursor-pointer hover:text-zombie-green transition-colors">
+          🔧 Advanced Diagnostic Tools
+        </summary>
+
+        <div class="mt-4 space-y-3">
+          <p class="text-xs text-gray-400 mb-3">
+            These tools help diagnose specific issues. Most users won't need these.
+          </p>
+
+          <div class="flex gap-3 flex-wrap">
+            <button onclick="scanProfile()" class="btn btn-secondary" id="scan-btn">
+              🔍 Basic Scan
+            </button>
+
+            <button onclick="deepScan()" class="btn btn-secondary" id="deep-scan-btn">
+              🔬 Deep Scan
+            </button>
+
+            <button onclick="publishToMissingRelays()" class="btn btn-secondary" id="publish-missing-btn">
+              📡 Publish to Missing Relays
+            </button>
+
+            <button onclick="toggleKeepProfile()" class="btn btn-secondary" id="keep-profile-btn">
+              Keep Profile: OFF
+            </button>
+
+            <button onclick="exportProfileData()" class="btn btn-secondary" id="export-btn">
+              💾 Export Profile JSON
+            </button>
+          </div>
+
+          <div class="text-xs text-gray-400 mt-3 bg-gray-900/50 p-3 rounded">
+            <p class="mb-2"><strong>Basic Scan:</strong> Quick check for deleted profiles</p>
+            <p class="mb-2"><strong>Deep Scan:</strong> Comprehensive check across all relays and event types</p>
+            <p class="mb-2"><strong>Publish to Missing Relays:</strong> Send your profile to specific relays that don't have it</p>
+            <p><strong>Keep Profile:</strong> When OFF (recommended), publishes a new profile. When ON, only removes deleted events.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="hidden">
+      <!-- This will be populated by JavaScript -->
+    </div>
+
+    <!-- Logs -->
+    <div class="card bg-gray-900">
+      <h3 class="text-lg font-medium mb-3">Activity Log</h3>
+      <div id="log-output" class="space-y-1 max-h-96 overflow-y-auto font-mono text-xs">
+        <div class="log-entry log-info">Ready to scan. Choose your authentication method and click "Scan My Profile".</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center text-sm text-gray-500 mt-8">
+      <p>Made with 🧠 for the Nostr community</p>
+      <p class="mt-2">
+        <a href="https://github.com/dmnyc/plebs-vs-zombies" class="zombie-green hover:underline" target="_blank">View on GitHub</a>
+        ·
+        <a href="https://plebsvszombies.cc" class="zombie-green hover:underline" target="_blank">Plebs vs. Zombies</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Lightning Animation Overlay -->
+  <div id="lightning-container" class="lightning-container">
+    <svg id="lightning-svg" class="lightning-svg"></svg>
+  </div>
+
+  <!-- NostrTools Library (local copy) -->
+  <script src="/nostr.bundle.js"></script>
+
+  <script>
+    // Global state
+    let pool = null;
+    let keepProfile = false;
+    let deletedProfiles = [];
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', async () => {
+      // NostrTools should be available globally from the bundle
+      if (!window.NostrTools) {
+        log('ERROR: NostrTools library not loaded!', 'error');
+        return;
+      }
+
+      // Set up auth method toggle
+      document.querySelectorAll('input[name="authMethod"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          const npubSection = document.getElementById('npub-input-section');
+          const nsecSection = document.getElementById('nsec-input-section');
+
+          // Hide all input sections first
+          npubSection.classList.add('hidden');
+          nsecSection.classList.add('hidden');
+
+          // Show the appropriate input section
+          if (e.target.value === 'npub') {
+            npubSection.classList.remove('hidden');
+          } else if (e.target.value === 'nsec') {
+            nsecSection.classList.remove('hidden');
+          }
+          // Extension doesn't need an input section
+        });
+      });
+
+      // Initialize SimplePool
+      try {
+        if (!window.NostrTools || !window.NostrTools.SimplePool) {
+          throw new Error('NostrTools library not loaded properly');
+        }
+        pool = new window.NostrTools.SimplePool();
+        log('NostrTools loaded successfully', 'success');
+
+        // Try to load relays from extension
+        if (window.nostr) {
+          try {
+            const relays = await window.nostr.getRelays();
+            const relayList = Object.keys(relays).join('\n');
+            if (relayList) {
+              document.getElementById('relay-input').value = relayList;
+              log('Loaded relays from browser extension', 'info');
+            }
+          } catch (e) {
+            // Extension doesn't support getRelays, use defaults
+            setDefaultRelays();
+          }
+        } else {
+          setDefaultRelays();
+        }
+      } catch (error) {
+        log('Failed to load NostrTools: ' + error.message, 'error');
+      }
+    });
+
+    function setDefaultRelays() {
+      const defaultRelays = [
+        // Primal relays (critical for Primal app)
+        'wss://relay.primal.net',
+        // Yakihonne relays (critical for Yakihonne app)
+        'wss://relay.yakihonne.com',
+        // Other popular relays
+        'wss://relay.damus.io',
+        'wss://relay.nostr.band',
+        'wss://nos.lol',
+        'wss://nostr.wine',
+        'wss://relay.snort.social',
+        'wss://nostr.mom',
+        'wss://purplepag.es'
+      ].join('\n');
+      document.getElementById('relay-input').value = defaultRelays;
+    }
+
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const logOutput = document.getElementById('log-output');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'text-gray-500';
+      timeSpan.textContent = timestamp;
+
+      const messageSpan = document.createElement('span');
+      messageSpan.textContent = message;
+
+      entry.appendChild(timeSpan);
+      entry.appendChild(messageSpan);
+      logOutput.appendChild(entry);
+      logOutput.scrollTop = logOutput.scrollHeight;
+      console.log(`[Resurrector ${type.toUpperCase()}] ${message}`);
+    }
+
+    function clearLogs() {
+      const logOutput = document.getElementById('log-output');
+      logOutput.innerHTML = '';
+      log('Logs cleared.', 'info');
+    }
+
+    function toggleKeepProfile() {
+      keepProfile = !keepProfile;
+      const btn = document.getElementById('keep-profile-btn');
+      btn.textContent = `Keep Profile: ${keepProfile ? 'ON' : 'OFF'}`;
+      log(`Keep Profile mode: ${keepProfile ? 'ON' : 'OFF'}`, 'info');
+    }
+
+    function generateLightning() {
+      const svg = document.getElementById('lightning-svg');
+      const container = document.getElementById('lightning-container');
+
+      if (!svg || !container) return;
+
+      const ancho = container.clientWidth;
+      const altura = container.clientHeight;
+
+      // Calculate a safe starting position
+      const safeWidthStart = ancho * 0.15;
+      const safeWidthEnd = ancho * 0.85;
+      const safeWidth = safeWidthEnd - safeWidthStart;
+
+      const xInicio = safeWidthStart + Math.random() * safeWidth;
+      let yActual = 0;
+      let zigzag = `M${xInicio},${yActual}`;
+
+      const grosor = Math.random() * 3 + 2;
+      const color = Math.random() > 0.5 ? 'white' : 'yellow';
+
+      // Create zigzag pattern
+      const segments = Math.floor(Math.random() * 3 + 5);
+
+      for (let i = 0; i < segments; i++) {
+        const maxOffset = Math.min(100, safeWidth * 0.25);
+        const xOffset = (Math.random() - 0.5) * maxOffset;
+
+        let yOffset;
+        if (i === segments - 1) {
+          yOffset = altura - yActual;
+        } else {
+          yOffset = (altura / segments) * (1 + Math.random() * 0.5);
+        }
+
+        yActual += yOffset;
+
+        let newX = xInicio + xOffset;
+        const edgeBuffer = ancho * 0.08;
+        if (newX < edgeBuffer) newX = edgeBuffer;
+        if (newX > ancho - edgeBuffer) newX = ancho - edgeBuffer;
+
+        zigzag += ` L${newX},${yActual}`;
+
+        // Add random branches
+        if (Math.random() > 0.7) {
+          const branchOffsetMax = maxOffset * 0.8;
+          const branchOffset = (Math.random() - 0.5) * branchOffsetMax;
+          let branchX = newX + branchOffset;
+
+          const edgeBuffer = ancho * 0.05;
+          if (branchX < edgeBuffer) branchX = edgeBuffer;
+          if (branchX > ancho - edgeBuffer) branchX = ancho - edgeBuffer;
+
+          const branchY = yActual + Math.random() * 30;
+          zigzag += ` M${newX},${yActual} L${branchX},${branchY} M${newX},${yActual}`;
+        }
+      }
+
+      // Create SVG path
+      const linea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      linea.setAttribute('d', zigzag);
+      linea.setAttribute('class', 'rayo');
+      linea.setAttribute('stroke', color);
+      linea.setAttribute('stroke-width', grosor.toString());
+      linea.setAttribute('fill', 'none');
+      svg.appendChild(linea);
+
+      // Add flash effect
+      container.classList.add('flash');
+      setTimeout(() => {
+        container.classList.remove('flash');
+      }, 200);
+
+      // Clean up lightning after animation
+      setTimeout(() => {
+        if (svg.contains(linea)) {
+          svg.removeChild(linea);
+        }
+      }, 800);
+    }
+
+    async function playResurrectionAnimation() {
+      const container = document.getElementById('lightning-container');
+
+      // Show container
+      container.classList.add('active');
+
+      // Generate multiple lightning bolts
+      generateLightning();
+      setTimeout(() => generateLightning(), 150);
+      setTimeout(() => generateLightning(), 300);
+
+      // Wait for animations to complete
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      // Hide container
+      container.classList.remove('active');
+    }
+
+    async function getPrivateKey() {
+      const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
+
+      if (authMethod === 'npub') {
+        // Read-only mode, no private key
+        return null;
+      } else if (authMethod === 'extension') {
+        if (!window.nostr) {
+          throw new Error('No Nostr extension found. Please install Alby, nos2x, or another NIP-07 extension.');
+        }
+        return null; // Will use extension for signing
+      } else {
+        const nsecInput = document.getElementById('nsec-input').value.trim();
+        if (!nsecInput) {
+          throw new Error('Please enter your private key (nsec or hex)');
+        }
+
+        // Validate input - reject if it's an npub or nprofile
+        if (nsecInput.startsWith('npub') || nsecInput.startsWith('nprofile')) {
+          throw new Error('Invalid input: You entered a public key (npub/nprofile) but a private key (nsec) is required for resurrection. Switch to "Check Any Profile" mode to scan with an npub.');
+        }
+
+        // Decode nsec if needed
+        if (nsecInput.startsWith('nsec')) {
+          const decoded = window.NostrTools.nip19.decode(nsecInput);
+          return decoded.data;
+        }
+        return nsecInput;
+      }
+    }
+
+    async function getPublicKey(privkey) {
+      const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
+
+      // Handle npub input
+      if (authMethod === 'npub') {
+        const npubInput = document.getElementById('npub-input').value.trim();
+        if (!npubInput) {
+          throw new Error('Please enter a public key (npub or hex)');
+        }
+
+        // Validate input - reject if it's an nsec
+        if (npubInput.startsWith('nsec')) {
+          throw new Error('Invalid input: You entered a private key (nsec) but a public key (npub) is required. Switch to "Private Key" mode to use your nsec for resurrection.');
+        }
+
+        // Decode npub or nprofile if needed
+        if (npubInput.startsWith('npub') || npubInput.startsWith('nprofile')) {
+          const decoded = window.NostrTools.nip19.decode(npubInput);
+          // nprofile returns an object with pubkey, npub returns the pubkey directly
+          return decoded.data.pubkey || decoded.data;
+        }
+        return npubInput;
+      }
+
+      // Handle extension or privkey
+      if (!privkey && window.nostr) {
+        return await window.nostr.getPublicKey();
+      }
+      return window.NostrTools.getPublicKey(privkey);
+    }
+
+    function getRelays() {
+      const relayText = document.getElementById('relay-input').value;
+      return relayText.split('\n').map(r => r.trim()).filter(r => r.startsWith('wss://'));
+    }
+
+    async function signEvent(event, privkey) {
+      event.created_at = Math.floor(Date.now() / 1000);
+
+      if (!privkey && window.nostr) {
+        event = await window.nostr.signEvent(event);
+      } else {
+        // Use finalizeEvent which handles pubkey, id, and sig in one call
+        event = window.NostrTools.finalizeEvent(event, privkey);
+      }
+
+      log(`Signed event ${event.id.substring(0, 8)}... with ${event.pubkey.substring(0, 8)}...`, 'success');
+      return event;
+    }
+
+    async function scanProfile() {
+      const scanBtn = document.getElementById('scan-btn');
+      scanBtn.disabled = true;
+      scanBtn.textContent = '🔍 Scanning...';
+      deletedProfiles = [];
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        log(`Starting scan for pubkey: ${pubkey.substring(0, 8)}...`, 'info');
+        log(`Using ${relays.length} relay(s)`, 'info');
+        log('Fetching profile metadata events...', 'info');
+
+        // Fetch all kind 0 events for this user
+        const events = await pool.querySync(relays, {
+          kinds: [0],
+          authors: [pubkey]
+        });
+
+        log(`Found ${events.length} profile event(s)`, 'info');
+
+        // Check each for deleted flag
+        for (const event of events) {
+          try {
+            const metadata = JSON.parse(event.content);
+
+            // Debug log
+            log(`Checking event ${event.id.substring(0, 8)}... - deleted flag: ${metadata.deleted}`, 'info');
+            console.log('Full event:', event);
+            console.log('Full metadata:', metadata);
+
+            if (metadata.deleted === true) {
+              log(`⚠️ Found deleted profile: ${event.id.substring(0, 8)}...`, 'warning');
+              deletedProfiles.push({
+                event,
+                metadata,
+                eventId: event.id,
+                createdAt: event.created_at
+              });
+            } else {
+              log(`✅ Profile looks fine: ${event.id.substring(0, 8)}...`, 'success');
+            }
+          } catch (error) {
+            log(`Error parsing event ${event.id.substring(0, 8)}...: ${error.message}`, 'error');
+          }
+        }
+
+        // Display results
+        displayResults(privkey);
+
+        if (deletedProfiles.length === 0) {
+          log('🎉 No deleted profiles found! Your account looks healthy.', 'success');
+        } else {
+          log(`Found ${deletedProfiles.length} deleted profile(s)`, 'warning');
+        }
+
+      } catch (error) {
+        log(`Scan failed: ${error.message}`, 'error');
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔍 Scan My Profile';
+      }
+    }
+
+    function displayResults(privkey) {
+      const resultsSection = document.getElementById('results-section');
+      const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
+      const isReadOnly = authMethod === 'npub';
+
+      if (deletedProfiles.length === 0) {
+        resultsSection.innerHTML = `
+          <div class="card bg-green-900/20 border-green-500/50">
+            <div class="flex items-center gap-3">
+              <div class="text-3xl">✅</div>
+              <div>
+                <h3 class="text-lg font-medium text-green-400">Profile Looks Healthy!</h3>
+                <p class="text-sm text-gray-300">No deleted profiles found.</p>
+              </div>
+            </div>
+          </div>
+        `;
+        resultsSection.classList.remove('hidden');
+        return;
+      }
+
+      let html = `
+        <div class="card bg-red-900/20 border-red-500/50">
+          <h2 class="text-2xl font-bold mb-4 text-red-400">⚠️ Deleted Profile Found!</h2>
+          <p class="text-gray-300 mb-4">Found ${deletedProfiles.length} deleted profile(s).</p>
+      `;
+
+      if (isReadOnly) {
+        html += `
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-3 rounded-lg mb-4">
+            <p class="text-sm text-yellow-400">
+              ⚠️ You're in read-only mode. To resurrect this profile, choose "Browser Extension" or "Private Key" authentication above and scan again.
+            </p>
+          </div>
+        `;
+      }
+
+      deletedProfiles.forEach((profile, index) => {
+        const date = new Date(profile.createdAt * 1000).toLocaleString();
+        html += `
+          <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-4">
+            <div class="mb-3">
+              <div class="font-mono text-sm text-gray-400">Event ID: ${profile.eventId.substring(0, 16)}...</div>
+              <div class="text-xs text-gray-500">Created: ${date}</div>
+            </div>
+            <div class="mb-3">
+              <h4 class="text-sm font-medium text-gray-300 mb-1">Profile Data:</h4>
+              <pre class="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">${JSON.stringify(profile.metadata, null, 2)}</pre>
+            </div>
+            ${isReadOnly ?
+              '<div class="bg-gray-700 text-gray-400 w-full py-3 px-4 rounded text-center">🔒 Sign in to resurrect</div>' :
+              `<button onclick="resurrectProfile(${index})" class="btn btn-primary w-full" id="resurrect-btn-${index}">⚡ Resurrect This Profile</button>`
+            }
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      resultsSection.innerHTML = html;
+      resultsSection.classList.remove('hidden');
+    }
+
+    async function resurrectProfile(index) {
+      const profile = deletedProfiles[index];
+      const btn = document.getElementById(`resurrect-btn-${index}`);
+
+      if (!confirm('Are you sure you want to resurrect this profile? This will publish new events to your relays.')) {
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⚡ Resurrecting...';
+
+      try {
+        const privkey = await getPrivateKey();
+        const relays = getRelays();
+
+        log(`Starting resurrection for event: ${profile.eventId.substring(0, 8)}...`, 'info');
+
+        // Step 1: Create and publish deletion event (kind 5)
+        log('Creating deletion event (kind 5)...', 'info');
+
+        let deletionEvent = {
+          kind: 5,
+          content: '',
+          tags: [['e', profile.eventId]]
+        };
+
+        deletionEvent = await signEvent(deletionEvent, privkey);
+
+        log('Publishing deletion event...', 'info');
+        const delPubs = pool.publish(relays, deletionEvent);
+        await Promise.allSettled(delPubs);
+        log('✅ Deletion event published!', 'success');
+
+        // Step 2: Publish clean profile (if not in keep-profile mode)
+        if (!keepProfile) {
+          log('Creating clean profile metadata...', 'info');
+
+          const cleanMetadata = { ...profile.metadata };
+
+          // Add display_name if name exists but display_name doesn't
+          if (cleanMetadata.name && !cleanMetadata.display_name) {
+            cleanMetadata.display_name = cleanMetadata.name;
+          }
+
+          // Ensure proper deletion flags for Yakihonne compatibility
+          delete cleanMetadata.deleted; // Remove old-style deleted flag
+          cleanMetadata.is_deleted = false; // Add Yakihonne-style flag
+
+          let profileEvent = {
+            kind: 0,
+            content: JSON.stringify(cleanMetadata),
+            tags: []
+          };
+
+          profileEvent = await signEvent(profileEvent, privkey);
+
+          log('Publishing clean profile...', 'info');
+          const profPubs = pool.publish(relays, profileEvent);
+          await Promise.allSettled(profPubs);
+          log('✅ Clean profile published!', 'success');
+        }
+
+        log('🎉 Resurrection complete!', 'success');
+
+        // Play resurrection animation
+        await playResurrectionAnimation();
+
+        // Remove from list
+        deletedProfiles.splice(index, 1);
+        displayResults(privkey);
+
+      } catch (error) {
+        log(`Resurrection failed: ${error.message}`, 'error');
+        btn.disabled = false;
+        btn.textContent = '⚡ Resurrect This Profile';
+      }
+    }
+
+    async function publishToMissingRelays() {
+      const publishBtn = document.getElementById('publish-missing-btn');
+      publishBtn.disabled = true;
+      publishBtn.textContent = '📡 Publishing...';
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        log('📡 Publishing profile to missing relays...', 'warning');
+
+        // Step 1: Find which relays are missing the profile
+        const missingRelays = [];
+        for (const relay of relays) {
+          try {
+            const events = await pool.querySync([relay], {
+              kinds: [0],
+              authors: [pubkey]
+            });
+
+            if (events.length === 0) {
+              missingRelays.push(relay);
+              log(`${relay.replace('wss://', '')} - MISSING profile`, 'warning');
+            } else {
+              log(`${relay.replace('wss://', '')} - Has profile`, 'info');
+            }
+          } catch (err) {
+            log(`${relay.replace('wss://', '')}: Error - ${err.message}`, 'error');
+          }
+        }
+
+        if (missingRelays.length === 0) {
+          log('✅ All relays have your profile!', 'success');
+          alert('All relays already have your profile. Try Force Resurrection if clients still show deleted.');
+          return;
+        }
+
+        log(`Found ${missingRelays.length} relay(s) missing your profile`, 'warning');
+        log('', 'info');
+
+        // Step 2: Get the latest profile from relays that have it
+        log('Fetching your latest profile...', 'info');
+        const allEvents = await pool.querySync(relays, {
+          kinds: [0],
+          authors: [pubkey]
+        });
+
+        if (allEvents.length === 0) {
+          throw new Error('No profile found on any relay. Use "Update Profile Metadata" to create one.');
+        }
+
+        // Find the newest profile
+        const latestProfile = allEvents.reduce((latest, event) => {
+          return (!latest || event.created_at > latest.created_at) ? event : latest;
+        }, null);
+
+        const metadata = JSON.parse(latestProfile.content);
+        log(`Latest profile: ${metadata.name || 'unknown'}`, 'info');
+        log(`Created: ${new Date(latestProfile.created_at * 1000).toLocaleString()}`, 'info');
+
+        // Add display_name if name exists but display_name doesn't
+        if (metadata.name && !metadata.display_name) {
+          metadata.display_name = metadata.name;
+        }
+
+        // Ensure proper deletion flags for Yakihonne compatibility
+        delete metadata.deleted; // Remove old-style deleted flag
+        metadata.is_deleted = false; // Add Yakihonne-style flag
+        metadata.pubkey = pubkey; // Add pubkey to metadata (Yakihonne includes this)
+
+        // Log what fields we're publishing
+        log(`Profile fields: ${Object.keys(metadata).join(', ')}`, 'info');
+
+        // Step 3: Create a NEW profile event with current timestamp
+        const newTimestamp = Math.floor(Date.now() / 1000);
+        let profileEvent = {
+          kind: 0,
+          content: JSON.stringify(metadata),
+          tags: [],
+          created_at: newTimestamp
+        };
+
+        profileEvent = await signEvent(profileEvent, privkey);
+
+        log('', 'info');
+        log(`Publishing to ${missingRelays.length} missing relay(s)...`, 'info');
+
+        // Step 4: Publish ONLY to missing relays
+        for (const relay of missingRelays) {
+          try {
+            log(`Publishing to ${relay.replace('wss://', '')}...`, 'info');
+            const pubs = pool.publish([relay], profileEvent);
+            await Promise.allSettled(pubs);
+            log(`  ✅ Published to ${relay.replace('wss://', '')}`, 'success');
+          } catch (err) {
+            log(`  ❌ Failed: ${err.message}`, 'error');
+          }
+        }
+
+        log('', 'info');
+        log('🎉 Profile published to missing relays!', 'success');
+
+        // Verify each relay actually has it now
+        log('', 'info');
+        log('🔍 Verifying relays received the profile...', 'info');
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+
+        for (const relay of missingRelays) {
+          try {
+            const verifyEvents = await pool.querySync([relay], {
+              kinds: [0],
+              authors: [pubkey]
+            });
+
+            if (verifyEvents.length > 0) {
+              log(`  ✅ ${relay.replace('wss://', '')} - CONFIRMED (has ${verifyEvents.length} event(s))`, 'success');
+            } else {
+              log(`  ❌ ${relay.replace('wss://', '')} - REJECTED (relay accepted publish but didn't store event)`, 'error');
+            }
+          } catch (err) {
+            log(`  ❌ ${relay.replace('wss://', '')} - Error verifying: ${err.message}`, 'error');
+          }
+        }
+
+        // Play animation
+        await playResurrectionAnimation();
+
+        alert(`Profile published to ${missingRelays.length} missing relay(s)! Check the logs to see which relays confirmed storage.`);
+
+      } catch (error) {
+        log(`Publish failed: ${error.message}`, 'error');
+        alert(`Publish failed: ${error.message}`);
+      } finally {
+        publishBtn.disabled = false;
+        publishBtn.textContent = '📡 Publish to Missing Relays';
+      }
+    }
+
+    async function exportProfileData() {
+      const exportBtn = document.getElementById('export-btn');
+      exportBtn.disabled = true;
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        log('📥 Fetching all profile data...', 'info');
+
+        // Fetch all profile events
+        const events = await pool.querySync(relays, {
+          kinds: [0],
+          authors: [pubkey]
+        });
+
+        if (events.length === 0) {
+          alert('No profile events found on any relay.');
+          return;
+        }
+
+        // Get the latest profile
+        const latestProfile = events.reduce((latest, event) => {
+          return (!latest || event.created_at > latest.created_at) ? event : latest;
+        }, null);
+
+        const metadata = JSON.parse(latestProfile.content);
+
+        // Create export data
+        const exportData = {
+          pubkey: pubkey,
+          npub: window.NostrTools.nip19.npubEncode(pubkey),
+          latestProfileEvent: {
+            id: latestProfile.id,
+            created_at: latestProfile.created_at,
+            created_at_readable: new Date(latestProfile.created_at * 1000).toISOString(),
+            kind: latestProfile.kind,
+            content: metadata,
+            tags: latestProfile.tags
+          },
+          allProfileEvents: events.map(e => ({
+            id: e.id,
+            created_at: e.created_at,
+            created_at_readable: new Date(e.created_at * 1000).toISOString(),
+            content: JSON.parse(e.content)
+          })),
+          relayStatus: {}
+        };
+
+        // Check which relays have the profile
+        for (const relay of relays) {
+          const eventsOnRelay = await pool.querySync([relay], {
+            kinds: [0],
+            authors: [pubkey]
+          });
+          exportData.relayStatus[relay] = eventsOnRelay.length > 0 ? `✅ Has profile (${eventsOnRelay.length} events)` : '❌ No profile';
+        }
+
+        // Create downloadable JSON file
+        const jsonStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nostr-profile-${pubkey.substring(0, 8)}-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        log('✅ Profile data exported!', 'success');
+        log(`Latest profile has ${Object.keys(metadata).length} fields: ${Object.keys(metadata).join(', ')}`, 'info');
+
+        alert(`Profile data exported!\n\nFields in profile: ${Object.keys(metadata).join(', ')}`);
+
+      } catch (error) {
+        log(`Export failed: ${error.message}`, 'error');
+        alert(`Export failed: ${error.message}`);
+      } finally {
+        exportBtn.disabled = false;
+      }
+    }
+
+    async function deepScan() {
+      const deepScanBtn = document.getElementById('deep-scan-btn');
+      deepScanBtn.disabled = true;
+      deepScanBtn.textContent = '🔬 Deep Scanning...';
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        log('🔬 Starting DEEP SCAN...', 'warning');
+        log(`Pubkey: ${pubkey.substring(0, 16)}...`, 'info');
+        log('', 'info');
+
+        // Check 1: Kind 0 profile events (metadata)
+        log('=== CHECKING KIND 0 (Profile Metadata) ===', 'info');
+        for (const relay of relays) {
+          try {
+            const events = await pool.querySync([relay], {
+              kinds: [0],
+              authors: [pubkey]
+            });
+
+            log(`${relay.replace('wss://', '')}:`, 'info');
+            if (events.length === 0) {
+              log(`  No profile events found`, 'warning');
+            }
+
+            for (const event of events) {
+              const metadata = JSON.parse(event.content);
+              const isDeleted = metadata.deleted === true;
+              const yakihonneDeleted = metadata.is_deleted === true;
+              const hasYakihonneFlag = metadata.hasOwnProperty('is_deleted');
+
+              log(`  Event ${event.id.substring(0, 8)}... (${new Date(event.created_at * 1000).toLocaleString()})`, isDeleted || yakihonneDeleted ? 'warning' : 'info');
+              log(`    deleted: ${metadata.deleted !== undefined ? metadata.deleted : '(not set)'}`, isDeleted ? 'warning' : 'info');
+              log(`    is_deleted: ${metadata.is_deleted !== undefined ? metadata.is_deleted : '(not set)'}`, yakihonneDeleted ? 'warning' : hasYakihonneFlag ? 'success' : 'warning');
+              log(`    name: ${metadata.name || '(none)'}`, 'info');
+              log(`    pubkey in metadata: ${metadata.pubkey ? 'yes' : 'NO (Yakihonne needs this!)'}`, metadata.pubkey ? 'info' : 'warning');
+
+              if (isDeleted || yakihonneDeleted) {
+                log(`    ⚠️ THIS PROFILE IS MARKED AS DELETED!`, 'error');
+              }
+              if (!hasYakihonneFlag) {
+                log(`    ⚠️ MISSING is_deleted flag (Yakihonne may reject this!)`, 'warning');
+              }
+            }
+          } catch (err) {
+            log(`${relay.replace('wss://', '')}: Error - ${err.message}`, 'error');
+          }
+        }
+
+        log('', 'info');
+
+        // Check 2: Kind 5 deletion events
+        log('=== CHECKING KIND 5 (Deletion Events) ===', 'info');
+        for (const relay of relays) {
+          try {
+            const deletionEvents = await pool.querySync([relay], {
+              kinds: [5],
+              authors: [pubkey]
+            });
+
+            log(`${relay.replace('wss://', '')}:`, 'info');
+            if (deletionEvents.length === 0) {
+              log(`  No deletion events found`, 'info');
+            } else {
+              for (const event of deletionEvents) {
+                log(`  Deletion event ${event.id.substring(0, 8)}... (${new Date(event.created_at * 1000).toLocaleString()})`, 'warning');
+                log(`    Targets ${event.tags.length} event(s)`, 'warning');
+                event.tags.forEach(tag => {
+                  if (tag[0] === 'e') {
+                    log(`      Deletes event: ${tag[1].substring(0, 16)}...`, 'warning');
+                  } else if (tag[0] === 'a') {
+                    log(`      Deletes kind: ${tag[1]}`, 'warning');
+                  }
+                });
+                if (event.content) {
+                  log(`    Reason: ${event.content}`, 'info');
+                }
+              }
+            }
+          } catch (err) {
+            log(`${relay.replace('wss://', '')}: Error - ${err.message}`, 'error');
+          }
+        }
+
+        log('', 'info');
+
+        // Check 3: Kind 3 contact lists (to see if account has any activity)
+        log('=== CHECKING KIND 3 (Contact List / Following) ===', 'info');
+        try {
+          const contactEvents = await pool.querySync(relays, {
+            kinds: [3],
+            authors: [pubkey],
+            limit: 1
+          });
+
+          if (contactEvents.length > 0) {
+            const event = contactEvents[0];
+            log(`Found contact list with ${event.tags.filter(t => t[0] === 'p').length} following`, 'info');
+          } else {
+            log(`No contact list found (account may be new/unused)`, 'warning');
+          }
+        } catch (err) {
+          log(`Error checking contacts: ${err.message}`, 'error');
+        }
+
+        log('', 'info');
+
+        // Check 4: Kind 1 notes (to see if account has posted)
+        log('=== CHECKING KIND 1 (Posts/Notes) ===', 'info');
+        try {
+          const notes = await pool.querySync(relays, {
+            kinds: [1],
+            authors: [pubkey],
+            limit: 5
+          });
+
+          if (notes.length > 0) {
+            log(`Found ${notes.length} recent post(s)`, 'info');
+          } else {
+            log(`No posts found (account may be new/unused)`, 'warning');
+          }
+        } catch (err) {
+          log(`Error checking posts: ${err.message}`, 'error');
+        }
+
+        log('', 'info');
+        log('=== DEEP SCAN COMPLETE ===', 'success');
+        log('Review the results above to identify the issue.', 'info');
+
+      } catch (error) {
+        log(`Deep scan failed: ${error.message}`, 'error');
+      } finally {
+        deepScanBtn.disabled = false;
+        deepScanBtn.textContent = '🔬 Deep Scan (Check Everything)';
+      }
+    }
+
+    async function updateProfile() {
+      const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
+
+      if (authMethod === 'npub') {
+        alert('Updating profile requires authentication. Please choose "Browser Extension" or "Private Key" authentication method above.');
+        return;
+      }
+
+      const updateBtn = document.getElementById('update-profile-btn');
+      updateBtn.disabled = true;
+      updateBtn.textContent = '✏️ Updating...';
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        // Get form values
+        const name = document.getElementById('profile-name').value.trim();
+        const about = document.getElementById('profile-about').value.trim();
+        const picture = document.getElementById('profile-picture').value.trim();
+        const banner = document.getElementById('profile-banner').value.trim();
+
+        if (!name && !about) {
+          throw new Error('Please enter at least a name or bio');
+        }
+
+        log('Updating profile metadata...', 'info');
+
+        // Fetch current profile to preserve other fields
+        const events = await pool.querySync(relays, {
+          kinds: [0],
+          authors: [pubkey],
+          limit: 1
+        });
+
+        let currentMetadata = {};
+        if (events.length > 0) {
+          try {
+            currentMetadata = JSON.parse(events[0].content);
+            log('Found existing profile, will merge metadata', 'info');
+          } catch (e) {
+            log('Could not parse existing profile, starting fresh', 'warning');
+          }
+        }
+
+        // Build new metadata - preserve ALL existing fields
+        const metadata = { ...currentMetadata };
+        if (name) metadata.name = name;
+        if (about) metadata.about = about;
+        if (picture) metadata.picture = picture;
+        if (banner) metadata.banner = banner;
+
+        // Add display_name if name is set but display_name doesn't exist
+        if (name && !metadata.display_name) {
+          metadata.display_name = name;
+        }
+
+        // Ensure proper deletion flags for Yakihonne compatibility
+        delete metadata.deleted; // Remove old-style deleted flag
+        metadata.is_deleted = false; // Add Yakihonne-style flag
+        metadata.pubkey = pubkey; // Add pubkey to metadata (Yakihonne includes this)
+
+        // Log what fields we have
+        log(`Profile fields: ${Object.keys(metadata).join(', ')}`, 'info');
+
+        log(`Setting name: ${metadata.name || '(not set)'}`, 'info');
+        log(`Setting about: ${metadata.about ? metadata.about.substring(0, 50) + '...' : '(not set)'}`, 'info');
+
+        // Create and sign profile event
+        let profileEvent = {
+          kind: 0,
+          content: JSON.stringify(metadata),
+          tags: [],
+          created_at: Math.floor(Date.now() / 1000)
+        };
+
+        profileEvent = await signEvent(profileEvent, privkey);
+
+        log('Publishing profile to relays...', 'info');
+        const pubs = pool.publish(relays, profileEvent);
+        await Promise.allSettled(pubs);
+
+        log('✅ Profile updated successfully!', 'success');
+        log(`Event ID: ${profileEvent.id}`, 'success');
+
+        alert('Profile updated! Check Primal/Yakihonne in a few moments to see if it appears.');
+
+      } catch (error) {
+        log(`Profile update failed: ${error.message}`, 'error');
+        alert(`Profile update failed: ${error.message}`);
+      } finally {
+        updateBtn.disabled = false;
+        updateBtn.textContent = '✏️ Update Profile Metadata';
+      }
+    }
+
+    async function forceResurrection() {
+      const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
+
+      if (authMethod === 'npub') {
+        alert('Force Resurrection requires authentication. Please choose "Browser Extension" or "Private Key" authentication method above.');
+        return;
+      }
+
+      if (!confirm('Force Resurrection will:\n\n1. Find ALL deleted profile events across all relays\n2. Delete ALL of them with a kind 5 event\n3. Publish a fresh clean profile with a guaranteed newer timestamp\n\nThis is useful when clients still show your profile as deleted even after a normal resurrection attempt.\n\nContinue?')) {
+        return;
+      }
+
+      const forceBtn = document.getElementById('force-btn');
+      forceBtn.disabled = true;
+      forceBtn.textContent = '⚡ Force Resurrecting...';
+
+      try {
+        const privkey = await getPrivateKey();
+        const pubkey = await getPublicKey(privkey);
+        const relays = getRelays();
+
+        if (relays.length === 0) {
+          throw new Error('Please add at least one relay');
+        }
+
+        log('🔥 Starting FORCED resurrection...', 'warning');
+        log(`Pubkey: ${pubkey.substring(0, 8)}...`, 'info');
+        log(`Using ${relays.length} relay(s)`, 'info');
+
+        // Step 1: Fetch ALL profile events FROM EACH RELAY individually
+        log('Fetching all profile events across relays...', 'info');
+
+        // Query each relay individually to see what each has
+        const allEvents = new Map(); // eventId -> event
+        const relayEventMap = new Map(); // relay -> [events]
+
+        for (const relay of relays) {
+          try {
+            log(`Querying ${relay}...`, 'info');
+            const eventsFromRelay = await pool.querySync([relay], {
+              kinds: [0],
+              authors: [pubkey]
+            });
+
+            relayEventMap.set(relay, eventsFromRelay);
+
+            for (const event of eventsFromRelay) {
+              allEvents.set(event.id, event);
+            }
+
+            log(`  - ${relay}: ${eventsFromRelay.length} event(s)`, 'info');
+          } catch (err) {
+            log(`  - ${relay}: Error - ${err.message}`, 'error');
+          }
+        }
+
+        const events = Array.from(allEvents.values());
+        log(`Found ${events.length} unique profile event(s) total across all relays`, 'info');
+
+        // Find all deleted profiles and get latest metadata
+        const deletedEventIds = [];
+        let latestCleanMetadata = null;
+        let latestDeletedMetadata = null;
+        let newestTimestamp = 0;
+
+        for (const event of events) {
+          try {
+            const metadata = JSON.parse(event.content);
+
+            // Show which relays have this specific event
+            const relaysWithThisEvent = [];
+            for (const [relay, eventsFromRelay] of relayEventMap.entries()) {
+              if (eventsFromRelay.some(e => e.id === event.id)) {
+                relaysWithThisEvent.push(relay);
+              }
+            }
+
+            if (metadata.deleted === true) {
+              deletedEventIds.push(event.id);
+              log(`Found DELETED profile: ${event.id.substring(0, 8)}... (timestamp: ${event.created_at})`, 'warning');
+              log(`  On relays: ${relaysWithThisEvent.map(r => r.replace('wss://', '')).join(', ')}`, 'warning');
+              log(`  Content: ${JSON.stringify(metadata).substring(0, 150)}...`, 'warning');
+              latestDeletedMetadata = metadata;
+            } else {
+              log(`Found clean profile: ${event.id.substring(0, 8)}... (timestamp: ${event.created_at})`, 'info');
+              log(`  On relays: ${relaysWithThisEvent.map(r => r.replace('wss://', '')).join(', ')}`, 'info');
+              latestCleanMetadata = metadata;
+            }
+
+            if (event.created_at > newestTimestamp) {
+              newestTimestamp = event.created_at;
+            }
+          } catch (err) {
+            log(`Error parsing event ${event.id.substring(0, 8)}...: ${err.message}`, 'error');
+          }
+        }
+
+        // Step 2: If we found deleted events, send kind 5 deletion
+        if (deletedEventIds.length > 0) {
+          log(`Found ${deletedEventIds.length} deleted event(s) to remove`, 'warning');
+
+          let deletionEvent = {
+            kind: 5,
+            content: 'Force removing all deleted profile events',
+            tags: deletedEventIds.map(id => ['e', id])
+          };
+
+          deletionEvent = await signEvent(deletionEvent, privkey);
+
+          log('Publishing deletion event...', 'info');
+          const delPubs = pool.publish(relays, deletionEvent);
+          await Promise.allSettled(delPubs);
+          log('✅ Deletion event published!', 'success');
+
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          log('No deleted events found, but will still publish fresh profile', 'info');
+        }
+
+        // Step 3: Publish fresh clean profile
+        log('Publishing fresh clean profile...', 'info');
+
+        // Use the latest metadata we have (prefer clean over deleted)
+        const baseMetadata = latestCleanMetadata || latestDeletedMetadata || {};
+        const cleanMetadata = { ...baseMetadata };
+
+        // If profile is completely empty, add minimal required fields
+        if (Object.keys(cleanMetadata).length === 0) {
+          log('⚠️ Profile is empty! Adding minimal required fields...', 'warning');
+          cleanMetadata.name = 'Nostr User';
+          cleanMetadata.about = 'Nostr user';
+        }
+
+        // Add display_name if name exists but display_name doesn't
+        if (cleanMetadata.name && !cleanMetadata.display_name) {
+          cleanMetadata.display_name = cleanMetadata.name;
+        }
+
+        // Ensure proper deletion flags for Yakihonne compatibility
+        delete cleanMetadata.deleted; // Remove old-style deleted flag
+        cleanMetadata.is_deleted = false; // Add Yakihonne-style flag
+        cleanMetadata.pubkey = pubkey; // Add pubkey to metadata (Yakihonne includes this)
+
+        // Log what fields we're publishing
+        log(`📝 Profile fields being published: ${Object.keys(cleanMetadata).join(', ')}`, 'success');
+        log(`📝 Profile content preview: ${JSON.stringify(cleanMetadata).substring(0, 200)}...`, 'info');
+
+        // Make timestamp newer than everything
+        const currentTimestamp = Math.floor(Date.now() / 1000);
+        const newTimestamp = Math.max(currentTimestamp, newestTimestamp + 1);
+
+        log(`New profile timestamp: ${newTimestamp} (newest existing: ${newestTimestamp})`, 'info');
+
+        let profileEvent = {
+          kind: 0,
+          content: JSON.stringify(cleanMetadata),
+          tags: [],
+          created_at: newTimestamp
+        };
+
+        profileEvent = await signEvent(profileEvent, privkey);
+
+        log('Publishing clean profile...', 'info');
+
+        // Log the EXACT event being published
+        log('📤 Publishing this exact event:', 'info');
+        log(`   Event ID: ${profileEvent.id}`, 'info');
+        log(`   Content: ${profileEvent.content.substring(0, 300)}...`, 'info');
+
+        // Publish to each relay individually so we can track success/failure
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const relay of relays) {
+          try {
+            log(`Publishing to ${relay.replace('wss://', '')}...`, 'info');
+            const pubs = pool.publish([relay], profileEvent);
+            const results = await Promise.allSettled(pubs);
+
+            // Check if at least one publish succeeded
+            const succeeded = results.some(r => r.status === 'fulfilled');
+
+            if (succeeded) {
+              successCount++;
+              log(`  ✅ ${relay.replace('wss://', '')} - SUCCESS`, 'success');
+            } else {
+              failCount++;
+              log(`  ❌ ${relay.replace('wss://', '')} - FAILED`, 'error');
+            }
+          } catch (err) {
+            failCount++;
+            log(`  ❌ ${relay.replace('wss://', '')} - ERROR: ${err.message}`, 'error');
+          }
+        }
+
+        log(`✅ Published to ${successCount}/${relays.length} relay(s)`, successCount > 0 ? 'success' : 'error');
+        if (failCount > 0) {
+          log(`⚠️ Failed on ${failCount} relay(s)`, 'warning');
+        }
+
+        log('🎉 Force resurrection complete!', 'success');
+
+        // Play resurrection animation
+        await playResurrectionAnimation();
+
+        // Verify
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        log('Verifying...', 'info');
+        const verifyEvents = await pool.querySync(relays, {
+          kinds: [0],
+          authors: [pubkey]
+        });
+        log(`Now seeing ${verifyEvents.length} total profile event(s)`, 'info');
+
+        alert('Force resurrection complete! Check your profile on different clients (Primal, Yakihonne, etc.) to verify.');
+
+      } catch (error) {
+        log(`Force resurrection failed: ${error.message}`, 'error');
+        alert(`Force resurrection failed: ${error.message}`);
+      } finally {
+        forceBtn.disabled = false;
+        forceBtn.textContent = '⚡ Force Resurrection';
+      }
+    }
+  </script>
+</body>
+</html>
