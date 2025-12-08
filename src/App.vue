@@ -47,18 +47,27 @@
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="setActiveView('backups')" 
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('backups')"
                     :class="{'text-zombie-green': activeView === 'backups', 'hover:text-zombie-green transition-colors': activeView !== 'backups'}"
                   >
                     Backups
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="setActiveView('settings')" 
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('resurrector')"
+                    :class="{'text-zombie-green': activeView === 'resurrector', 'hover:text-zombie-green transition-colors': activeView !== 'resurrector'}"
+                  >
+                    Resurrector
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('settings')"
                     :class="{'text-zombie-green': activeView === 'settings', 'hover:text-zombie-green transition-colors': activeView !== 'settings'}"
                   >
                     Settings
@@ -204,9 +213,9 @@
               </a>
             </li>
             <li>
-              <a 
-                href="#" 
-                @click.prevent="setActiveView('backups'); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="setActiveView('backups'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'backups'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
@@ -214,9 +223,19 @@
               </a>
             </li>
             <li>
-              <a 
-                href="#" 
-                @click.prevent="setActiveView('settings'); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="setActiveView('resurrector'); mobileMenuOpen = false"
+                :class="{'text-zombie-green bg-gray-800': activeView === 'resurrector'}"
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Resurrector
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                @click.prevent="setActiveView('settings'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'settings'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
@@ -404,6 +423,44 @@
               </div>
             </div>
           </div>
+
+          <!-- The Resurrector Section -->
+          <div class="mt-8 pt-6 border-t border-gray-700">
+            <div class="text-center mb-6">
+              <div class="text-4xl mb-3 flex items-center justify-center gap-2">
+                <span style="display: inline-block; transform: scaleX(-1);">⚡</span>
+                <span>🧟‍♂️</span>
+                <span>⚡</span>
+              </div>
+              <h3 class="text-xl mb-2 text-zombie-green">The Resurrector</h3>
+              <p class="text-gray-300 text-sm">
+                Bring your deleted Nostr profile back to life
+              </p>
+            </div>
+
+            <a
+              href="/resurrector.html"
+              target="_blank"
+              class="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              <span>⚡</span>
+              <span>Open Resurrector</span>
+            </a>
+
+            <div class="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+              <div class="flex items-start gap-2">
+                <span class="text-zombie-green text-sm">💡</span>
+                <div class="text-xs text-gray-300">
+                  <strong class="text-zombie-green">What it does:</strong><br>
+                  • Scans for deleted profile events<br>
+                  • Removes the "deleted" flag from your profile<br>
+                  • Publishes a clean profile to relays<br>
+                  • Works with nsec/hex keys (no extension needed)<br>
+                  • Your keys never leave your browser
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -522,8 +579,8 @@
               <code class="bg-gray-800 px-3 py-2 rounded text-yellow-400 text-sm flex-grow text-center">
                 {{ zapModal.lightningAddress }}
               </code>
-              <button 
-                @click="copyLightningAddress"
+              <button
+                @click="copyLightningAddress($event)"
                 class="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded"
                 title="Copy Lightning Address"
               >
@@ -615,6 +672,7 @@ import BackupsView from './views/BackupsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import ScoutModeView from './views/ScoutModeView.vue';
+import ResurrectorView from './views/ResurrectorView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
@@ -634,6 +692,7 @@ export default {
     SettingsView,
     FollowsManagerView,
     ScoutModeView,
+    ResurrectorView,
     CopyButton,
     Nip46Connection,
     ClientAuthorizationModal,
@@ -671,6 +730,7 @@ export default {
         backups: markRaw(BackupsView),
         settings: markRaw(SettingsView),
         follows: markRaw(FollowsManagerView),
+        resurrector: markRaw(ResurrectorView),
         scout: markRaw(ScoutModeView)
       },
       // Scout Mode state
@@ -1045,7 +1105,7 @@ export default {
       this.zapModal.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('lightning:' + lightningAddress)}`;
     },
     
-    copyLightningAddress() {
+    copyLightningAddress(event) {
       navigator.clipboard.writeText(this.zapModal.lightningAddress)
         .then(() => {
           // Show brief success feedback
