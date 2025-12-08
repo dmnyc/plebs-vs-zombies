@@ -73,7 +73,29 @@ This tool works by:
       color: #5cdb5c;
     }
 
-    .btn {
+    .btn-primary {
+      background: #5cdb5c;
+      color: #2c3531;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #4ade80;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #374151;
+      color: #e5e7eb;
       padding: 0.75rem 1.5rem;
       border-radius: 0.5rem;
       font-weight: 600;
@@ -82,26 +104,11 @@ This tool works by:
       border: none;
     }
 
-    .btn-primary {
-      background: #5cdb5c;
-      color: #2c3531;
-      font-weight: 600;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: #4ade80;
-    }
-
-    .btn-secondary {
-      background: #374151;
-      color: #e5e7eb;
-    }
-
     .btn-secondary:hover:not(:disabled) {
       background: #4b5563;
     }
 
-    .btn:disabled {
+    .btn-secondary:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
@@ -133,15 +140,10 @@ This tool works by:
       border-color: #10b981;
     }
 
-    .log-entry {
-      display: flex;
-      gap: 0.5rem;
-    }
-
     .log-info { color: #9ca3af; }
-    .log-success { color: #10b981; }
+    .log-success { color: #4ade80; }
     .log-warning { color: #fbbf24; }
-    .log-error { color: #ef4444; }
+    .log-error { color: #f87171; }
 
     /* Lightning Animation - from Primal Spark */
     .lightning-container {
@@ -226,30 +228,51 @@ This tool works by:
         <div class="text-2xl">🔒</div>
         <div class="flex-1">
           <h3 class="text-lg font-medium text-yellow-400 mb-2">Security Notice</h3>
-          <ul class="text-sm text-gray-300 space-y-1 list-disc list-inside">
-            <li><strong>Preferred:</strong> Use a browser extension (NIP-07) like Alby or nos2x</li>
-            <li><strong>Fallback:</strong> If you must use an nsec, it never leaves your browser</li>
-            <li><strong>Privacy:</strong> All operations happen locally - no data sent to any server</li>
-            <li><strong>Open Source:</strong> You can inspect the code below or on <a href="https://github.com/dmnyc/plebs-vs-zombies" class="zombie-green hover:underline" target="_blank">GitHub</a></li>
-          </ul>
+          <div class="space-y-2">
+            <div class="flex items-start gap-3">
+              <span class="text-lg flex-shrink-0">⚡</span>
+              <span class="text-sm text-gray-300"><strong>Recommended:</strong> <a href="/" class="zombie-green hover:underline">Connect with Browser Extension</a> (NIP-07) like Alby or nos2x</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="text-lg flex-shrink-0">🛡️</span>
+              <span class="text-sm text-gray-300"><strong>Fallback:</strong> If you must use an nsec, it never leaves your browser</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="text-lg flex-shrink-0">🔐</span>
+              <span class="text-sm text-gray-300"><strong>Privacy:</strong> All operations happen locally - no data sent to any server</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="text-lg flex-shrink-0">👁️</span>
+              <span class="text-sm text-gray-300"><strong>Open Source:</strong> You can inspect the code below or on <a href="https://github.com/dmnyc/plebs-vs-zombies" class="zombie-green hover:underline" target="_blank">GitHub</a></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- How It Works -->
-    <div class="card bg-gray-800/50">
+    <div class="card bg-gray-800/50 border-yellow-500/30">
       <div class="flex items-start gap-3">
         <div class="text-2xl">💡</div>
         <div class="flex-1">
-          <h3 class="text-lg font-medium text-blue-400 mb-2">How It Works</h3>
-          <p class="text-sm text-gray-300 mb-2">
+          <h3 class="text-lg font-medium text-yellow-400 mb-2">How It Works</h3>
+          <p class="text-sm text-gray-300 mb-3">
             Nostr accounts are "deleted" by setting a <code class="bg-gray-900 px-1 rounded text-yellow-300">"deleted": true</code> flag in your profile metadata. The Resurrector:
           </p>
-          <ol class="text-sm text-gray-300 list-decimal list-inside space-y-1">
-            <li>Scans for profile events with the deleted flag</li>
-            <li>Sends a deletion event (kind 5) to remove the deleted profile</li>
-            <li>Publishes a clean version of your profile without the deleted flag</li>
-          </ol>
+          <div class="space-y-2">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">1</span>
+              <span class="text-sm text-gray-300">Scans for profile events with the deleted flag</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">2</span>
+              <span class="text-sm text-gray-300">Sends a deletion event (kind 5) to remove the deleted profile</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">3</span>
+              <span class="text-sm text-gray-300">Publishes a clean version of your profile without the deleted flag</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -259,7 +282,7 @@ This tool works by:
       <h2 class="text-2xl font-bold mb-4">Step 1: Choose Authentication Method</h2>
 
       <div class="space-y-3 mb-4">
-        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-zombie-green transition-colors">
           <input
             type="radio"
             name="authMethod"
@@ -274,21 +297,7 @@ This tool works by:
           </div>
         </label>
 
-        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
-          <input
-            type="radio"
-            name="authMethod"
-            value="extension"
-            id="auth-extension"
-            class="mt-1"
-          />
-          <div class="flex-1">
-            <div class="font-medium text-green-400">Browser Extension (Recommended)</div>
-            <div class="text-sm text-gray-400">Use Alby, nos2x, or other NIP-07 extensions - can resurrect</div>
-          </div>
-        </label>
-
-        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-yellow-500 transition-colors">
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-zombie-green transition-colors">
           <input
             type="radio"
             name="authMethod"
@@ -298,19 +307,19 @@ This tool works by:
           />
           <div class="flex-1">
             <div class="font-medium text-yellow-400">Private Key (nsec/hex)</div>
-            <div class="text-sm text-gray-400">Only if you don't have access to an extension - can resurrect</div>
+            <div class="text-sm text-gray-400">Required to resurrect profiles</div>
           </div>
         </label>
       </div>
 
       <!-- Npub Input (shown by default) -->
       <div id="npub-input-section" class="mb-4">
-        <label class="block text-sm font-medium mb-2">Public Key (npub)</label>
+        <label class="block text-sm font-medium mb-2">Public Key (npub or hex)</label>
         <input
           type="text"
           id="npub-input"
           placeholder="npub1... or hex pubkey"
-          class="mb-2"
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-zombie-green mb-2"
         />
         <p class="text-xs text-blue-400">ℹ️ Read-only mode - you can scan but not resurrect without signing</p>
       </div>
@@ -322,7 +331,7 @@ This tool works by:
           type="password"
           id="nsec-input"
           placeholder="nsec1... or hex private key"
-          class="mb-2"
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-zombie-green mb-2"
         />
         <p class="text-xs text-yellow-400">⚠️ Your private key never leaves this browser window</p>
       </div>
@@ -335,87 +344,45 @@ This tool works by:
           rows="5"
           placeholder="wss://relay.damus.io&#10;wss://relay.nostr.band&#10;wss://nos.lol&#10;wss://relay.primal.net"
         ></textarea>
-        <p class="text-xs text-gray-400 mt-1">Relays will be auto-filled from your extension if available</p>
+        <p class="text-xs text-gray-400 mt-1">Common relays are pre-filled. You can add or remove as needed.</p>
       </div>
-    </div>
-
-    <!-- Update Profile Section -->
-    <div class="card">
-      <h2 class="text-2xl font-bold mb-4">Step 2: Update Profile Metadata</h2>
-      <p class="text-sm text-gray-400 mb-4">
-        Many clients filter out profiles with minimal metadata. Fill this out to ensure your profile is visible on Primal, Yakihonne, etc.
-      </p>
-
-      <div class="space-y-3 mb-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Display Name</label>
-          <input
-            type="text"
-            id="profile-name"
-            placeholder="Your name"
-            class="w-full"
-          />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">About / Bio</label>
-          <textarea
-            id="profile-about"
-            rows="3"
-            placeholder="A short bio about yourself"
-            class="w-full"
-          ></textarea>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Profile Picture URL (optional)</label>
-          <input
-            type="text"
-            id="profile-picture"
-            placeholder="https://example.com/avatar.jpg"
-            class="w-full"
-          />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-1">Banner Image URL (optional)</label>
-          <input
-            type="text"
-            id="profile-banner"
-            placeholder="https://example.com/banner.jpg"
-            class="w-full"
-          />
-        </div>
-      </div>
-
-      <button onclick="updateProfile()" class="btn btn-primary w-full mb-4" id="update-profile-btn">
-        ✏️ Update Profile Metadata
-      </button>
     </div>
 
     <!-- Main Actions Section -->
     <div class="card">
-      <h2 class="text-2xl font-bold mb-4">Step 3: Fix Your Profile</h2>
+      <h2 class="text-2xl font-bold mb-4" id="step2-heading">Step 2: Check Profile Status</h2>
 
-      <div class="bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-lg mb-4">
-        <p class="text-sm text-gray-400">
-          💡 <strong class="text-yellow-400">Quick Fix:</strong> Click <strong>Force Resurrection</strong> to automatically fix deleted profiles and publish a clean version that works with Primal, Yakihonne, and other clients.
+      <!-- Read-only notice for npub mode -->
+      <div id="npub-readonly-notice" class="bg-blue-900/20 border border-blue-600/40 p-3 rounded-lg mb-4">
+        <p class="text-sm text-blue-300">
+          ℹ️ <strong>Read-Only Mode:</strong> You can scan profiles with an npub, but resurrection requires authentication. Choose "Browser Extension" or "Private Key" above to resurrect a profile.
         </p>
       </div>
 
-      <div class="flex gap-3 mb-4 flex-wrap">
-        <button onclick="forceResurrection()" class="btn btn-primary w-full sm:w-auto" id="force-btn" style="background: #d97706; font-size: 1.1rem; padding: 1rem 2rem;">
-          ⚡ Force Resurrection (Recommended)
+      <div class="bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-lg mb-4">
+        <p class="text-sm text-gray-400">
+          💡 <strong class="text-yellow-400">How it works:</strong> Click the button below to scan for deleted profiles across all relays. If found and you're authenticated, it will remove the deleted flag and publish a clean version.
+        </p>
+      </div>
+
+      <div class="flex gap-3 flex-wrap">
+        <button onclick="forceResurrection()" class="btn-primary text-lg px-8 py-4" id="force-btn" style="background: #5cdb5c;">
+          🔍 Check Profile
         </button>
 
-        <button onclick="clearLogs()" class="btn btn-secondary">
+        <button onclick="clearLogs()" class="btn-secondary hidden" id="clear-logs-btn">
           🗑️ Clear Logs
         </button>
       </div>
     </div>
 
+    <!-- Scan Results Section (separate card) -->
+    <div id="results-section" class="hidden">
+      <!-- This will be populated by JavaScript -->
+    </div>
+
     <!-- Advanced Tools (Collapsible) -->
-    <div class="card bg-gray-800/30">
+    <div id="advanced-tools-section" class="card bg-gray-800/30 hidden">
       <details>
         <summary class="text-lg font-medium cursor-pointer hover:text-zombie-green transition-colors">
           🔧 Advanced Diagnostic Tools
@@ -427,23 +394,23 @@ This tool works by:
           </p>
 
           <div class="flex gap-3 flex-wrap">
-            <button onclick="scanProfile()" class="btn btn-secondary" id="scan-btn">
+            <button onclick="scanProfile()" class="btn-secondary" id="scan-btn">
               🔍 Basic Scan
             </button>
 
-            <button onclick="deepScan()" class="btn btn-secondary" id="deep-scan-btn">
+            <button onclick="deepScan()" class="btn-secondary" id="deep-scan-btn">
               🔬 Deep Scan
             </button>
 
-            <button onclick="publishToMissingRelays()" class="btn btn-secondary" id="publish-missing-btn">
+            <button onclick="publishToMissingRelays()" class="btn-secondary" id="publish-missing-btn">
               📡 Publish to Missing Relays
             </button>
 
-            <button onclick="toggleKeepProfile()" class="btn btn-secondary" id="keep-profile-btn">
+            <button onclick="toggleKeepProfile()" class="btn-secondary" id="keep-profile-btn">
               Keep Profile: OFF
             </button>
 
-            <button onclick="exportProfileData()" class="btn btn-secondary" id="export-btn">
+            <button onclick="exportProfileData()" class="btn-secondary" id="export-btn">
               💾 Export Profile JSON
             </button>
           </div>
@@ -458,16 +425,72 @@ This tool works by:
       </details>
     </div>
 
-    <!-- Results Section -->
-    <div id="results-section" class="hidden">
-      <!-- This will be populated by JavaScript -->
+    <!-- Logs -->
+    <div id="log-section" class="card bg-gray-900 hidden">
+      <h3 class="text-lg font-medium mb-3">Activity Log</h3>
+      <div id="log-output" class="space-y-1 max-h-96 overflow-y-auto font-mono text-sm">
+        <!-- Logs will appear here when actions are performed -->
+      </div>
     </div>
 
-    <!-- Logs -->
-    <div class="card bg-gray-900">
-      <h3 class="text-lg font-medium mb-3">Activity Log</h3>
-      <div id="log-output" class="space-y-1 max-h-96 overflow-y-auto font-mono text-xs">
-        <div class="log-entry log-info">Ready to scan. Choose your authentication method and click "Scan My Profile".</div>
+    <!-- Help & Disclaimer Section -->
+    <div class="card mt-6" style="background: rgba(55, 65, 81, 0.3);">
+      <h3 class="text-lg font-medium mb-4">Need Help?</h3>
+      <div class="space-y-3 text-sm text-gray-300 mb-6">
+        <p>
+          <strong class="text-yellow-400">Q: Why would my profile be deleted?</strong><br>
+          Some Nostr clients allow you to "delete" your account by setting the <code class="bg-gray-900 px-1 rounded">deleted: true</code> flag in your profile.
+        </p>
+        <p>
+          <strong class="text-yellow-400">Q: Is this safe?</strong><br>
+          Yes! Your private key never leaves this browser window. All operations happen locally using secure cryptography.
+        </p>
+        <p>
+          <strong class="text-yellow-400">Q: What's "Keep Profile Mode"?</strong><br>
+          When OFF (recommended), it republishes your profile. When ON, it only removes the deleted events without republishing. Use for more control.
+        </p>
+      </div>
+
+      <!-- Important Disclaimer -->
+      <div style="background: rgba(124, 45, 18, 0.2); border: 1px solid rgba(249, 115, 22, 0.4); border-radius: 0.75rem; padding: 1rem;">
+        <div class="flex items-start gap-3">
+          <div class="text-2xl">⚠️</div>
+          <div class="flex-1">
+            <h3 class="text-lg font-medium mb-2" style="color: #fb923c;">Important: Client Compatibility Disclaimer</h3>
+            <p class="text-sm text-gray-300 mb-3">
+              The Resurrector is a <strong>best effort</strong> service. While it works in the majority of cases we've tested,
+              there is <strong>no guarantee that all Nostr clients will behave the same way</strong>.
+            </p>
+
+            <div class="mb-3">
+              <p class="text-sm font-medium mb-2" style="color: #fed7aa;">Known Client-Specific Issues:</p>
+              <ul class="text-sm text-gray-300 space-y-2 list-disc list-inside">
+                <li>
+                  <strong style="color: #fdba74;">Yakihonne:</strong> May require clearing the app cache or completely
+                  uninstalling and reinstalling the app before it will recognize your nsec as not deleted.
+                </li>
+                <li>
+                  <strong style="color: #fdba74;">Primal:</strong> Some users may still experience errors logging in if
+                  delete flags are present in remote cache services (a known issue on their end).
+                </li>
+                <li>
+                  <strong style="color: #fdba74;">Other clients:</strong> Each client handles profile metadata differently.
+                  Some may cache deleted status or have different relay configurations.
+                </li>
+              </ul>
+            </div>
+
+            <p class="text-sm text-gray-300 mb-2">
+              <strong style="color: #fb923c;">What We Offer:</strong> We publish the necessary events to clear the deleted flag
+              from your profile across relays. In most cases tested, this successfully restores profile usability.
+            </p>
+
+            <p class="text-sm text-gray-400 italic">
+              We provide this service with no assurances that every client will accept your nsec after resurrection.
+              Results may vary depending on the client's implementation and caching behavior.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -509,18 +532,37 @@ This tool works by:
         radio.addEventListener('change', (e) => {
           const npubSection = document.getElementById('npub-input-section');
           const nsecSection = document.getElementById('nsec-input-section');
+          const npubInput = document.getElementById('npub-input');
+          const nsecInput = document.getElementById('nsec-input');
+          const readonlyNotice = document.getElementById('npub-readonly-notice');
+          const forceBtn = document.getElementById('force-btn');
+          const step2Heading = document.getElementById('step2-heading');
+          const advancedTools = document.getElementById('advanced-tools-section');
+
+          // Clear input fields when switching modes for security
+          npubInput.value = '';
+          nsecInput.value = '';
 
           // Hide all input sections first
           npubSection.classList.add('hidden');
           nsecSection.classList.add('hidden');
+          readonlyNotice.classList.add('hidden');
 
-          // Show the appropriate input section
+          // Show the appropriate input section and update UI
           if (e.target.value === 'npub') {
             npubSection.classList.remove('hidden');
+            readonlyNotice.classList.remove('hidden');
+            forceBtn.innerHTML = '🔍 Check Profile';
+            forceBtn.style.background = '#5cdb5c'; // zombie-green
+            step2Heading.textContent = 'Step 2: Check Profile Status';
+            advancedTools.classList.add('hidden');
           } else if (e.target.value === 'nsec') {
             nsecSection.classList.remove('hidden');
+            forceBtn.innerHTML = '⚡ Resurrect Profile';
+            forceBtn.style.background = '#d97706'; // orange
+            step2Heading.textContent = 'Step 2: Fix Your Profile';
+            advancedTools.classList.remove('hidden');
           }
-          // Extension doesn't need an input section
         });
       });
 
@@ -532,22 +574,8 @@ This tool works by:
         pool = new window.NostrTools.SimplePool();
         log('NostrTools loaded successfully', 'success');
 
-        // Try to load relays from extension
-        if (window.nostr) {
-          try {
-            const relays = await window.nostr.getRelays();
-            const relayList = Object.keys(relays).join('\n');
-            if (relayList) {
-              document.getElementById('relay-input').value = relayList;
-              log('Loaded relays from browser extension', 'info');
-            }
-          } catch (e) {
-            // Extension doesn't support getRelays, use defaults
-            setDefaultRelays();
-          }
-        } else {
-          setDefaultRelays();
-        }
+        // Set default relays
+        setDefaultRelays();
       } catch (error) {
         log('Failed to load NostrTools: ' + error.message, 'error');
       }
@@ -558,7 +586,8 @@ This tool works by:
         // Primal relays (critical for Primal app)
         'wss://relay.primal.net',
         // Yakihonne relays (critical for Yakihonne app)
-        'wss://relay.yakihonne.com',
+        'wss://nostr-01.yakihonne.com',
+        'wss://nostr-02.yakihonne.com',
         // Other popular relays
         'wss://relay.damus.io',
         'wss://relay.nostr.band',
@@ -575,7 +604,7 @@ This tool works by:
       const timestamp = new Date().toLocaleTimeString();
       const logOutput = document.getElementById('log-output');
       const entry = document.createElement('div');
-      entry.className = `log-entry log-${type}`;
+      entry.className = `flex gap-2 text-xs log-${type}`;
 
       const timeSpan = document.createElement('span');
       timeSpan.className = 'text-gray-500';
@@ -589,12 +618,31 @@ This tool works by:
       logOutput.appendChild(entry);
       logOutput.scrollTop = logOutput.scrollHeight;
       console.log(`[Resurrector ${type.toUpperCase()}] ${message}`);
+
+      // Show log section and Clear Logs button when logs exist
+      const logSection = document.getElementById('log-section');
+      if (logSection) {
+        logSection.classList.remove('hidden');
+      }
+      const clearLogsBtn = document.getElementById('clear-logs-btn');
+      if (clearLogsBtn) {
+        clearLogsBtn.classList.remove('hidden');
+      }
     }
 
     function clearLogs() {
       const logOutput = document.getElementById('log-output');
       logOutput.innerHTML = '';
-      log('Logs cleared.', 'info');
+
+      // Hide log section and Clear Logs button after clearing
+      const logSection = document.getElementById('log-section');
+      if (logSection) {
+        logSection.classList.add('hidden');
+      }
+      const clearLogsBtn = document.getElementById('clear-logs-btn');
+      if (clearLogsBtn) {
+        clearLogsBtn.classList.add('hidden');
+      }
     }
 
     function toggleKeepProfile() {
@@ -710,11 +758,6 @@ This tool works by:
       if (authMethod === 'npub') {
         // Read-only mode, no private key
         return null;
-      } else if (authMethod === 'extension') {
-        if (!window.nostr) {
-          throw new Error('No Nostr extension found. Please install Alby, nos2x, or another NIP-07 extension.');
-        }
-        return null; // Will use extension for signing
       } else {
         const nsecInput = document.getElementById('nsec-input').value.trim();
         if (!nsecInput) {
@@ -759,10 +802,7 @@ This tool works by:
         return npubInput;
       }
 
-      // Handle extension or privkey
-      if (!privkey && window.nostr) {
-        return await window.nostr.getPublicKey();
-      }
+      // Handle privkey
       return window.NostrTools.getPublicKey(privkey);
     }
 
@@ -774,12 +814,8 @@ This tool works by:
     async function signEvent(event, privkey) {
       event.created_at = Math.floor(Date.now() / 1000);
 
-      if (!privkey && window.nostr) {
-        event = await window.nostr.signEvent(event);
-      } else {
-        // Use finalizeEvent which handles pubkey, id, and sig in one call
-        event = window.NostrTools.finalizeEvent(event, privkey);
-      }
+      // Use finalizeEvent which handles pubkey, id, and sig in one call
+      event = window.NostrTools.finalizeEvent(event, privkey);
 
       log(`Signed event ${event.id.substring(0, 8)}... with ${event.pubkey.substring(0, 8)}...`, 'success');
       return event;
@@ -862,7 +898,7 @@ This tool works by:
 
       if (deletedProfiles.length === 0) {
         resultsSection.innerHTML = `
-          <div class="card bg-green-900/20 border-green-500/50">
+          <div class="card border-green-500/50">
             <div class="flex items-center gap-3">
               <div class="text-3xl">✅</div>
               <div>
@@ -886,7 +922,7 @@ This tool works by:
         html += `
           <div class="bg-yellow-900/30 border border-yellow-600/50 p-3 rounded-lg mb-4">
             <p class="text-sm text-yellow-400">
-              ⚠️ You're in read-only mode. To resurrect this profile, choose "Browser Extension" or "Private Key" authentication above and scan again.
+              ⚠️ You're in read-only mode. To resurrect this profile, choose "Private Key" authentication above, or use the <a href="/" class="zombie-green hover:underline">Browser Extension (NIP-07) method</a>.
             </p>
           </div>
         `;
@@ -1473,19 +1509,28 @@ This tool works by:
 
     async function forceResurrection() {
       const authMethod = document.querySelector('input[name="authMethod"]:checked').value;
-
-      if (authMethod === 'npub') {
-        alert('Force Resurrection requires authentication. Please choose "Browser Extension" or "Private Key" authentication method above.');
-        return;
-      }
-
-      if (!confirm('Force Resurrection will:\n\n1. Find ALL deleted profile events across all relays\n2. Delete ALL of them with a kind 5 event\n3. Publish a fresh clean profile with a guaranteed newer timestamp\n\nThis is useful when clients still show your profile as deleted even after a normal resurrection attempt.\n\nContinue?')) {
-        return;
-      }
-
       const forceBtn = document.getElementById('force-btn');
+
+      // In npub mode, just do a scan
+      if (authMethod === 'npub') {
+        forceBtn.disabled = true;
+        forceBtn.textContent = '🔍 Checking...';
+
+        try {
+          await scanProfile();
+        } finally {
+          forceBtn.disabled = false;
+          forceBtn.textContent = '🔍 Check Profile';
+        }
+        return;
+      }
+
+      if (!confirm('This will:\n\n1. Find ALL deleted profile events across all relays\n2. Delete ALL of them with a kind 5 event\n3. Publish a fresh clean profile with a guaranteed newer timestamp\n\nThis is useful when clients still show your profile as deleted.\n\nContinue?')) {
+        return;
+      }
+
       forceBtn.disabled = true;
-      forceBtn.textContent = '⚡ Force Resurrecting...';
+      forceBtn.textContent = '⚡ Resurrecting...';
 
       try {
         const privkey = await getPrivateKey();

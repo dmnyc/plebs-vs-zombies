@@ -423,6 +423,44 @@
               </div>
             </div>
           </div>
+
+          <!-- The Resurrector Section -->
+          <div class="mt-8 pt-6 border-t border-gray-700">
+            <div class="text-center mb-6">
+              <div class="text-4xl mb-3 flex items-center justify-center gap-2">
+                <span style="display: inline-block; transform: scaleX(-1);">⚡</span>
+                <span>🧟‍♂️</span>
+                <span>⚡</span>
+              </div>
+              <h3 class="text-xl mb-2 text-zombie-green">The Resurrector</h3>
+              <p class="text-gray-300 text-sm">
+                Bring your deleted Nostr profile back to life
+              </p>
+            </div>
+
+            <a
+              href="/resurrector.html"
+              target="_blank"
+              class="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              <span>⚡</span>
+              <span>Open Resurrector</span>
+            </a>
+
+            <div class="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+              <div class="flex items-start gap-2">
+                <span class="text-zombie-green text-sm">💡</span>
+                <div class="text-xs text-gray-300">
+                  <strong class="text-zombie-green">What it does:</strong><br>
+                  • Scans for deleted profile events<br>
+                  • Removes the "deleted" flag from your profile<br>
+                  • Publishes a clean profile to relays<br>
+                  • Works with nsec/hex keys (no extension needed)<br>
+                  • Your keys never leave your browser
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

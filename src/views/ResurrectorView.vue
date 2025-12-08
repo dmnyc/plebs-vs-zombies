@@ -19,26 +19,35 @@
         <div class="text-2xl">💡</div>
         <div class="flex-1">
           <h3 class="text-lg font-medium text-yellow-400 mb-2">How It Works</h3>
-          <p class="text-sm text-gray-300 mb-2">
+          <p class="text-sm text-gray-300 mb-3">
             Nostr accounts are "deleted" by setting a <code class="bg-gray-900 px-1 rounded text-yellow-300">"deleted": true</code>
             flag in your profile metadata. The Resurrector:
           </p>
-          <ol class="text-sm text-gray-300 list-decimal list-inside space-y-1">
-            <li>Scans for profile events with the deleted flag</li>
-            <li>Sends a deletion event (kind 5) to remove the deleted profile</li>
-            <li>Publishes a clean version of your profile without the deleted flag</li>
-          </ol>
+          <div class="space-y-2">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">1</span>
+              <span class="text-sm text-gray-300">Scans for profile events with the deleted flag</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">2</span>
+              <span class="text-sm text-gray-300">Sends a deletion event (kind 5) to remove the deleted profile</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-zombie-green text-gray-900 font-bold text-sm flex items-center justify-center">3</span>
+              <span class="text-sm text-gray-300">Publishes a clean version of your profile without the deleted flag</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Scan Section -->
     <div class="card mb-6">
-      <h2 class="text-2xl font-bold mb-4">Step 1: Scan a Profile</h2>
+      <h2 class="text-2xl font-bold mb-4">Step 1: Choose Profile</h2>
 
       <!-- Scan Mode Selection -->
       <div class="space-y-3 mb-4">
-        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-green-500 transition-colors">
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-zombie-green transition-colors">
           <input
             type="radio"
             v-model="scanMode"
@@ -46,12 +55,12 @@
             class="mt-1"
           />
           <div class="flex-1">
-            <div class="font-medium text-green-400">Scan My Profile</div>
-            <div class="text-sm text-gray-400">Check your own profile - can resurrect</div>
+            <div class="font-medium text-green-400">My Profile</div>
+            <div class="text-sm text-gray-400">Check and resurrect your own profile</div>
           </div>
         </label>
 
-        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+        <label class="flex items-start gap-3 p-3 border border-gray-700 rounded-lg cursor-pointer hover:border-zombie-green transition-colors">
           <input
             type="radio"
             v-model="scanMode"
@@ -59,8 +68,8 @@
             class="mt-1"
           />
           <div class="flex-1">
-            <div class="font-medium text-blue-400">Check Another Profile (npub)</div>
-            <div class="text-sm text-gray-400">Read-only scan - can't resurrect</div>
+            <div class="font-medium text-blue-400">Another Profile (npub)</div>
+            <div class="text-sm text-gray-400">Read-only check - can't resurrect</div>
           </div>
         </label>
       </div>
@@ -74,30 +83,44 @@
           placeholder="npub1... or hex pubkey"
           class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-zombie-green"
         />
-        <p class="text-xs text-blue-400 mt-1">ℹ️ Read-only mode - you can scan but not resurrect</p>
+        <p class="text-xs text-blue-400 mt-1">ℹ️ Read-only mode - you can check but not resurrect</p>
+      </div>
+    </div>
+
+    <!-- Action Section -->
+    <div class="card mb-6">
+      <h2 class="text-2xl font-bold mb-4">Step 2: {{ scanMode === 'other' ? 'Check Profile' : 'Check or Resurrect Profile' }}</h2>
+
+      <div class="bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-lg mb-4">
+        <p class="text-sm text-gray-400">
+          💡 <strong class="text-yellow-400">How it works:</strong>
+          <span v-if="scanMode === 'other'"> Check scans for deleted profiles without making changes.</span>
+          <span v-else> Check scans for issues. Resurrect removes deleted flags and publishes a clean profile across all relays.</span>
+        </p>
       </div>
 
       <div class="flex gap-3 flex-wrap">
         <button
           @click="scanProfile"
           :disabled="isScanning || (scanMode === 'other' && !npubInput)"
-          class="btn-primary"
+          class="btn-primary text-lg px-8 py-4"
           :class="{'opacity-50 cursor-not-allowed': isScanning || (scanMode === 'other' && !npubInput)}"
+          style="background: #5cdb5c"
         >
-          <span v-if="isScanning">🔍 Scanning...</span>
-          <span v-else>🔍 Scan Profile</span>
+          <span v-if="isScanning">🔍 Checking...</span>
+          <span v-else>🔍 Check Profile</span>
         </button>
 
         <button
           v-if="scanMode === 'self'"
           @click="forceResurrection"
           :disabled="isResurrecting"
-          class="btn-primary bg-yellow-600 hover:bg-yellow-500"
+          class="btn-primary text-lg px-8 py-4"
           :class="{'opacity-50 cursor-not-allowed': isResurrecting}"
-          title="Force publish a clean profile even if scan finds nothing"
+          style="background: #d97706"
         >
-          <span v-if="isResurrecting">⚡ Force Resurrecting...</span>
-          <span v-else>⚡ Force Resurrection</span>
+          <span v-if="isResurrecting">⚡ Resurrecting...</span>
+          <span v-else>⚡ Resurrect Profile</span>
         </button>
 
         <button
@@ -107,13 +130,6 @@
         >
           🗑️ Clear Logs
         </button>
-      </div>
-
-      <!-- Force Resurrection Info -->
-      <div v-if="scanMode === 'self'" class="mt-4 bg-yellow-900/10 border border-yellow-600/20 p-3 rounded-lg">
-        <p class="text-xs text-gray-400">
-          💡 <strong class="text-yellow-400">Tip:</strong> If clients like Primal or Yakihonne still show your profile as deleted, use Force Resurrection. It will find and remove ALL deleted profile events across all relays and publish a fresh clean profile.
-        </p>
       </div>
     </div>
 
@@ -152,18 +168,6 @@
             <pre class="text-xs bg-gray-900 p-2 rounded overflow-x-auto text-gray-400">{{ JSON.stringify(profile.metadata, null, 2) }}</pre>
           </div>
 
-          <div class="mb-3">
-            <label class="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                type="checkbox"
-                v-model="keepProfileMode"
-                class="w-4 h-4 text-zombie-green focus:ring-zombie-green rounded"
-              />
-              <span>Keep Profile Mode</span>
-              <span class="text-xs text-gray-500">(Only delete the "deleted" event, don't republish profile)</span>
-            </label>
-          </div>
-
           <button
             v-if="scanMode === 'self'"
             @click="resurrectProfile(profile)"
@@ -186,30 +190,78 @@
 
     <!-- No Deleted Profiles -->
     <div v-else-if="hasScanned && deletedProfiles.length === 0" class="card mb-6 border-green-500/50">
-      <div class="flex items-center gap-3 mb-4">
+      <div class="flex items-center gap-3">
         <div class="text-3xl">✅</div>
         <div class="flex-1">
-          <h3 class="text-lg font-medium text-green-400">Your Profile Looks Healthy!</h3>
+          <h3 class="text-lg font-medium text-green-400">{{ scanMode === 'other' ? 'This Profile Looks Healthy!' : 'Your Profile Looks Healthy!' }}</h3>
           <p class="text-sm text-gray-300">No deleted profiles found.</p>
         </div>
       </div>
+    </div>
 
-      <!-- Force Resurrection Option -->
-      <div v-if="scanMode === 'self'" class="bg-yellow-900/20 border border-yellow-600/30 p-4 rounded-lg">
-        <h4 class="text-sm font-medium text-yellow-400 mb-2">⚡ Still showing as deleted on some clients?</h4>
-        <p class="text-xs text-gray-300 mb-3">
-          Sometimes deleted profiles exist on relays our scan doesn't check. Use Force Resurrection to publish a fresh clean profile that overrides any deleted versions.
-        </p>
-        <button
-          @click="forceResurrection"
-          :disabled="isResurrecting"
-          class="btn-primary bg-yellow-600 hover:bg-yellow-500"
-          :class="{'opacity-50 cursor-not-allowed': isResurrecting}"
-        >
-          <span v-if="isResurrecting">⚡ Force Resurrecting...</span>
-          <span v-else>⚡ Force Resurrection</span>
-        </button>
-      </div>
+    <!-- Advanced Tools (Collapsible) -->
+    <div v-if="scanMode === 'self'" class="card bg-gray-800/30 mb-6">
+      <details>
+        <summary class="text-lg font-medium cursor-pointer hover:text-zombie-green transition-colors">
+          🔧 Advanced Diagnostic Tools
+        </summary>
+
+        <div class="mt-4 space-y-3">
+          <p class="text-xs text-gray-400 mb-3">
+            These tools help diagnose specific issues. Most users won't need these.
+          </p>
+
+          <!-- Advanced Tool Buttons -->
+          <div class="flex gap-3 flex-wrap mb-3">
+            <button
+              @click="scanProfile"
+              :disabled="isScanning || isResurrecting || isRunningAdvancedTool"
+              class="btn-secondary"
+            >
+              {{ isScanning ? '🔍 Scanning...' : '🔍 Basic Scan' }}
+            </button>
+
+            <button
+              @click="runDeepScan"
+              :disabled="isScanning || isResurrecting || isRunningAdvancedTool"
+              class="btn-secondary"
+            >
+              {{ isDeepScanning ? '🔬 Deep Scanning...' : '🔬 Deep Scan' }}
+            </button>
+
+            <button
+              @click="publishToMissingRelays"
+              :disabled="isScanning || isResurrecting || isRunningAdvancedTool"
+              class="btn-secondary"
+            >
+              {{ isPublishingToMissing ? '📡 Publishing...' : '📡 Publish to Missing Relays' }}
+            </button>
+
+            <button
+              @click="toggleKeepProfile"
+              class="btn-secondary"
+            >
+              Keep Profile: {{ keepProfileMode ? 'ON' : 'OFF' }}
+            </button>
+
+            <button
+              @click="exportProfile"
+              :disabled="isScanning || isResurrecting || isRunningAdvancedTool"
+              class="btn-secondary"
+            >
+              💾 Export Profile JSON
+            </button>
+          </div>
+
+          <!-- Tool Descriptions -->
+          <div class="text-xs text-gray-400 bg-gray-900/50 p-3 rounded">
+            <p class="mb-2"><strong>Basic Scan:</strong> Quick check for deleted profiles</p>
+            <p class="mb-2"><strong>Deep Scan:</strong> Comprehensive check across all relays and event types</p>
+            <p class="mb-2"><strong>Publish to Missing Relays:</strong> Send your profile to specific relays that don't have it</p>
+            <p><strong>Keep Profile:</strong> When OFF (recommended), publishes a new profile. When ON, only removes deleted events.</p>
+          </div>
+        </div>
+      </details>
     </div>
 
     <!-- Logs Section -->
@@ -233,34 +285,10 @@
       </div>
     </div>
 
-    <!-- Standalone Version Link -->
-    <div class="card bg-purple-900/20 border-purple-500/30">
-      <div class="flex items-start gap-3">
-        <div class="text-2xl">🔗</div>
-        <div class="flex-1">
-          <h3 class="text-lg font-medium text-purple-400 mb-2">Need nsec/hex key support?</h3>
-          <p class="text-sm text-gray-300 mb-3">
-            If your account is deleted and you don't have access to a browser extension, use our standalone version that supports nsec/hex private keys.
-          </p>
-          <a
-            href="/resurrector.html"
-            target="_blank"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium"
-          >
-            <span>🚀</span>
-            <span>Open Standalone Resurrector</span>
-          </a>
-          <p class="text-xs text-gray-400 mt-2">
-            ⚠️ Your private key never leaves your browser window
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Help Section -->
+    <!-- Help & Disclaimer Section -->
     <div class="card mt-6 bg-gray-800/30">
-      <h3 class="text-lg font-medium mb-3">Need Help?</h3>
-      <div class="space-y-2 text-sm text-gray-300">
+      <h3 class="text-lg font-medium mb-4">Need Help?</h3>
+      <div class="space-y-3 text-sm text-gray-300 mb-6">
         <p>
           <strong class="text-yellow-400">Q: Why would my profile be deleted?</strong><br>
           Some Nostr clients allow you to "delete" your account by setting the <code class="bg-gray-900 px-1 rounded">deleted: true</code> flag in your profile.
@@ -273,10 +301,48 @@
           <strong class="text-yellow-400">Q: What's "Keep Profile Mode"?</strong><br>
           When enabled, it only deletes the "deleted" profile event without republishing a new one. Use this if you want more control over your profile update.
         </p>
-        <p>
-          <strong class="text-yellow-400">Q: What if I don't have a browser extension?</strong><br>
-          Use the <a href="/resurrector.html" target="_blank" class="text-purple-400 hover:underline">standalone version</a> which supports nsec/hex private keys as a fallback.
-        </p>
+      </div>
+
+      <!-- Important Disclaimer -->
+      <div class="bg-orange-900/20 border border-orange-500/40 p-4 rounded-lg">
+        <div class="flex items-start gap-3">
+          <div class="text-2xl">⚠️</div>
+          <div class="flex-1">
+            <h3 class="text-lg font-medium text-orange-400 mb-2">Important: Client Compatibility Disclaimer</h3>
+            <p class="text-sm text-gray-300 mb-3">
+              The Resurrector is a <strong>best effort</strong> service. While it works in the majority of cases we've tested,
+              there is <strong>no guarantee that all Nostr clients will behave the same way</strong>.
+            </p>
+
+            <div class="mb-3">
+              <p class="text-sm text-orange-200 font-medium mb-2">Known Client-Specific Issues:</p>
+              <ul class="text-sm text-gray-300 space-y-2 list-disc list-inside">
+                <li>
+                  <strong class="text-orange-300">Yakihonne:</strong> May require clearing the app cache or completely
+                  uninstalling and reinstalling the app before it will recognize your nsec as not deleted.
+                </li>
+                <li>
+                  <strong class="text-orange-300">Primal:</strong> Some users may still experience errors logging in if
+                  delete flags are present in remote cache services (a known issue on their end).
+                </li>
+                <li>
+                  <strong class="text-orange-300">Other clients:</strong> Each client handles profile metadata differently.
+                  Some may cache deleted status or have different relay configurations.
+                </li>
+              </ul>
+            </div>
+
+            <p class="text-sm text-gray-300 mb-2">
+              <strong class="text-orange-400">What We Offer:</strong> We publish the necessary events to clear the deleted flag
+              from your profile across relays. In most cases tested, this successfully restores profile usability.
+            </p>
+
+            <p class="text-sm text-gray-400 italic">
+              We provide this service with no assurances that every client will accept your nsec after resurrection.
+              Results may vary depending on the client's implementation and caching behavior.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -365,8 +431,16 @@ export default {
       keepProfileMode: false,
       scanMode: 'self', // 'self' or 'other'
       npubInput: '',
-      showAnimation: false
+      showAnimation: false,
+      isDeepScanning: false,
+      isPublishingToMissing: false,
+      isExporting: false
     };
+  },
+  computed: {
+    isRunningAdvancedTool() {
+      return this.isDeepScanning || this.isPublishingToMissing || this.isExporting;
+    }
   },
   methods: {
     async scanProfile() {
@@ -586,6 +660,67 @@ export default {
 
     formatDate(timestamp) {
       return new Date(timestamp * 1000).toLocaleString();
+    },
+
+    async runDeepScan() {
+      this.isDeepScanning = true;
+
+      try {
+        await resurrectorService.deepScan();
+        this.updateLogs();
+        alert('Deep scan complete! Check the activity log for detailed results.');
+      } catch (error) {
+        console.error('Deep scan failed:', error);
+        alert(`Deep scan failed: ${error.message}`);
+      } finally {
+        this.isDeepScanning = false;
+        this.updateLogs();
+      }
+    },
+
+    async publishToMissingRelays() {
+      if (!confirm('This will publish your profile to relays that are missing it.\n\nContinue?')) {
+        return;
+      }
+
+      this.isPublishingToMissing = true;
+
+      try {
+        const result = await resurrectorService.publishToMissingRelays();
+        this.updateLogs();
+
+        if (result.missingCount === 0) {
+          alert(result.message);
+        } else {
+          alert(`Published to ${result.successCount}/${result.missingCount} relay(s).\n\nCheck the activity log for details.`);
+        }
+      } catch (error) {
+        console.error('Publish to missing relays failed:', error);
+        alert(`Publish to missing relays failed: ${error.message}`);
+      } finally {
+        this.isPublishingToMissing = false;
+        this.updateLogs();
+      }
+    },
+
+    async exportProfile() {
+      this.isExporting = true;
+
+      try {
+        const result = await resurrectorService.exportProfileData();
+        this.updateLogs();
+        alert(`Profile data exported!\n\nFound ${result.fieldCount} fields: ${result.fields.join(', ')}`);
+      } catch (error) {
+        console.error('Export failed:', error);
+        alert(`Export failed: ${error.message}`);
+      } finally {
+        this.isExporting = false;
+        this.updateLogs();
+      }
+    },
+
+    toggleKeepProfile() {
+      this.keepProfileMode = !this.keepProfileMode;
     }
   }
 };
