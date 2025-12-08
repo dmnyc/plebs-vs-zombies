@@ -51,11 +51,25 @@
     
     <div v-else class="space-y-4">
       <div class="space-y-3">
-        <div 
-          v-for="backup in paginatedBackups" 
-          :key="backup.id" 
-          class="p-4 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
+        <div
+          v-for="backup in paginatedBackups"
+          :key="backup.id"
+          class="p-4 border rounded-lg transition-all"
+          :class="restoring === backup.id
+            ? 'border-zombie-green bg-green-900/20 shadow-lg shadow-zombie-green/20'
+            : 'border-gray-700 hover:bg-gray-800'"
         >
+        <!-- Restoring Indicator -->
+        <div v-if="restoring === backup.id" class="mb-3 p-3 bg-zombie-green/10 border border-zombie-green/30 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-zombie-green"></div>
+            <div>
+              <div class="text-zombie-green font-semibold">Restoring Backup...</div>
+              <div class="text-xs text-gray-400 mt-1">This may take a moment. Please wait.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Backup Info Section -->
         <div class="mb-3">
           <div class="flex items-center gap-2 mb-2">
@@ -72,17 +86,22 @@
             <div v-if="backup.notes" class="mt-1">Notes: {{ backup.notes }}</div>
           </div>
         </div>
-        
+
         <!-- Action Buttons Section -->
         <div class="flex flex-wrap gap-2 mb-2">
-          <button 
-            @click="restoreBackup(backup)" 
-            class="text-sm px-3 py-1.5 bg-green-900 hover:bg-green-800 rounded transition-colors flex items-center gap-1"
+          <button
+            @click="restoreBackup(backup)"
+            class="text-sm px-3 py-1.5 rounded transition-colors flex items-center gap-1"
+            :class="restoring === backup.id
+              ? 'bg-zombie-green/20 text-zombie-green border border-zombie-green/50 cursor-wait'
+              : restoring
+                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                : 'bg-green-900 hover:bg-green-800'"
             title="Restore this backup"
             :disabled="restoring"
           >
             <span>{{ restoring === backup.id ? '⏳' : '🔄' }}</span>
-            <span>Restore</span>
+            <span>{{ restoring === backup.id ? 'Restoring...' : 'Restore' }}</span>
           </button>
           <button 
             @click="exportBackup(backup)" 
