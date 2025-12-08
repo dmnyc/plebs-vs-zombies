@@ -1,6 +1,7 @@
 import NDK, { NDKEvent, NDKNip07Signer } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 import nip46Service from './nip46Service.js';
+import syncManager from './syncManager.js';
 
 class NostrService {
   constructor() {
@@ -177,6 +178,20 @@ class NostrService {
 
       // Save session
       this.saveSession();
+
+      // Trigger relay sync (non-blocking, delayed to allow initialization)
+      setTimeout(() => {
+        console.log('🔄 Triggering automatic relay sync...');
+        syncManager.syncAll().then((result) => {
+          if (result.success) {
+            console.log(`✅ Auto-sync complete: synced ${result.synced.length} services`);
+          } else {
+            console.warn('⚠️ Auto-sync failed:', result.error || result.message);
+          }
+        }).catch(error => {
+          console.warn('⚠️ Auto-sync error:', error);
+        });
+      }, 1000); // Delay 1 second to allow full initialization
 
       return {
         success: true,
@@ -1365,11 +1380,26 @@ class NostrService {
               if (currentPubkey === this.pubkey) {
                 this.extensionConnected = true;
                 this.extensionAuthorized = true;
-                
+
                 // Initialize NDK connection
                 await this.initialize();
-                
+
                 console.log('✅ NIP-07 session restored successfully');
+
+                // Trigger relay sync (non-blocking, delayed to allow initialization)
+                setTimeout(() => {
+                  console.log('🔄 Triggering automatic relay sync on session restore...');
+                  syncManager.syncAll().then((result) => {
+                    if (result.success) {
+                      console.log(`✅ Auto-sync complete: synced ${result.synced.length} services`);
+                    } else {
+                      console.warn('⚠️ Auto-sync failed:', result.error || result.message);
+                    }
+                  }).catch(error => {
+                    console.warn('⚠️ Auto-sync error:', error);
+                  });
+                }, 1000); // Delay 1 second to allow full initialization
+
                 return true;
               } else {
                 console.log('⚠️ Different user detected - clearing session');
@@ -1403,20 +1433,35 @@ class NostrService {
       if (restored) {
         // Get pubkey from restored connection
         this.pubkey = await this.nip46Service.getPublicKey();
-        
+
         // Load user profile
         await this.loadUserProfile();
-        
+
         // Initialize NDK with NIP-46 signer
         await this.initialize();
-        
+
         console.log('✅ NIP-46 session restored successfully');
+
+        // Trigger relay sync (non-blocking, delayed to allow initialization)
+        setTimeout(() => {
+          console.log('🔄 Triggering automatic relay sync on NIP-46 session restore...');
+          syncManager.syncAll().then((result) => {
+            if (result.success) {
+              console.log(`✅ Auto-sync complete: synced ${result.synced.length} services`);
+            } else {
+              console.warn('⚠️ Auto-sync failed:', result.error || result.message);
+            }
+          }).catch(error => {
+            console.warn('⚠️ Auto-sync error:', error);
+          });
+        }, 1000); // Delay 1 second to allow full initialization
+
         return true;
       }
     } catch (error) {
       console.error('Failed to restore NIP-46 session:', error);
     }
-    
+
     return false;
   }
 
@@ -2125,20 +2170,35 @@ class NostrService {
       if (restored) {
         // Get pubkey from restored connection
         this.pubkey = await this.nip46Service.getPublicKey();
-        
+
         // Load user profile
         await this.loadUserProfile();
-        
+
         // Initialize NDK with NIP-46 signer
         await this.initialize();
-        
+
         console.log('✅ NIP-46 session restored successfully');
+
+        // Trigger relay sync (non-blocking, delayed to allow initialization)
+        setTimeout(() => {
+          console.log('🔄 Triggering automatic relay sync on NIP-46 session restore...');
+          syncManager.syncAll().then((result) => {
+            if (result.success) {
+              console.log(`✅ Auto-sync complete: synced ${result.synced.length} services`);
+            } else {
+              console.warn('⚠️ Auto-sync failed:', result.error || result.message);
+            }
+          }).catch(error => {
+            console.warn('⚠️ Auto-sync error:', error);
+          });
+        }, 1000); // Delay 1 second to allow full initialization
+
         return true;
       }
     } catch (error) {
       console.error('Failed to restore NIP-46 session:', error);
     }
-    
+
     return false;
   }
 }

@@ -408,7 +408,201 @@
         </div>
       </div>
     </div>
-    
+
+    <!-- Relay Storage Sync Section -->
+    <div id="relay-backup" v-if="isConnected" class="mt-6 card">
+      <h3 class="text-xl mb-4">☁️ Relay Storage & Sync</h3>
+
+      <div class="mb-6">
+        <p class="text-gray-300 mb-3">
+          Your settings are automatically synchronized to Nostr relays for multi-device access.
+        </p>
+
+        <!-- Sync Status -->
+        <div class="p-4 bg-gray-800 border border-gray-600 rounded-lg mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div :class="syncStatus.isOnline ? 'text-zombie-green' : 'text-gray-500'">
+                <span class="w-3 h-3 rounded-full inline-block" :class="syncStatus.isOnline ? 'bg-zombie-green' : 'bg-gray-500'"></span>
+              </div>
+              <span class="text-gray-100 font-medium">
+                {{ syncStatus.isOnline ? 'Online' : 'Offline' }}
+              </span>
+            </div>
+            <span class="text-sm text-gray-400">
+              Last synced: {{ lastSyncFormatted }}
+            </span>
+          </div>
+
+          <div v-if="syncStatus.isSyncing" class="mb-3">
+            <div class="flex items-center gap-2 text-sm text-gray-300">
+              <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-zombie-green"></div>
+              <span>Syncing...</span>
+            </div>
+          </div>
+
+          <!-- Synced Services -->
+          <div v-if="syncStatus.syncedServices && syncStatus.syncedServices.length > 0" class="mb-3">
+            <div class="text-sm text-gray-400 mb-2">Synced Services:</div>
+            <div class="grid grid-cols-2 gap-2">
+              <div v-for="service in syncStatus.syncedServices" :key="service" class="text-xs text-gray-300 flex items-center gap-1">
+                <span class="text-zombie-green">✓</span>
+                <span>{{ formatServiceName(service) }}</span>
+              </div>
+              <!-- Always show Follow Lists as synced if backups exist -->
+              <div v-if="relayBackups.length > 0" class="text-xs text-gray-300 flex items-center gap-1">
+                <span class="text-zombie-green">✓</span>
+                <span>Follow Lists</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sync Errors -->
+          <div v-if="syncStatus.errors && syncStatus.errors.length > 0" class="mt-3 p-2 bg-red-900 border border-red-700 rounded">
+            <div class="text-sm text-red-200 font-medium mb-1">Sync Errors:</div>
+            <div v-for="(error, index) in syncStatus.errors" :key="index" class="text-xs text-red-300">
+              {{ error.message }}
+            </div>
+          </div>
+
+          <!-- Sync Actions -->
+          <div class="flex gap-2 mt-4">
+            <button
+              @click="manualSync"
+              :disabled="syncStatus.isSyncing"
+              class="btn-primary text-sm"
+              :class="{ 'opacity-50 cursor-not-allowed': syncStatus.isSyncing }"
+            >
+              {{ syncStatus.isSyncing ? 'Syncing...' : 'Sync Now' }}
+            </button>
+            <button
+              @click="clearSyncErrors"
+              v-if="syncStatus.errors && syncStatus.errors.length > 0"
+              class="btn-secondary text-sm"
+            >
+              Clear Errors
+            </button>
+          </div>
+        </div>
+
+        <!-- Backup Management -->
+        <div class="p-4 bg-gray-800 border border-gray-600 rounded-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-lg font-medium text-gray-200">📦 Encrypted Backups</h4>
+            <span v-if="relayBackups.length > 0" class="text-sm text-gray-400">
+              {{ relayBackups.length }} backup{{ relayBackups.length !== 1 ? 's' : '' }} available
+            </span>
+          </div>
+
+          <p class="text-sm text-gray-400 mb-4">
+            Encrypted snapshots of all your settings, immunity list, and follow list stored on Nostr relays. Up to 3 most recent backups are kept.
+          </p>
+
+          <!-- Loading Backups -->
+          <div v-if="loadingBackups" class="text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-zombie-green"></div>
+            <p class="text-sm text-gray-400 mt-2">Loading backups...</p>
+          </div>
+
+          <!-- Backup List -->
+          <div v-else-if="relayBackups.length > 0" class="space-y-2 mb-4">
+            <div
+              v-for="backup in relayBackups"
+              :key="backup.dTag"
+              class="p-3 border rounded-lg transition-all"
+              :class="restoringBackup === backup.dTag
+                ? 'border-zombie-green bg-green-900/20 shadow-lg shadow-zombie-green/20'
+                : 'bg-gray-700 border-gray-600'"
+            >
+              <!-- Restoring Indicator -->
+              <div v-if="restoringBackup === backup.dTag" class="mb-3 p-3 bg-zombie-green/10 border border-zombie-green/30 rounded-lg">
+                <div class="flex items-center gap-3">
+                  <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-zombie-green"></div>
+                  <div>
+                    <div class="text-zombie-green font-semibold">Restoring Backup...</div>
+                    <div class="text-xs text-gray-400 mt-1">This may take a moment. Please wait.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-gray-200">
+                    {{ formatBackupDate(backup.timestamp) }}
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">
+                    {{ backup.metadata?.deviceInfo || 'Unknown device' }} ·
+                    {{ backup.metadata?.backupReason || 'manual' }}
+                    <span v-if="backup.metadata?.followCount" class="ml-1">
+                      · {{ backup.metadata.followCount }} follows
+                    </span>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-1">
+                    {{ formatBackupAge(backup.timestamp) }}
+                  </div>
+                </div>
+                <div class="flex gap-2 ml-4">
+                  <button
+                    @click="restoreBackup(backup.dTag)"
+                    class="text-xs px-3 py-1 rounded transition-colors font-medium"
+                    :class="restoringBackup === backup.dTag
+                      ? 'bg-zombie-green/20 text-zombie-green border border-zombie-green/50 cursor-wait'
+                      : restoringBackup
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-zombie-green hover:bg-green-600 text-black'"
+                    :disabled="restoringBackup"
+                    title="Restore this backup"
+                  >
+                    {{ restoringBackup === backup.dTag ? '⏳ Restoring...' : 'Restore' }}
+                  </button>
+                  <button
+                    @click="deleteBackup(backup.dTag)"
+                    class="text-xs px-3 py-1 bg-red-700 hover:bg-red-600 rounded transition-colors"
+                    :class="{ 'opacity-50 cursor-not-allowed': restoringBackup }"
+                    :disabled="restoringBackup"
+                    title="Delete this backup"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Backups -->
+          <div v-else class="text-center py-6 text-gray-400">
+            <div class="text-3xl mb-2">📦</div>
+            <p class="text-sm">No backups found on relay</p>
+            <p class="text-xs text-gray-500 mt-1">Create your first backup below</p>
+          </div>
+
+          <!-- Backup Actions -->
+          <div class="flex gap-2">
+            <button
+              @click="createManualBackup"
+              :disabled="creatingBackup"
+              class="btn-primary text-sm"
+              :class="{ 'opacity-50 cursor-not-allowed': creatingBackup }"
+            >
+              {{ creatingBackup ? 'Creating...' : 'Create Backup' }}
+            </button>
+            <button
+              @click="refreshBackups"
+              class="btn-secondary text-sm"
+            >
+              Refresh List
+            </button>
+            <button
+              @click="deleteAllRelayData"
+              class="btn-danger text-sm ml-auto"
+            >
+              Delete All Relay Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="mt-6 card">
       <h3 class="text-xl mb-4">App Information</h3>
       
@@ -550,15 +744,34 @@
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { nip19 } from 'nostr-tools';
 import { getVersionSync } from '../utils/version';
 import Nip46Connection from '../components/Nip46Connection.vue';
+import { useRelaySync } from '../composables/useRelaySync';
+import relayBackupService from '../services/settings/relayBackupService';
+import syncManager from '../services/syncManager';
 
 export default {
   name: 'SettingsView',
   components: {
     Nip46Connection
+  },
+  setup() {
+    // Use relay sync composable
+    const {
+      syncStatus,
+      lastSyncFormatted,
+      syncAll,
+      clearErrors
+    } = useRelaySync();
+
+    return {
+      syncStatus,
+      lastSyncFormatted,
+      syncAll,
+      clearSyncErrors: clearErrors
+    };
   },
   data() {
     return {
@@ -586,7 +799,12 @@ export default {
         show: false,
         lightningAddress: 'plebsvszombies@rizful.com',
         qrCode: ''
-      }
+      },
+      // Relay sync data
+      relayBackups: [],
+      loadingBackups: false,
+      creatingBackup: false,
+      restoringBackup: null // Track which backup is being restored (dTag)
     };
   },
   computed: {
@@ -951,25 +1169,187 @@ export default {
       const creatorNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
       const nostrUrl = `https://jumble.social/users/${creatorNpub}`;
       window.open(nostrUrl, '_blank');
+    },
+
+    // Relay Sync Methods
+    async manualSync() {
+      try {
+        const result = await this.syncAll();
+        if (result.success) {
+          alert(`Sync complete! Synced ${result.synced.length} services.`);
+        } else {
+          alert(`Sync failed: ${result.message || result.error}`);
+        }
+      } catch (error) {
+        console.error('Manual sync failed:', error);
+        alert(`Sync error: ${error.message}`);
+      }
+    },
+
+    formatServiceName(serviceName) {
+      const nameMap = {
+        'zombieClassification': 'Zombie Classification',
+        'scanSettings': 'Scan Settings',
+        'batchSettings': 'Batch Settings',
+        'relayConfig': 'Relay Configuration',
+        'immunityList': 'Immunity List',
+        'preferences': 'Preferences'
+      };
+      return nameMap[serviceName] || serviceName;
+    },
+
+    // Backup Methods
+    async loadBackups() {
+      this.loadingBackups = true;
+      try {
+        this.relayBackups = await relayBackupService.listBackups();
+        console.log(`Loaded ${this.relayBackups.length} backups from relay`);
+      } catch (error) {
+        console.error('Failed to load backups:', error);
+      } finally {
+        this.loadingBackups = false;
+      }
+    },
+
+    async refreshBackups() {
+      await this.loadBackups();
+    },
+
+    async createManualBackup() {
+      if (!confirm('Create a backup of all your settings?\n\nThis will be encrypted and stored on Nostr relays.')) {
+        return;
+      }
+
+      this.creatingBackup = true;
+      try {
+        const result = await relayBackupService.createBackup('manual');
+        if (result.success) {
+          alert('Backup created successfully!');
+          await this.loadBackups();
+        } else {
+          alert(`Failed to create backup: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Failed to create backup:', error);
+        alert(`Backup error: ${error.message}`);
+      } finally {
+        this.creatingBackup = false;
+      }
+    },
+
+    async restoreBackup(dTag) {
+      const backup = this.relayBackups.find(b => b.dTag === dTag);
+      const backupDate = backup ? this.formatBackupDate(backup.timestamp) : dTag;
+      const followCount = backup?.metadata?.followCount || 0;
+
+      const confirmMessage = followCount > 0
+        ? `Restore from backup?\n\nBackup: ${backupDate}\nFollows: ${followCount}\n\nThis will restore:\n- All settings\n- Immunity list\n- Follow list (${followCount} follows)\n\nYour current follow list will be replaced!`
+        : `Restore settings from backup?\n\nBackup: ${backupDate}\n\nThis will restore all settings and immunity list.`;
+
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+
+      this.restoringBackup = dTag;
+
+      try {
+        const result = await relayBackupService.restoreBackup(dTag);
+        if (result.success) {
+          const restoredItems = result.restored.join(', ');
+          const followMessage = result.followListRestored
+            ? `\n\nFollow list restored: ${result.followCount} follows`
+            : '';
+
+          alert(`Backup restored successfully!\n\nRestored: ${restoredItems}${followMessage}\n\nPlease reload the page to see the restored settings.`);
+
+          // Reload settings
+          this.loadSettings();
+          await this.loadImmunityRecords();
+        } else {
+          alert(`Failed to restore backup: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Failed to restore backup:', error);
+        alert(`Restore error: ${error.message}`);
+      } finally {
+        this.restoringBackup = null;
+      }
+    },
+
+    async deleteBackup(dTag) {
+      const backup = this.relayBackups.find(b => b.dTag === dTag);
+      const backupDate = backup ? this.formatBackupDate(backup.timestamp) : dTag;
+
+      if (!confirm(`Delete this backup?\n\nBackup: ${backupDate}\n\nThis action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const success = await relayBackupService.deleteBackup(dTag);
+        if (success) {
+          alert('Backup deleted successfully!');
+          await this.loadBackups();
+        } else {
+          alert('Failed to delete backup.');
+        }
+      } catch (error) {
+        console.error('Failed to delete backup:', error);
+        alert(`Delete error: ${error.message}`);
+      }
+    },
+
+    async deleteAllRelayData() {
+      if (!confirm('Delete ALL data from Nostr relays?\n\nThis will remove:\n- All settings\n- All backups\n- Immunity list\n\nYour local settings will remain unchanged.\n\nThis action cannot be undone!')) {
+        return;
+      }
+
+      if (!confirm('Are you absolutely sure?\n\nThis will delete everything from relays.')) {
+        return;
+      }
+
+      try {
+        const result = await syncManager.deleteAllData();
+        if (result.success) {
+          alert(`All relay data deleted.\n\nDeleted: ${result.deleted.join(', ')}`);
+          await this.loadBackups();
+        } else {
+          alert(`Failed to delete all data: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Failed to delete all relay data:', error);
+        alert(`Delete error: ${error.message}`);
+      }
+    },
+
+    formatBackupDate(timestamp) {
+      if (!timestamp) return 'Unknown date';
+      const date = new Date(timestamp * 1000);
+      return format(date, 'MMM d, yyyy h:mm a');
+    },
+
+    formatBackupAge(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp * 1000);
+      return formatDistanceToNow(date, { addSuffix: true });
     }
   },
   async mounted() {
     this.loadSettings();
     await this.loadImmunityRecords();
-    
+
     // Update connection status from nostrService (single source of truth)
     this.updateConnectionStatus();
-    
+
     // Load additional data if connected
     if (this.isConnected) {
       try {
         // Load relays
         this.relays = [...nostrService.relays];
-        
+
         // Load user's NIP-65 relay list if available
         this.userRelayList = nostrService.userRelayList;
         console.log('📋 Initial userRelayList from nostrService:', !!this.userRelayList);
-        
+
         // If we don't have relay list yet, try to fetch it
         if (!this.userRelayList && nostrService.pubkey) {
           try {
@@ -990,6 +1370,10 @@ export default {
         } else if (!nostrService.pubkey) {
           console.warn('⚠️ Cannot fetch relay list - nostrService.pubkey not available');
         }
+
+        // Load relay backups
+        console.log('📦 Loading relay backups...');
+        await this.loadBackups();
       } catch (error) {
         console.warn('Could not load settings data:', error);
       }
