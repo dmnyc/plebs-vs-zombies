@@ -32,19 +32,20 @@
       
       <!-- Backup History -->
       <BackupHistory ref="backupHistory" @backup-restored="handleBackupRestored" />
-      
-      <!-- Remote Backup Section -->
+
+      <!-- Remote Backup Section - HIDDEN (we now have relay backups) -->
+      <!--
       <div class="card">
         <h3 class="text-xl mb-4 flex items-center">
-          Remote Backup 
+          Remote Backup
           <span class="ml-2 px-2 py-0.5 text-xs bg-blue-700 text-blue-100 rounded-full">External</span>
         </h3>
-        
+
         <div class="mb-6">
           <p class="text-gray-300 mb-4">
             Use <a href="https://nostr.land" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">nostr.land</a>'s free backup and restoration service for your Nostr social graph.
           </p>
-          
+
           <div class="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-4">
             <div class="flex items-start">
               <svg class="w-5 h-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -69,7 +70,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="space-y-3 mb-4">
             <div class="flex items-center">
               <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -90,11 +91,11 @@
               <span class="text-gray-300 text-sm">Professional restoration service</span>
             </div>
           </div>
-          
+
           <div class="flex flex-col gap-3">
-            <a 
-              href="https://nostr.land/restore" 
-              target="_blank" 
+            <a
+              href="https://nostr.land/restore"
+              target="_blank"
               rel="noopener noreferrer"
               class="btn-primary w-full text-center inline-flex items-center justify-center"
             >
@@ -103,6 +104,69 @@
               </svg>
               Restore from Nostr.land
             </a>
+          </div>
+        </div>
+      </div>
+      -->
+
+      <!-- Relay Backup Section -->
+      <div class="card">
+        <h3 class="text-xl mb-4 flex items-center">
+          Relay Backup
+          <span class="ml-2 px-2 py-0.5 text-xs bg-purple-700 text-purple-100 rounded-full">Encrypted</span>
+        </h3>
+
+        <div class="mb-6">
+          <p class="text-gray-300 mb-4">
+            Your settings, immunity list, and follow lists are automatically encrypted and synced to Nostr relays for multi-device access.
+          </p>
+
+          <div class="bg-purple-900/20 border border-purple-700/50 rounded-lg p-4 mb-4">
+            <div class="flex items-start">
+              <svg class="w-5 h-5 text-purple-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+              </svg>
+              <div>
+                <p class="text-purple-200 text-sm font-medium mb-1">How Relay Backups Work</p>
+                <p class="text-purple-300 text-sm">
+                  Your data is encrypted with NIP-04 and stored on your Nostr relays. The app automatically syncs changes and keeps your 3 most recent backups.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 mb-4">
+            <div class="flex items-center">
+              <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              <span class="text-gray-300 text-sm">End-to-end encrypted (NIP-04)</span>
+            </div>
+            <div class="flex items-center">
+              <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              <span class="text-gray-300 text-sm">Automatic multi-device sync</span>
+            </div>
+            <div class="flex items-center">
+              <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+              <span class="text-gray-300 text-sm">3 most recent backups kept</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <button
+              @click="goToRelayBackups"
+              class="btn-primary w-full text-center inline-flex items-center justify-center"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              Manage Relay Backups
+            </button>
           </div>
         </div>
       </div>
@@ -132,6 +196,20 @@ export default {
       // If the parent App doesn't handle navigate event, use router or direct method
       if (this.$parent && this.$parent.setActiveView) {
         this.$parent.setActiveView('hunting');
+      }
+    },
+    goToRelayBackups() {
+      this.$emit('navigate', 'settings');
+      // If the parent App doesn't handle navigate event, use router or direct method
+      if (this.$parent && this.$parent.setActiveView) {
+        this.$parent.setActiveView('settings');
+        // Scroll to relay backup section after navigation
+        this.$nextTick(() => {
+          const element = document.getElementById('relay-backup');
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
       }
     },
     async copyRelay() {

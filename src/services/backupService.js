@@ -459,11 +459,58 @@ class BackupService {
   /**
    * Initialize the backup service
    */
-  init() {
+  async init() {
     // Check if automatic backups are enabled
     const intervalDays = localStorage.getItem('automaticBackupIntervalDays');
     if (intervalDays) {
       this.setupAutomaticBackups(parseInt(intervalDays, 10));
+    }
+
+    // Auto-restore from relay if no local backups exist
+    try {
+      const localBackups = await this.getBackups();
+
+      if (localBackups.length === 0) {
+        console.log('[BackupService] No local backups found, checking relay...');
+
+        // Import relay backup service and nostr service dynamically to avoid circular dependencies
+        const relayBackupService = (await import('./settings/relayBackupService.js')).default;
+        const nostrService = (await import('./nostrService.js')).default;
+
+        // Only proceed if user is connected
+        if (!nostrService.pubkey) {
+          console.log('[BackupService] Not connected, skipping relay check');
+          return;
+        }
+
+        // List relay backups
+        const relayBackups = await relayBackupService.listBackups();
+
+        if (relayBackups.length > 0) {
+          console.log(`[BackupService] Found ${relayBackups.length} relay backups`);
+
+          // Get most recent backup (already sorted newest first)
+          const mostRecent = relayBackups[0];
+          console.log(`[BackupService] Auto-restoring backup from ${new Date(mostRecent.timestamp * 1000).toLocaleString()}`);
+
+          // Restore the backup
+          const result = await relayBackupService.restoreBackup(mostRecent.dTag);
+
+          if (result.success) {
+            console.log('[BackupService] Auto-restore successful');
+            console.log(`[BackupService] Restored ${result.restored.length} services`);
+          } else {
+            console.warn('[BackupService] Auto-restore failed:', result.error);
+          }
+        } else {
+          console.log('[BackupService] No relay backups found');
+        }
+      } else {
+        console.log(`[BackupService] Found ${localBackups.length} local backups, skipping auto-restore`);
+      }
+    } catch (error) {
+      console.warn('[BackupService] Auto-restore check failed:', error);
+      // Don't throw - this shouldn't block app initialization
     }
   }
 }
