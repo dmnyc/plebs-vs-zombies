@@ -12,6 +12,10 @@
       "destination": "/competition.html"
     },
     {
+      "source": "/resurrector",
+      "destination": "/resurrector.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

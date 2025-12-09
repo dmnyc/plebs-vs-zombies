@@ -439,7 +439,7 @@
             </div>
 
             <a
-              href="/resurrector.html"
+              href="/resurrector"
               target="_blank"
               class="btn-primary w-full flex items-center justify-center gap-2"
             >
@@ -466,7 +466,9 @@
 
       <!-- Main App Views -->
       <div v-else>
-        <component :is="currentView" ref="currentViewComponent" @logout="logout"></component>
+        <router-view @logout="logout" v-slot="{ Component }">
+          <component :is="Component" ref="currentViewComponent" />
+        </router-view>
       </div>
     </main>
 
@@ -748,12 +750,43 @@ export default {
       return this.views[this.activeView];
     }
   },
+  watch: {
+    // Sync activeView with route changes
+    '$route'(to) {
+      const routeToView = {
+        'Dashboard': 'dashboard',
+        'Hunt Zombies': 'hunting',
+        'Follows': 'follows',
+        'Backups': 'backups',
+        'Resurrector': 'resurrector',
+        'Settings': 'settings',
+        'Scout': 'scout'
+      };
+
+      const viewName = routeToView[to.name];
+      if (viewName) {
+        this.activeView = viewName;
+      }
+    }
+  },
   methods: {
     setActiveView(view) {
-      if (this.views[view]) {
-        this.activeView = view;
+      // Map view names to route names
+      const viewToRoute = {
+        'dashboard': '/',
+        'hunting': '/hunt',
+        'follows': '/follows',
+        'backups': '/backups',
+        'resurrector': '/resurrector',
+        'settings': '/settings',
+        'scout': '/scout'
+      };
+
+      const routePath = viewToRoute[view];
+      if (routePath) {
+        this.$router.push(routePath);
         this.mobileMenuOpen = false; // Close mobile menu when view changes
-        
+
         // Exit scout mode when navigating to other views
         if (this.isScoutMode && view !== 'scout') {
           this.exitScoutMode();
@@ -1246,6 +1279,21 @@ export default {
         this.userDropdownOpen = false;
       }
     });
+
+    // Sync activeView with initial route
+    const routeToView = {
+      'Dashboard': 'dashboard',
+      'Hunt Zombies': 'hunting',
+      'Follows': 'follows',
+      'Backups': 'backups',
+      'Resurrector': 'resurrector',
+      'Settings': 'settings',
+      'Scout': 'scout'
+    };
+    const viewName = routeToView[this.$route.name];
+    if (viewName) {
+      this.activeView = viewName;
+    }
   },
   
   beforeUnmount() {
