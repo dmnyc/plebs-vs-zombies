@@ -136,9 +136,6 @@
     <!-- Results Section -->
     <div v-if="deletedProfiles.length > 0" class="card mb-6 border-red-500/50">
       <h2 class="text-2xl font-bold mb-4 text-red-400">⚠️ Deleted Profile Found!</h2>
-      <p class="text-gray-300 mb-4">
-        Found {{ deletedProfiles.length }} deleted profile(s).
-      </p>
 
       <div v-if="scanMode === 'other'" class="bg-yellow-900/30 border border-yellow-600/50 p-3 rounded-lg mb-4">
         <p class="text-sm text-yellow-400">

@@ -104,8 +104,6 @@ class ResurrectorService {
 
       if (this.deletedProfiles.length === 0) {
         this.log('No deleted profiles found! Your account looks healthy.', 'success');
-      } else {
-        this.log(`Found ${this.deletedProfiles.length} deleted profile(s)`, 'warning');
       }
 
       return this.deletedProfiles;

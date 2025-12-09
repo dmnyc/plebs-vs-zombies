@@ -893,8 +893,6 @@ This tool works by:
 
         if (deletedProfiles.length === 0) {
           log('🎉 No deleted profiles found! Your account looks healthy.', 'success');
-        } else {
-          log(`Found ${deletedProfiles.length} deleted profile(s)`, 'warning');
         }
 
       } catch (error) {
@@ -929,7 +927,6 @@ This tool works by:
       let html = `
         <div class="card bg-red-900/20 border-red-500/50">
           <h2 class="text-2xl font-bold mb-4 text-red-400">⚠️ Deleted Profile Found!</h2>
-          <p class="text-gray-300 mb-4">Found ${deletedProfiles.length} deleted profile(s).</p>
       `;
 
       if (isReadOnly) {
