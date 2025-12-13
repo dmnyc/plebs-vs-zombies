@@ -395,6 +395,31 @@
             </button>
           </div>
         </div>
+
+        <!-- Export Controls -->
+        <div class="bg-gray-800 p-4 rounded-lg mt-4">
+          <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+            📥 Export Zombie List
+          </h4>
+          <div class="flex flex-wrap justify-center items-center gap-2">
+            <button
+              @click="exportAsJSON"
+              class="text-sm btn-secondary flex items-center gap-1"
+              :disabled="scoutResults.totalZombies === 0"
+              title="Export zombie list as JSON file"
+            >
+              <span>📄</span> JSON
+            </button>
+            <button
+              @click="exportAsTXT"
+              class="text-sm btn-secondary flex items-center gap-1"
+              :disabled="scoutResults.totalZombies === 0"
+              title="Export zombie list as TXT file"
+            >
+              <span>📝</span> TXT
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Detailed Breakdown -->
@@ -1090,6 +1115,166 @@ https://plebsvszombies.cc`;
       } finally {
         this.posting = false;
       }
+    },
+    /**
+     * Get all zombies sorted by ranking (from most zombie to least zombie/most pleb)
+     * Order: burned > ancient > rotting > fresh
+     */
+    getSortedZombiesForExport() {
+      if (!this.scoutResults?.analysisResults) return [];
+
+      const typeOrder = { burned: 0, ancient: 1, rotting: 2, fresh: 3 };
+      const allZombies = [];
+
+      // Collect all zombies from each category
+      ['burned', 'ancient', 'rotting', 'fresh'].forEach(type => {
+        const zombiesOfType = this.scoutResults.analysisResults[type] || [];
+        zombiesOfType.forEach(zombie => {
+          allZombies.push({
+            ...zombie,
+            type: type
+          });
+        });
+      });
+
+      // Sort by type, then by days inactive
+      return allZombies.sort((a, b) => {
+        const typeComparison = (typeOrder[a.type] ?? 4) - (typeOrder[b.type] ?? 4);
+        if (typeComparison !== 0) return typeComparison;
+
+        const daysA = a.daysSinceActivity ?? Infinity;
+        const daysB = b.daysSinceActivity ?? Infinity;
+        return daysB - daysA;
+      });
+    },
+    /**
+     * Export zombie list as JSON file
+     */
+    exportAsJSON() {
+      const sortedZombies = this.getSortedZombiesForExport();
+
+      const exportData = {
+        createdBy: 'Plebs vs. Zombies',
+        website: 'https://plebsvszombies.cc',
+        exportDate: new Date().toISOString(),
+        scoutedUser: {
+          npub: this.scoutTarget.npub,
+          pubkey: this.scoutTarget.pubkey,
+          name: this.scoutTarget.name,
+          display_name: this.scoutTarget.display_name
+        },
+        totalZombies: sortedZombies.length,
+        totalFollows: this.scoutResults.totalFollows,
+        zombieScore: this.scoutResults.zombieScore,
+        zombies: sortedZombies.map((zombie, index) => {
+          let npub = '';
+          try {
+            npub = nip19.npubEncode(zombie.pubkey);
+          } catch (e) {
+            npub = 'invalid';
+          }
+
+          return {
+            rank: index + 1,
+            pubkey: zombie.pubkey,
+            npub: npub,
+            type: zombie.type,
+            displayName: this.getUserDisplayName(zombie),
+            username: zombie.name || null,
+            daysSinceActivity: zombie.daysSinceActivity ?? null,
+            lastActivity: zombie.lastActivity ? new Date(zombie.lastActivity * 1000).toISOString() : null,
+            about: zombie.profile?.about || zombie.about || null,
+            picture: zombie.profile?.picture || zombie.picture || null
+          };
+        })
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const targetName = this.scoutTarget.name || this.scoutTarget.display_name || 'user';
+      const filename = `scout-${targetName}-zombies-${new Date().toISOString().split('T')[0]}.json`;
+
+      this.downloadFile(blob, filename);
+      alert(`Exported ${sortedZombies.length} zombies to ${filename}`);
+    },
+    /**
+     * Export zombie list as TXT file
+     */
+    exportAsTXT() {
+      const sortedZombies = this.getSortedZombiesForExport();
+      const exportDate = new Date().toISOString();
+      const targetName = this.scoutTarget.name || this.scoutTarget.display_name || this.scoutTarget.npub;
+
+      let txtContent = `Scout Report - Zombie List Export\n`;
+      txtContent += `====================================\n`;
+      txtContent += `Created by: Plebs vs. Zombies\n`;
+      txtContent += `Website: https://plebsvszombies.cc\n`;
+      txtContent += `Scouted User: ${targetName}\n`;
+      txtContent += `User npub: ${this.scoutTarget.npub}\n`;
+      txtContent += `Export Date: ${exportDate}\n`;
+      txtContent += `Total Follows: ${this.scoutResults.totalFollows}\n`;
+      txtContent += `Total Zombies: ${sortedZombies.length}\n`;
+      txtContent += `Zombie Score™: ${this.scoutResults.zombieScore}%\n`;
+      txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
+      txtContent += `\n`;
+      txtContent += `Legend: 🔥 burned | 💀 ancient | 🧟 rotting | 🌱 fresh\n`;
+      txtContent += `====================================\n\n`;
+
+      sortedZombies.forEach((zombie, index) => {
+        let npub = '';
+        try {
+          npub = nip19.npubEncode(zombie.pubkey);
+        } catch (e) {
+          npub = 'invalid';
+        }
+
+        const typeEmoji = {
+          burned: '🔥',
+          ancient: '💀',
+          rotting: '🧟',
+          fresh: '🌱'
+        }[zombie.type] || '❓';
+
+        const displayName = this.getUserDisplayName(zombie);
+        const username = zombie.name ? `@${zombie.name}` : '';
+        const daysInactive = zombie.daysSinceActivity != null ? `${Math.round(zombie.daysSinceActivity)} days inactive` : 'Unknown activity';
+
+        txtContent += `${index + 1}. ${typeEmoji} [${zombie.type.toUpperCase()}] ${displayName}\n`;
+        if (username && username !== `@${displayName}`) {
+          txtContent += `   Username: ${username}\n`;
+        }
+        txtContent += `   npub: ${npub}\n`;
+        txtContent += `   pubkey: ${zombie.pubkey}\n`;
+        txtContent += `   Activity: ${daysInactive}\n`;
+        if (zombie.profile?.about || zombie.about) {
+          const about = zombie.profile?.about || zombie.about;
+          const aboutTruncated = about.length > 100
+            ? about.substring(0, 100) + '...'
+            : about;
+          txtContent += `   Bio: ${aboutTruncated.replace(/\n/g, ' ')}\n`;
+        }
+        txtContent += `\n`;
+      });
+
+      const blob = new Blob([txtContent], { type: 'text/plain' });
+      const targetNameClean = (this.scoutTarget.name || this.scoutTarget.display_name || 'user').replace(/[^a-zA-Z0-9]/g, '-');
+      const filename = `scout-${targetNameClean}-zombies-${new Date().toISOString().split('T')[0]}.txt`;
+
+      this.downloadFile(blob, filename);
+      alert(`Exported ${sortedZombies.length} zombies to ${filename}`);
+    },
+    /**
+     * Helper method to download a file
+     */
+    downloadFile(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
   },
   async mounted() {
