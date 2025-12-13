@@ -294,29 +294,8 @@
           </button>
         </div>
       </div>
-      
-      <!-- Export Controls -->
-      <div class="flex flex-wrap justify-center items-center gap-2 mt-3 pt-3 border-t border-gray-700">
-        <span class="text-sm text-gray-400">Export Results:</span>
-        <button 
-          @click="exportAsJSON" 
-          class="text-sm btn-secondary flex items-center gap-1"
-          :disabled="availableZombies.length === 0"
-          title="Export zombie list as JSON file"
-        >
-          <span>📄</span> JSON
-        </button>
-        <button 
-          @click="exportAsTXT" 
-          class="text-sm btn-secondary flex items-center gap-1"
-          :disabled="availableZombies.length === 0"
-          title="Export zombie list as TXT file"
-        >
-          <span>📝</span> TXT
-        </button>
-      </div>
     </div>
-    
+
     <div class="mt-6 border-t border-gray-700 pt-4">
       <!-- Warning for large batches -->
       <div v-if="totalSelectedCount > 50" class="mb-4 p-3 bg-yellow-900 border border-yellow-600 rounded-lg">
@@ -348,6 +327,31 @@
         <span class="font-bold">THE NUCLEAR OPTION</span>
         <span class="text-sm font-bold">({{ availableZombies.length }} {{ availableZombies.length === 1 ? 'target' : 'targets' }})</span>
       </button>
+
+      <!-- Export Controls -->
+      <div class="bg-gray-800 p-4 rounded-lg mt-4">
+        <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          📥 Export Zombie List
+        </h4>
+        <div class="flex flex-wrap justify-center items-center gap-2">
+          <button
+            @click="exportAsJSON"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as JSON file"
+          >
+            <span>📄</span> JSON
+          </button>
+          <button
+            @click="exportAsTXT"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as TXT file"
+          >
+            <span>📝</span> TXT
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Alert Modal -->
@@ -407,7 +411,7 @@
 </template>
 
 <script>
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { nip19 } from 'nostr-tools';
 import immunityService from '../services/immunityService';
 import CopyButton from './CopyButton.vue';
@@ -656,8 +660,10 @@ export default {
      */
     exportAsJSON() {
       const sortedZombies = this.getSortedZombiesForExport();
-      
+
       const exportData = {
+        createdBy: 'Plebs vs. Zombies',
+        website: 'https://plebsvszombies.cc',
         exportDate: new Date().toISOString(),
         totalZombies: sortedZombies.length,
         zombies: sortedZombies.map((zombie, index) => {
@@ -699,6 +705,8 @@ export default {
       
       let txtContent = `Zombie List Export\n`;
       txtContent += `==================\n`;
+      txtContent += `Created by: Plebs vs. Zombies\n`;
+      txtContent += `Website: https://plebsvszombies.cc\n`;
       txtContent += `Export Date: ${exportDate}\n`;
       txtContent += `Total Zombies: ${sortedZombies.length}\n`;
       txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
