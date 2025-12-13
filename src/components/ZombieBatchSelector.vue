@@ -295,25 +295,6 @@
         </div>
       </div>
 
-      <!-- Export Controls -->
-      <div class="flex flex-wrap justify-center items-center gap-2 mt-3 pt-3 border-t border-gray-700">
-        <button
-          @click="exportAsJSON"
-          class="text-sm btn-secondary flex items-center gap-1"
-          :disabled="availableZombies.length === 0"
-          title="Export zombie list as JSON file"
-        >
-          <span>📄</span> JSON
-        </button>
-        <button
-          @click="exportAsTXT"
-          class="text-sm btn-secondary flex items-center gap-1"
-          :disabled="availableZombies.length === 0"
-          title="Export zombie list as TXT file"
-        >
-          <span>📝</span> TXT
-        </button>
-      </div>
     </div>
 
     <div class="mt-6 border-t border-gray-700 pt-4">
@@ -347,6 +328,31 @@
         <span class="font-bold">THE NUCLEAR OPTION</span>
         <span class="text-sm font-bold">({{ availableZombies.length }} {{ availableZombies.length === 1 ? 'target' : 'targets' }})</span>
       </button>
+
+      <!-- Export Controls -->
+      <div class="bg-gray-800 p-4 rounded-lg mt-4">
+        <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          📥 Export Zombie List
+        </h4>
+        <div class="flex flex-wrap justify-center items-center gap-2">
+          <button
+            @click="exportAsJSON"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as JSON file"
+          >
+            <span>📄</span> JSON
+          </button>
+          <button
+            @click="exportAsTXT"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as TXT file"
+          >
+            <span>📝</span> TXT
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Alert Modal -->
