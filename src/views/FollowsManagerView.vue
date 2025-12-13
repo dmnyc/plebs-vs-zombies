@@ -586,11 +586,7 @@ export default {
       }
     },
     goToZombieHunting() {
-      this.$emit('navigate', 'hunting');
-      // If the parent App doesn't handle navigate event, use router or direct method
-      if (this.$parent && this.$parent.setActiveView) {
-        this.$parent.setActiveView('hunting');
-      }
+      this.$router.push('/hunt');
     },
     handleAvatarError(event) {
       const img = event.target;

@@ -14,7 +14,7 @@
           
           <div class="flex items-center">
             <!-- Desktop Navigation for signed-in users -->
-            <nav v-if="isConnected" class="hidden lg:block">
+            <nav v-if="isConnected" class="hidden xl:block">
               <ul class="flex gap-6">
                 <li>
                   <a 
@@ -86,7 +86,7 @@
             </nav>
             
             <!-- Desktop Navigation for signed-out Scout Mode -->
-            <nav v-if="!isConnected && isScoutMode" class="hidden lg:block">
+            <nav v-if="!isConnected && isScoutMode" class="hidden xl:block">
               <ul class="flex gap-6">
                 <li>
                   <a 
@@ -104,9 +104,9 @@
             <div class="flex items-center ml-auto">
               <!-- User Avatar and Dropdown -->  
               <div v-if="isConnected && userProfile" class="relative">
-                <button 
+                <button
                   @click="userDropdownOpen = !userDropdownOpen"
-                  class="hover:bg-gray-800 rounded-lg transition-colors lg:ml-4"
+                  class="hover:bg-gray-800 rounded-lg transition-colors xl:ml-4"
                 >
                   <img 
                     :src="userProfile?.picture || '/default-avatar.svg'" 
@@ -140,10 +140,10 @@
               </div>
               
               <!-- Mobile/Tablet Hamburger Button -->
-              <button 
+              <button
                 v-if="isConnected"
                 @click="mobileMenuOpen = !mobileMenuOpen"
-                class="lg:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors ml-2"
+                class="xl:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors ml-2"
                 :class="{'bg-gray-800': mobileMenuOpen}"
               >
                 <span class="w-5 h-0.5 bg-white transition-all" :class="mobileMenuOpen ? 'rotate-45 translate-y-1' : ''"></span>
@@ -155,7 +155,7 @@
         </div>
         
         <!-- Mobile/Tablet Navigation Menu -->
-        <nav v-if="isConnected && mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
+        <nav v-if="isConnected && mobileMenuOpen" class="xl:hidden mt-4 pt-4 border-t border-gray-700">
           <!-- User Info Section (Mobile) -->
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center gap-3 mb-3">
