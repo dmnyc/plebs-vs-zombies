@@ -14,6 +14,7 @@ Plebs vs. Zombies helps you identify and manage these dormant accounts to mainta
 - **Customizable Time Thresholds**: Set your own definition of "dormant" (90, 180, 365 days)
 - **Batch Processing**: Purge zombies in manageable batches
 - **Follow List Backup**: Safely back up your existing follow list before making changes
+- **Export Zombie Lists**: Export your zombie lists in JSON or TXT format for sharing or record-keeping
 - **Statistics**: Track your zombie hunting progress and bandwidth savings
 - **Resurrector**: A tool to recover your Nostr profile if it has been accidentally marked as "deleted". It works by finding the delete flag event, publishing a new event to delete the deletion, and then republishing a clean profile event. This feature is available as both a standalone tool for quick access and as part of the main application, with the in-app version being recommended for better security.
 

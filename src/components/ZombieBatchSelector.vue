@@ -295,7 +295,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="mt-6 border-t border-gray-700 pt-4">
       <!-- Warning for large batches -->
       <div v-if="totalSelectedCount > 50" class="mb-4 p-3 bg-yellow-900 border border-yellow-600 rounded-lg">
@@ -327,6 +327,31 @@
         <span class="font-bold">THE NUCLEAR OPTION</span>
         <span class="text-sm font-bold">({{ availableZombies.length }} {{ availableZombies.length === 1 ? 'target' : 'targets' }})</span>
       </button>
+
+      <!-- Export Controls -->
+      <div class="bg-gray-800 p-4 rounded-lg mt-4">
+        <h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          📥 Export Zombie List
+        </h4>
+        <div class="flex flex-wrap justify-center items-center gap-2">
+          <button
+            @click="exportAsJSON"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as JSON file"
+          >
+            <span>📄</span> JSON
+          </button>
+          <button
+            @click="exportAsTXT"
+            class="text-sm btn-secondary flex items-center gap-1"
+            :disabled="availableZombies.length === 0"
+            title="Export zombie list as TXT file"
+          >
+            <span>📝</span> TXT
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Alert Modal -->
@@ -386,7 +411,7 @@
 </template>
 
 <script>
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { nip19 } from 'nostr-tools';
 import immunityService from '../services/immunityService';
 import CopyButton from './CopyButton.vue';
@@ -611,6 +636,137 @@ export default {
         totalTargets: this.availableZombies.length,
         allZombies: this.availableZombies
       });
+    },
+    /**
+     * Get zombies sorted by ranking (from most zombie to least zombie/most pleb)
+     * Order: burned > ancient > rotting > fresh
+     */
+    getSortedZombiesForExport() {
+      const typeOrder = { burned: 0, ancient: 1, rotting: 2, fresh: 3 };
+      
+      return [...this.availableZombies].sort((a, b) => {
+        // First sort by zombie type (most zombie first)
+        const typeComparison = (typeOrder[a.type] ?? 4) - (typeOrder[b.type] ?? 4);
+        if (typeComparison !== 0) return typeComparison;
+        
+        // Within the same type, sort by days since activity (most inactive first)
+        const daysA = a.daysSinceActivity ?? Infinity;
+        const daysB = b.daysSinceActivity ?? Infinity;
+        return daysB - daysA;
+      });
+    },
+    /**
+     * Export zombie list as JSON file
+     */
+    exportAsJSON() {
+      const sortedZombies = this.getSortedZombiesForExport();
+
+      const exportData = {
+        createdBy: 'Plebs vs. Zombies',
+        website: 'https://plebsvszombies.cc',
+        exportDate: new Date().toISOString(),
+        totalZombies: sortedZombies.length,
+        zombies: sortedZombies.map((zombie, index) => {
+          let npub = '';
+          try {
+            npub = nip19.npubEncode(zombie.pubkey);
+          } catch (e) {
+            npub = 'invalid';
+          }
+          
+          return {
+            rank: index + 1,
+            pubkey: zombie.pubkey,
+            npub: npub,
+            type: zombie.type,
+            displayName: this.getDisplayName(zombie),
+            username: zombie.profile?.name || null,
+            daysSinceActivity: zombie.daysSinceActivity ?? null,
+            lastActivity: zombie.lastActivity ? new Date(zombie.lastActivity * 1000).toISOString() : null,
+            about: zombie.profile?.about || null,
+            picture: zombie.profile?.picture || null
+          };
+        })
+      };
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const filename = `zombie-list-${new Date().toISOString().split('T')[0]}.json`;
+      
+      this.downloadFile(blob, filename);
+      this.showAlert('Export Complete', `Exported ${sortedZombies.length} zombies to ${filename}`, 'success');
+    },
+    /**
+     * Export zombie list as TXT file
+     */
+    exportAsTXT() {
+      const sortedZombies = this.getSortedZombiesForExport();
+      const exportDate = new Date().toISOString();
+      
+      let txtContent = `Zombie List Export\n`;
+      txtContent += `==================\n`;
+      txtContent += `Created by: Plebs vs. Zombies\n`;
+      txtContent += `Website: https://plebsvszombies.cc\n`;
+      txtContent += `Export Date: ${exportDate}\n`;
+      txtContent += `Total Zombies: ${sortedZombies.length}\n`;
+      txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
+      txtContent += `\n`;
+      txtContent += `Legend: 🔥 burned | 💀 ancient | 🧟 rotting | 🌱 fresh\n`;
+      txtContent += `==================\n\n`;
+      
+      sortedZombies.forEach((zombie, index) => {
+        let npub = '';
+        try {
+          npub = nip19.npubEncode(zombie.pubkey);
+        } catch (e) {
+          npub = 'invalid';
+        }
+        
+        const typeEmoji = {
+          burned: '🔥',
+          ancient: '💀',
+          rotting: '🧟',
+          fresh: '🌱'
+        }[zombie.type] || '❓';
+        
+        const displayName = this.getDisplayName(zombie);
+        const username = zombie.profile?.name ? `@${zombie.profile.name}` : '';
+        const daysInactive = zombie.daysSinceActivity != null ? `${zombie.daysSinceActivity} days inactive` : 'Unknown activity';
+        
+        txtContent += `${index + 1}. ${typeEmoji} [${zombie.type.toUpperCase()}] ${displayName}\n`;
+        if (username && username !== `@${displayName}`) {
+          txtContent += `   Username: ${username}\n`;
+        }
+        txtContent += `   npub: ${npub}\n`;
+        txtContent += `   pubkey: ${zombie.pubkey}\n`;
+        txtContent += `   Activity: ${daysInactive}\n`;
+        if (zombie.profile?.about) {
+          const aboutTruncated = zombie.profile.about.length > 100 
+            ? zombie.profile.about.substring(0, 100) + '...' 
+            : zombie.profile.about;
+          txtContent += `   Bio: ${aboutTruncated.replace(/\n/g, ' ')}\n`;
+        }
+        txtContent += `\n`;
+      });
+      
+      const blob = new Blob([txtContent], { type: 'text/plain' });
+      const filename = `zombie-list-${new Date().toISOString().split('T')[0]}.txt`;
+      
+      this.downloadFile(blob, filename);
+      this.showAlert('Export Complete', `Exported ${sortedZombies.length} zombies to ${filename}`, 'success');
+    },
+    /**
+     * Helper method to download a file
+     */
+    downloadFile(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
   },
   watch: {
@@ -640,7 +796,7 @@ export default {
       }
     }
   },
-  emits: ['purge', 'immunity-granted', 'nuclear-option']
+  emits: ['purge', 'confirm-purge', 'immunity-granted', 'nuclear-option']
 };
 </script>
 
