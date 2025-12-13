@@ -824,11 +824,7 @@ export default {
   },
   methods: {
     goToZombieHunting() {
-      this.$emit('navigate', 'hunting');
-      // If the parent App doesn't handle navigate event, use router or direct method
-      if (this.$parent && this.$parent.setActiveView) {
-        this.$parent.setActiveView('hunting');
-      }
+      this.$router.push('/hunt');
     },
 
     updateConnectionStatus() {

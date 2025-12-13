@@ -192,25 +192,17 @@ export default {
   },
   methods: {
     goToZombieHunting() {
-      this.$emit('navigate', 'hunting');
-      // If the parent App doesn't handle navigate event, use router or direct method
-      if (this.$parent && this.$parent.setActiveView) {
-        this.$parent.setActiveView('hunting');
-      }
+      this.$router.push('/hunt');
     },
     goToRelayBackups() {
-      this.$emit('navigate', 'settings');
-      // If the parent App doesn't handle navigate event, use router or direct method
-      if (this.$parent && this.$parent.setActiveView) {
-        this.$parent.setActiveView('settings');
-        // Scroll to relay backup section after navigation
-        this.$nextTick(() => {
-          const element = document.getElementById('relay-backup');
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        });
-      }
+      this.$router.push('/settings');
+      // Scroll to relay backup section after navigation
+      this.$nextTick(() => {
+        const element = document.getElementById('relay-backup');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
     },
     async copyRelay() {
       try {

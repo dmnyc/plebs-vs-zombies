@@ -1017,7 +1017,7 @@ export default {
           
           if (shouldContinue) {
             // Navigate to backups page
-            this.$parent.setActiveView('backups');
+            this.$router.push('/backups');
             return false;
           }
           
@@ -1045,8 +1045,8 @@ export default {
           );
           
           if (shouldContinue) {
-            // Navigate to backups page  
-            this.$parent.setActiveView('backups');
+            // Navigate to backups page
+            this.$router.push('/backups');
             return false;
           }
         }

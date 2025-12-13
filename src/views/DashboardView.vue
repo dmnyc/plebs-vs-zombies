@@ -572,10 +572,10 @@ export default {
       }
     },
     goToZombieHunting() {
-      this.$parent.setActiveView('hunting');
+      this.$router.push('/hunt');
     },
     goToBackups() {
-      this.$parent.setActiveView('backups');
+      this.$router.push('/backups');
     },
     async resetImmunity() {
       const count = this.followStats.immune;
@@ -644,7 +644,7 @@ export default {
     handleGoToBackups() {
       localStorage.setItem('pvz-welcome-seen', 'true');
       this.showWelcomeModal = false;
-      this.$parent.setActiveView('backups');
+      this.$router.push('/backups');
     },
     handleSkipBackup() {
       this.showWelcomeModal = false;
