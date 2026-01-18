@@ -49,3 +49,6 @@ dev-notes.md
 # Claude Code files
 CLAUDE.md
 .claude/
+scripts/ADD-NPUB-INSTRUCTIONS.md
+scripts/add-npub-to-following-space.js
+SURVIVOR-INDEX-PLAN.md
