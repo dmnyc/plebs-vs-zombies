@@ -51,4 +51,5 @@ CLAUDE.md
 .claude/
 scripts/ADD-NPUB-INSTRUCTIONS.md
 scripts/add-npub-to-following-space.js
+scripts/batch-touch.js
 SURVIVOR-INDEX-PLAN.md
