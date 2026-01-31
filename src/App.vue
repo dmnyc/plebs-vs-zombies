@@ -11,15 +11,15 @@
               </h1>
             </div>
           </div>
-          
+
           <div class="flex items-center">
             <!-- Desktop Navigation for signed-in users -->
             <nav v-if="isConnected" class="hidden xl:block">
               <ul class="flex gap-6">
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="setActiveView('dashboard')" 
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('dashboard')"
                     :class="{'text-zombie-green': activeView === 'dashboard' && !isScoutMode, 'hover:text-zombie-green transition-colors': activeView !== 'dashboard' || isScoutMode}"
                   >
                     Dashboard
@@ -38,9 +38,9 @@
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="setActiveView('follows')" 
+                  <a
+                    href="#"
+                    @click.prevent="setActiveView('follows')"
                     :class="{'text-zombie-green': activeView === 'follows', 'hover:text-zombie-green transition-colors': activeView !== 'follows'}"
                   >
                     Follows
@@ -74,9 +74,9 @@
                   </a>
                 </li>
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="showScoutModeMenu" 
+                  <a
+                    href="#"
+                    @click.prevent="showScoutModeMenu"
                     :class="{'text-zombie-green': isScoutMode, 'hover:text-zombie-green transition-colors': !isScoutMode}"
                   >
                     Scout Mode
@@ -84,14 +84,14 @@
                 </li>
               </ul>
             </nav>
-            
+
             <!-- Desktop Navigation for signed-out Scout Mode -->
             <nav v-if="!isConnected && isScoutMode" class="hidden xl:block">
               <ul class="flex gap-6">
                 <li>
-                  <a 
-                    href="#" 
-                    @click.prevent="async () => await exitScoutMode()" 
+                  <a
+                    href="#"
+                    @click.prevent="async () => await exitScoutMode()"
                     class="hover:text-zombie-green transition-colors"
                   >
                     Start Over
@@ -99,26 +99,26 @@
                 </li>
               </ul>
             </nav>
-            
+
             <!-- User Avatar and Mobile Menu Container -->
             <div class="flex items-center ml-auto">
-              <!-- User Avatar and Dropdown -->  
+              <!-- User Avatar and Dropdown -->
               <div v-if="isConnected && userProfile" class="relative">
                 <button
                   @click="userDropdownOpen = !userDropdownOpen"
                   class="hover:bg-gray-800 rounded-lg transition-colors xl:ml-4"
                 >
-                  <img 
-                    :src="userProfile?.picture || '/default-avatar.svg'" 
+                  <img
+                    :src="userProfile?.picture || '/default-avatar.svg'"
                     :alt="userProfile?.name || userProfile?.display_name || 'User'"
                     class="w-8 h-8 rounded-full object-cover bg-gray-700"
                     @error="handleAvatarError"
                   />
                 </button>
-              
+
               <!-- Dropdown Menu -->
-              <div 
-                v-if="userDropdownOpen" 
+              <div
+                v-if="userDropdownOpen"
                 class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50"
               >
                 <div class="p-3 border-b border-gray-700">
@@ -129,7 +129,7 @@
                   </div>
                 </div>
                 <div class="p-1">
-                  <button 
+                  <button
                     @click="logout"
                     class="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
                   >
@@ -138,7 +138,7 @@
                 </div>
               </div>
               </div>
-              
+
               <!-- Mobile/Tablet Hamburger Button -->
               <button
                 v-if="isConnected"
@@ -153,14 +153,14 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Mobile/Tablet Navigation Menu -->
         <nav v-if="isConnected && mobileMenuOpen" class="xl:hidden mt-4 pt-4 border-t border-gray-700">
           <!-- User Info Section (Mobile) -->
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center gap-3 mb-3">
-              <img 
-                :src="userProfile?.picture || '/default-avatar.svg'" 
+              <img
+                :src="userProfile?.picture || '/default-avatar.svg'"
                 :alt="userProfile?.name || userProfile?.display_name || 'User'"
                 class="w-10 h-10 rounded-full object-cover bg-gray-700"
                 @error="handleAvatarError"
@@ -173,19 +173,19 @@
                 </div>
               </div>
             </div>
-            <button 
+            <button
               @click="logout"
               class="w-full px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors text-left"
             >
               Logout
             </button>
           </div>
-          
+
           <ul class="space-y-2">
             <li>
-              <a 
-                href="#" 
-                @click.prevent="setActiveView('dashboard'); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="setActiveView('dashboard'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'dashboard' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
@@ -203,9 +203,9 @@
               </a>
             </li>
             <li>
-              <a 
-                href="#" 
-                @click.prevent="setActiveView('follows'); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="setActiveView('follows'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'follows'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
@@ -243,9 +243,9 @@
               </a>
             </li>
             <li>
-              <a 
-                href="#" 
-                @click.prevent="showScoutModeMenu(); mobileMenuOpen = false" 
+              <a
+                href="#"
+                @click.prevent="showScoutModeMenu(); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
@@ -254,14 +254,14 @@
             </li>
           </ul>
         </nav>
-        
+
         <!-- Mobile/Tablet Navigation Menu for signed-out Scout Mode -->
         <nav v-if="!isConnected && isScoutMode && mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
           <ul class="space-y-2">
             <li>
-              <a 
-                href="#" 
-                @click.prevent="async () => { await exitScoutMode(); mobileMenuOpen = false; }" 
+              <a
+                href="#"
+                @click.prevent="async () => { await exitScoutMode(); mobileMenuOpen = false; }"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Start Over
@@ -316,15 +316,15 @@
           <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
           <p class="text-gray-300">Choose your signing method to connect and manage your dormant follows.</p>
         </div>
-        
+
         <div class="space-y-4 mb-8">
           <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
-          
+
           <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
-            <input 
-              type="radio" 
-              value="nip07" 
-              v-model="loginSigningMethod" 
+            <input
+              type="radio"
+              value="nip07"
+              v-model="loginSigningMethod"
               class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
             />
             <div class="flex-grow">
@@ -338,15 +338,15 @@
           </label>
         </div>
         -->
-          
+
           <!-- TEMPORARILY DISABLED - NIP-46 Remote Signer -->
           <!--
           <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
                  :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
-            <input 
-              type="radio" 
-              value="nip46" 
-              v-model="loginSigningMethod" 
+            <input
+              type="radio"
+              value="nip46"
+              v-model="loginSigningMethod"
               class="w-5 h-5 text-purple-500 mt-0.5"
             />
             <div class="flex-grow">
@@ -461,6 +461,29 @@
               </div>
             </div>
           </div>
+
+          <div class="mt-8 pt-6 border-t border-gray-700 text-center">
+            <a
+              href="https://mutable.top"
+              target="_blank"
+              rel="noreferrer"
+              class="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <span class="text-white font-medium">From the creator of</span>
+              <img
+                src="https://www.mutable.top/mutable_logo.svg"
+                alt=""
+                class="h-8 w-auto"
+                loading="lazy"
+              />
+              <img
+                src="https://www.mutable.top/mutable_text.svg"
+                alt="Mutable"
+                class="h-4 w-auto"
+                loading="lazy"
+              />
+            </a>
+          </div>
         </div>
       </div>
 
@@ -473,9 +496,9 @@
     </main>
 
     <!-- NIP-46 Setup Modal -->
-    <div 
-      v-if="showNip46Setup" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" 
+    <div
+      v-if="showNip46Setup"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       @click="closeNip46Setup"
     >
       <div class="bg-zombie-dark border border-gray-700 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
@@ -485,16 +508,16 @@
               <h2 class="text-2xl font-bold text-gray-100">Setup Remote Signer</h2>
               <p class="text-gray-400 mt-1">Connect to your NIP-46 bunker to continue</p>
             </div>
-            <button 
+            <button
               @click="closeNip46Setup"
               class="text-gray-400 hover:text-gray-200 text-2xl leading-none"
             >
               ×
             </button>
           </div>
-          
+
           <!-- Use the existing Nip46Connection component -->
-          <Nip46Connection 
+          <Nip46Connection
             @connected="onNip46Connected"
             @disconnected="closeNip46Setup"
           />
@@ -511,8 +534,8 @@
             <span class="block sm:inline">Made with 🧠 for the Nostr community</span>
           </p>
           <div class="flex flex-wrap gap-2">
-            <a 
-              href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h" 
+            <a
+              href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h"
               target="_blank"
               class="text-xs px-3 py-1 rounded-full transition-colors inline-flex items-center gap-1"
               style="background-color: #8e30eb; color: white;"
@@ -521,14 +544,14 @@
             >
               Follow on Nostr 🟣
             </a>
-            <button 
+            <button
               @click="showZapModal"
               class="text-xs px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-black rounded-full transition-colors inline-flex items-center gap-1"
             >
               ⚡ Zap Creator
             </button>
-            <a 
-              href="https://github.com/dmnyc/plebs-vs-zombies" 
+            <a
+              href="https://github.com/dmnyc/plebs-vs-zombies"
               target="_blank"
               class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded-full transition-colors inline-flex items-center gap-1"
             >
@@ -540,9 +563,9 @@
     </footer>
 
     <!-- Zap Modal -->
-    <div 
-      v-if="zapModal.show" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <div
+      v-if="zapModal.show"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="closeZapModal"
     >
       <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
@@ -550,30 +573,30 @@
           <h3 class="text-lg font-medium text-yellow-400 flex items-center gap-2">
             ⚡ Zap the Creator
           </h3>
-          <button 
+          <button
             @click="closeZapModal"
             class="text-gray-400 hover:text-gray-200 text-xl"
           >
             ×
           </button>
         </div>
-        
+
         <div class="text-center space-y-4">
           <div class="text-gray-300">
             Show your appreciation for Plebs vs Zombies!
           </div>
-          
+
           <!-- QR Code -->
           <div class="flex justify-center">
             <div class="bg-white p-4 rounded-lg">
-              <img 
-                :src="zapModal.qrCode" 
+              <img
+                :src="zapModal.qrCode"
                 alt="Lightning Address QR Code"
                 class="w-48 h-48"
               />
             </div>
           </div>
-          
+
           <!-- Lightning Address -->
           <div class="space-y-2">
             <div class="text-sm text-gray-400">Lightning Address:</div>
@@ -590,16 +613,16 @@
               </button>
             </div>
           </div>
-          
+
           <!-- Action Buttons -->
           <div class="flex gap-3 mt-6">
-            <button 
+            <button
               @click="zapOnNostr"
               class="flex-1 bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors"
             >
               Zap on Nostr
             </button>
-            <button 
+            <button
               @click="closeZapModal"
               class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2 rounded transition-colors"
             >
@@ -620,14 +643,14 @@
   />
 
   <!-- Scout Mode Modal for Signed-in Users -->
-  <div 
-    v-if="showScoutModal" 
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+  <div
+    v-if="showScoutModal"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
     @click="closeScoutModal"
   >
     <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
       <h3 class="text-lg font-medium text-yellow-400 mb-4">👁️🔍 Start Scout Mode</h3>
-      
+
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">
@@ -993,36 +1016,36 @@ export default {
         this.isConnecting = false;
       }
     },
-    
+
     getConnectButtonText() {
       if (!this.loginSigningMethod) return 'Select a method';
-      
+
       if (this.loginSigningMethod === 'nip07') {
         return 'Connect Browser Extension';
       } else if (this.loginSigningMethod === 'nip46') {
         return 'Setup Remote Signer';
       }
-      
+
       return 'Connect to Nostr';
     },
-    
+
     logout() {
       nostrService.logout();
       this.isConnected = false;
       this.userProfile = null;
       this.userDropdownOpen = false;
       this.mobileMenuOpen = false;
-      
+
       // Exit Scout Mode if active
       if (this.isScoutMode) {
         this.exitScoutMode();
       }
-      
+
       // Reset to sign-in state
       this.activeView = 'dashboard'; // Reset view state
       console.log('✅ Logged out and returned to sign-in page');
     },
-    
+
     formatNpub(pubkey) {
       if (!pubkey) return '';
       try {
@@ -1033,33 +1056,33 @@ export default {
         return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8);
       }
     },
-    
+
     handleAvatarError(event) {
       event.target.src = '/default-avatar.svg';
     },
-    
+
     onNip46Connected(result) {
       console.log('✅ NIP-46 connected from setup modal:', result);
-      
+
       // Handle both direct result object and CustomEvent
       const data = result?.detail || result;
-      
+
       if (!data || !data.pubkey) {
         console.error('❌ Invalid connection data:', result);
         return;
       }
-      
+
       console.log('🔄 Setting isConnected = true and userProfile');
       this.isConnected = true;
-      
+
       // CRITICAL: Set pubkey in nostrService for other parts of the app
       nostrService.pubkey = data.pubkey;
       nostrService.setSigningMethod('nip46');
       console.log('✅ Set nostrService.pubkey:', data.pubkey.substring(0, 8) + '...');
-      
+
       // Check if we already have profile data in nostrService
       const existingProfile = nostrService.userProfile;
-      
+
       this.userProfile = existingProfile ? {
         ...existingProfile,
         picture: existingProfile.picture || '/default-avatar.svg' // Ensure we have a picture
@@ -1070,33 +1093,33 @@ export default {
         name: 'NIP-46 User',
         picture: '/default-avatar.svg'
       };
-      
+
       console.log('✅ State after setting:', {
         isConnected: this.isConnected,
         userProfile: this.userProfile,
         showNip46Setup: this.showNip46Setup
       });
       console.log('📋 userProfile details:', JSON.stringify(this.userProfile, null, 2));
-      
+
       // Initialize other services
       backupService.init();
       immunityService.init();
-      
+
       // Close the setup modal and navigate to dashboard immediately
       console.log('🔄 Closing modal and navigating to dashboard');
       this.showNip46Setup = false;
       this.activeView = 'dashboard';
-      
+
       console.log('✅ Final state:', {
         isConnected: this.isConnected,
         userProfile: this.userProfile,
         showNip46Setup: this.showNip46Setup,
         activeView: this.activeView
       });
-      
+
       // Force Vue reactivity update using key technique
       this.forceUpdateKey += 1;
-      
+
       // Load the user profile data which will dispatch user-profile-loaded event
       console.log('🔄 Loading user profile data...');
       // Use setTimeout to not block the UI update
@@ -1107,7 +1130,7 @@ export default {
           console.warn('⚠️ Failed to load user profile:', error);
         });
       }, 100); // Small delay to let UI update first
-      
+
       // Force dashboard to refresh follow data after connection
       this.$nextTick(() => {
         if (this.activeView === 'dashboard' && this.$refs.currentViewComponent) {
@@ -1116,28 +1139,28 @@ export default {
         }
       });
     },
-    
+
     closeNip46Setup() {
       this.showNip46Setup = false;
       this.loginSigningMethod = 'nip07'; // Reset to default
     },
-    
+
     showZapModal() {
       // Generate QR code for the Lightning address
       this.generateQRCode();
       this.zapModal.show = true;
     },
-    
+
     closeZapModal() {
       this.zapModal.show = false;
     },
-    
+
     generateQRCode() {
       // Generate QR code URL using a QR service
       const lightningAddress = this.zapModal.lightningAddress;
       this.zapModal.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('lightning:' + lightningAddress)}`;
     },
-    
+
     copyLightningAddress(event) {
       navigator.clipboard.writeText(this.zapModal.lightningAddress)
         .then(() => {
@@ -1153,15 +1176,15 @@ export default {
           console.error('Failed to copy Lightning address:', err);
         });
     },
-    
+
     zapOnNostr() {
       const creatorNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
       window.open(`https://jumble.social/users/${creatorNpub}`, '_blank');
     },
-    
+
     onUserProfileLoaded(event) {
       console.log('📡 Received user-profile-loaded event:', event.detail);
-      
+
       if (event.detail && this.isConnected) {
         // Update the user profile with the loaded data
         this.userProfile = {
@@ -1170,9 +1193,9 @@ export default {
           // Ensure we have a default picture if none provided
           picture: event.detail.picture || '/default-avatar.svg'
         };
-        
+
         console.log('✅ Updated userProfile with loaded data:', this.userProfile);
-        
+
         // Force Vue reactivity update
         this.forceUpdateKey += 1;
       }
@@ -1181,13 +1204,13 @@ export default {
     handleAuthorizationAllow(options) {
       console.log('✅ User allowed NIP-46 connection', options);
       this.authorizationModal.show = false;
-      
+
       // TODO: Store permission preferences if remember is true
       if (options.remember) {
         console.log('💾 User wants to remember this decision for future connections');
         // Could store app permissions in localStorage
       }
-      
+
       // Complete the pending connection
       if (this.authorizationModal.pendingConnection) {
         this.completePendingConnection();
@@ -1197,13 +1220,13 @@ export default {
     handleAuthorizationDeny(options) {
       console.log('❌ User denied NIP-46 connection', options);
       this.authorizationModal.show = false;
-      
+
       // TODO: Store permission preferences if remember is true
       if (options.remember) {
         console.log('💾 User wants to remember this decision for future connections');
         // Could store app permissions in localStorage to auto-deny
       }
-      
+
       // Cancel the pending connection
       this.authorizationModal.pendingConnection = null;
     },
@@ -1234,7 +1257,7 @@ export default {
     const sessionRestored = await nostrService.restoreSession();
     if (sessionRestored && (nostrService.isExtensionReady() || nostrService.isBunkerReady())) {
       this.isConnected = true;
-      
+
       // For NIP-46, create default profile if userProfile is not set or incomplete
       if (nostrService.getSigningMethod() === 'nip46' && nostrService.pubkey) {
         this.userProfile = nostrService.userProfile || {
@@ -1243,7 +1266,7 @@ export default {
           name: 'NIP-46 User',
           picture: '/default-avatar.svg'
         };
-        
+
         // If userProfile exists but is missing picture, add default
         if (this.userProfile && !this.userProfile.picture) {
           this.userProfile.picture = '/default-avatar.svg';
@@ -1251,7 +1274,7 @@ export default {
       } else {
         this.userProfile = nostrService.userProfile;
       }
-      
+
       console.log('✅ Session restored successfully');
       console.log('📋 Final userProfile:', this.userProfile);
     } else if (sessionRestored) {
@@ -1259,17 +1282,17 @@ export default {
       console.log('⚠️ Session data found but no signing method ready - clearing session');
       nostrService.logout();
     }
-    
+
     // Initialize services
     backupService.init();
     immunityService.init();
-    
+
     // Listen for NIP-46 connection events from SettingsView
     window.addEventListener('nip46-connected', this.onNip46Connected);
-    
+
     // Listen for user profile loaded events
     window.addEventListener('user-profile-loaded', this.onUserProfileLoaded);
-    
+
     // Close menus when clicking outside
     document.addEventListener('click', (e) => {
       if (this.mobileMenuOpen && !e.target.closest('header')) {
@@ -1295,7 +1318,7 @@ export default {
       this.activeView = viewName;
     }
   },
-  
+
   beforeUnmount() {
     window.removeEventListener('nip46-connected', this.onNip46Connected);
     window.removeEventListener('user-profile-loaded', this.onUserProfileLoaded);
