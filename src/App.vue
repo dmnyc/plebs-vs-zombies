@@ -687,6 +687,7 @@
       </div>
     </div>
   </div>
+  <Analytics />
 </template>
 
 <script>
@@ -707,6 +708,7 @@ import backupService from './services/backupService';
 import immunityService from './services/immunityService';
 import scoutService from './services/scoutService';
 import { nip19 } from 'nostr-tools';
+import { Analytics } from '@vercel/analytics/vue';
 
 export default {
   name: 'App',
@@ -719,6 +721,7 @@ export default {
     ScoutModeView,
     ResurrectorView,
     CopyButton,
+    Analytics,
     Nip46Connection,
     ClientAuthorizationModal,
     ProfileSearchInput

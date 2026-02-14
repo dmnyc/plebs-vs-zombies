@@ -30,6 +30,7 @@
   "homepage": "https://github.com/dmnyc/plebs-vs-zombies#readme",
   "dependencies": {
     "@nostr-dev-kit/ndk": "^2.5.1",
+    "@vercel/analytics": "^1.6.1",
     "chart.js": "^4.4.2",
     "date-fns": "^3.3.1",
     "localforage": "^1.10.0",
