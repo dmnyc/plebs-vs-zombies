@@ -5,28 +5,29 @@
  * Stores settings both locally (localStorage) and on Nostr relays (NIP-78).
  */
 
-import relayStorage from '../relayStorage';
-import syncManager from '../syncManager';
+import relayStorage from "../relayStorage";
+import syncManager from "../syncManager";
 
 class RelayConfigSettings {
   constructor() {
-    this.dTag = 'relay-config';
-    this.storageKey = 'relay_config_settings';
+    this.dTag = "relay-config";
+    this.storageKey = "relay_config_settings";
 
     // Default relays
     this.defaultRelays = [
-      'wss://relay.damus.io',
-      'wss://relay.nostr.band',
-      'wss://nos.lol',
-      'wss://relay.primal.net',
-      'wss://nostr.wine'
+      "wss://relay.damus.io",
+      "wss://nos.lol",
+      "wss://relay.primal.net",
+      "wss://nostr.wine",
+      "wss://purplepag.es",
+      "wss://relay.nos.social",
     ];
 
     // Default settings
     this.defaults = {
       relays: [...this.defaultRelays],
       useNIP65: true, // Use NIP-65 relay list if available
-      preferredRelays: [] // Preferred relays for this app specifically
+      preferredRelays: [], // Preferred relays for this app specifically
     };
 
     // Current settings
@@ -36,7 +37,7 @@ class RelayConfigSettings {
     this.loadFromLocalStorage();
 
     // Register with sync manager
-    syncManager.registerService('relayConfig', this);
+    syncManager.registerService("relayConfig", this);
   }
 
   /**
@@ -65,8 +66,8 @@ class RelayConfigSettings {
     try {
       // Validate relay URL
       const url = new URL(relayUrl);
-      if (!['wss:', 'ws:'].includes(url.protocol)) {
-        throw new Error('Invalid relay protocol. Must be wss: or ws:');
+      if (!["wss:", "ws:"].includes(url.protocol)) {
+        throw new Error("Invalid relay protocol. Must be wss: or ws:");
       }
 
       // Add relay if not already present
@@ -78,13 +79,13 @@ class RelayConfigSettings {
           await this.publishToRelay();
         }
 
-        console.log('[RelayConfigSettings] Added relay:', relayUrl);
+        console.log("[RelayConfigSettings] Added relay:", relayUrl);
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to add relay:', error);
+      console.error("[RelayConfigSettings] Failed to add relay:", error);
       throw error;
     }
   }
@@ -106,13 +107,13 @@ class RelayConfigSettings {
           await this.publishToRelay();
         }
 
-        console.log('[RelayConfigSettings] Removed relay:', relayUrl);
+        console.log("[RelayConfigSettings] Removed relay:", relayUrl);
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to remove relay:', error);
+      console.error("[RelayConfigSettings] Failed to remove relay:", error);
       return false;
     }
   }
@@ -126,11 +127,14 @@ class RelayConfigSettings {
   async updateSettings(newSettings, publish = true) {
     try {
       // Apply settings
-      if (newSettings.relays !== undefined && Array.isArray(newSettings.relays)) {
+      if (
+        newSettings.relays !== undefined &&
+        Array.isArray(newSettings.relays)
+      ) {
         // Validate all relays
         for (const relayUrl of newSettings.relays) {
           const url = new URL(relayUrl);
-          if (!['wss:', 'ws:'].includes(url.protocol)) {
+          if (!["wss:", "ws:"].includes(url.protocol)) {
             throw new Error(`Invalid relay protocol: ${relayUrl}`);
           }
         }
@@ -141,7 +145,10 @@ class RelayConfigSettings {
         this.settings.useNIP65 = Boolean(newSettings.useNIP65);
       }
 
-      if (newSettings.preferredRelays !== undefined && Array.isArray(newSettings.preferredRelays)) {
+      if (
+        newSettings.preferredRelays !== undefined &&
+        Array.isArray(newSettings.preferredRelays)
+      ) {
         this.settings.preferredRelays = [...newSettings.preferredRelays];
       }
 
@@ -153,10 +160,10 @@ class RelayConfigSettings {
         await this.publishToRelay();
       }
 
-      console.log('[RelayConfigSettings] Settings updated:', this.settings);
+      console.log("[RelayConfigSettings] Settings updated:", this.settings);
       return true;
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to update settings:', error);
+      console.error("[RelayConfigSettings] Failed to update settings:", error);
       return false;
     }
   }
@@ -174,7 +181,7 @@ class RelayConfigSettings {
       await this.publishToRelay();
     }
 
-    console.log('[RelayConfigSettings] Reset to defaults');
+    console.log("[RelayConfigSettings] Reset to defaults");
     return true;
   }
 
@@ -189,12 +196,18 @@ class RelayConfigSettings {
         const parsed = JSON.parse(stored);
         this.settings = {
           ...this.defaults,
-          ...parsed
+          ...parsed,
         };
-        console.log('[RelayConfigSettings] Loaded from localStorage:', this.settings);
+        console.log(
+          "[RelayConfigSettings] Loaded from localStorage:",
+          this.settings,
+        );
       }
     } catch (error) {
-      console.warn('[RelayConfigSettings] Failed to load from localStorage:', error);
+      console.warn(
+        "[RelayConfigSettings] Failed to load from localStorage:",
+        error,
+      );
       this.settings = { ...this.defaults };
     }
   }
@@ -206,9 +219,12 @@ class RelayConfigSettings {
   saveToLocalStorage() {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.settings));
-      console.log('[RelayConfigSettings] Saved to localStorage');
+      console.log("[RelayConfigSettings] Saved to localStorage");
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to save to localStorage:', error);
+      console.error(
+        "[RelayConfigSettings] Failed to save to localStorage:",
+        error,
+      );
     }
   }
 
@@ -220,14 +236,14 @@ class RelayConfigSettings {
     try {
       const data = {
         version: 1,
-        ...this.settings
+        ...this.settings,
       };
 
       const eventId = await relayStorage.publish(this.dTag, data, false);
-      console.log('[RelayConfigSettings] Published to relay:', eventId);
+      console.log("[RelayConfigSettings] Published to relay:", eventId);
       return eventId;
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to publish to relay:', error);
+      console.error("[RelayConfigSettings] Failed to publish to relay:", error);
       throw error;
     }
   }
@@ -241,7 +257,7 @@ class RelayConfigSettings {
       const data = await relayStorage.fetch(this.dTag, false);
 
       if (data && data.relays) {
-        console.log('[RelayConfigSettings] Fetched from relay:', data);
+        console.log("[RelayConfigSettings] Fetched from relay:", data);
 
         // Compare timestamps to determine which is newer
         const localTimestamp = this.getLocalTimestamp();
@@ -249,32 +265,42 @@ class RelayConfigSettings {
 
         if (relayTimestamp > localTimestamp) {
           // Relay data is newer, update local settings
-          console.log('[RelayConfigSettings] Relay data is newer, updating local');
+          console.log(
+            "[RelayConfigSettings] Relay data is newer, updating local",
+          );
           this.settings = {
             ...this.defaults,
             relays: data.relays || this.defaults.relays,
-            useNIP65: data.useNIP65 !== undefined ? data.useNIP65 : this.defaults.useNIP65,
-            preferredRelays: data.preferredRelays || this.defaults.preferredRelays
+            useNIP65:
+              data.useNIP65 !== undefined
+                ? data.useNIP65
+                : this.defaults.useNIP65,
+            preferredRelays:
+              data.preferredRelays || this.defaults.preferredRelays,
           };
           this.saveToLocalStorage();
           this.setLocalTimestamp(relayTimestamp);
         } else if (localTimestamp > relayTimestamp) {
           // Local data is newer, publish to relay
-          console.log('[RelayConfigSettings] Local data is newer, publishing to relay');
+          console.log(
+            "[RelayConfigSettings] Local data is newer, publishing to relay",
+          );
           await this.publishToRelay();
         } else {
-          console.log('[RelayConfigSettings] Data is in sync');
+          console.log("[RelayConfigSettings] Data is in sync");
         }
 
         return true;
       } else {
         // No data on relay, publish current settings
-        console.log('[RelayConfigSettings] No data on relay, publishing current settings');
+        console.log(
+          "[RelayConfigSettings] No data on relay, publishing current settings",
+        );
         await this.publishToRelay();
         return true;
       }
     } catch (error) {
-      console.error('[RelayConfigSettings] Sync failed:', error);
+      console.error("[RelayConfigSettings] Sync failed:", error);
       return false;
     }
   }
@@ -286,10 +312,13 @@ class RelayConfigSettings {
   async deleteFromRelay() {
     try {
       const eventId = await relayStorage.delete(this.dTag);
-      console.log('[RelayConfigSettings] Deleted from relay:', eventId);
+      console.log("[RelayConfigSettings] Deleted from relay:", eventId);
       return eventId;
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to delete from relay:', error);
+      console.error(
+        "[RelayConfigSettings] Failed to delete from relay:",
+        error,
+      );
       throw error;
     }
   }
@@ -315,9 +344,12 @@ class RelayConfigSettings {
    */
   setLocalTimestamp(timestamp) {
     try {
-      localStorage.setItem(`${this.storageKey}_timestamp`, timestamp.toString());
+      localStorage.setItem(
+        `${this.storageKey}_timestamp`,
+        timestamp.toString(),
+      );
     } catch (error) {
-      console.error('[RelayConfigSettings] Failed to set timestamp:', error);
+      console.error("[RelayConfigSettings] Failed to set timestamp:", error);
     }
   }
 }

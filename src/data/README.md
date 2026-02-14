@@ -48,7 +48,7 @@ Each entry includes:
 
 ### Updating the List
 
-We have a script that fetches trending profiles from nostr.band:
+There is a script that can update the profile list:
 
 ```bash
 npm run update-profiles
@@ -56,14 +56,7 @@ npm run update-profiles
 node scripts/fetch-well-known-profiles.js
 ```
 
-This will:
-1. Fetch trending profiles from nostr.band API (~50 profiles due to API pagination limitations)
-2. Process and clean the profile names (removes emojis, extracts usernames)
-3. Combine with ~20 critical well-known profiles (hardcoded in the script)
-4. Generate a new `wellKnownProfiles.json` file with ~70 profiles
-5. Fall back to a manual list if the API is unavailable
-
-**Note**: The nostr.band trending API currently has broken pagination - it returns the same 50 profiles regardless of offset parameter. Until this is fixed, we rely on a curated list of critical profiles combined with the 50 trending ones.
+**Note**: The script previously fetched trending profiles from the nostr.band API, which is no longer operational. It now falls back to a curated manual list of well-known profiles.
 
 #### Automated Updates
 
@@ -76,7 +69,6 @@ This means the list stays fresh without manual intervention!
 
 ### Finding Popular Profiles Manually
 
-- [Nostr.band Top Profiles](https://nostr.band/stats/profile)
 - [Primal Explore](https://primal.net/explore)
 - [Nostr.directory](https://nostr.directory)
 - The Plebs vs Zombies Competition Leaderboard

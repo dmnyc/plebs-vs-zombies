@@ -1,25 +1,23 @@
-import { differenceInDays } from 'date-fns';
-import nostrService from './nostrService';
-import immunityService from './immunityService';
-import localforage from 'localforage';
+import { differenceInDays } from "date-fns";
+import nostrService from "./nostrService";
+import immunityService from "./immunityService";
+import localforage from "localforage";
 
 // Configure localforage
 localforage.config({
-  name: 'plebs-vs-zombies',
-  storeName: 'zombie_data'
+  name: "plebs-vs-zombies",
+  storeName: "zombie_data",
 });
 
 class ZombieService {
   constructor() {
     this.zombieThresholds = {
-      fresh: 90,    // 3 months minimum before considering zombie
-      rotting: 180, // 6 months for "rotting" zombie  
-      ancient: 365  // 1 year for "ancient" zombie (more conservative)
+      fresh: 90, // 3 months minimum before considering zombie
+      rotting: 180, // 6 months for "rotting" zombie
+      ancient: 365, // 1 year for "ancient" zombie (more conservative)
     };
-    this.batchSize = 30;  // Default batch size for unfollows
-    
+    this.batchSize = 30; // Default batch size for unfollows
   }
-
 
   /**
    * Set custom thresholds for zombie classification
@@ -43,37 +41,56 @@ class ZombieService {
    * Classify follows based on their activity and deleted status
    */
   classifyZombies(activityData, profileData = null, progressCallback = null) {
-    
     const now = Date.now() / 1000; // Current time in seconds
     const zombies = {
       burned: [], // Deleted accounts - highest priority for purging
       fresh: [],
       rotting: [],
       ancient: [],
-      active: []
+      active: [],
     };
 
-    console.log(`Classifying zombies using thresholds: fresh=${this.zombieThresholds.fresh}d, rotting=${this.zombieThresholds.rotting}d, ancient=${this.zombieThresholds.ancient}d`);
+    console.log(
+      `Classifying zombies using thresholds: fresh=${this.zombieThresholds.fresh}d, rotting=${this.zombieThresholds.rotting}d, ancient=${this.zombieThresholds.ancient}d`,
+    );
 
     // Debug specific users before classification
-    const debugUsers = ['f2aa7b81', '42ca8dc2', '0461fcbe', 'c83723d3', 'd0debf9f'];
+    const debugUsers = [
+      "f2aa7b81",
+      "42ca8dc2",
+      "0461fcbe",
+      "c83723d3",
+      "d0debf9f",
+    ];
     for (const prefix of debugUsers) {
       for (const [pubkey, events] of activityData.entries()) {
         if (pubkey.startsWith(prefix)) {
-          console.log(`🎯 PRE-CLASSIFICATION: ${pubkey.substring(0, 8)}... has ${events.length} events`);
+          console.log(
+            `🎯 PRE-CLASSIFICATION: ${pubkey.substring(0, 8)}... has ${events.length} events`,
+          );
           if (events.length > 0) {
             const mostRecent = events[0];
-            const daysSince = (Date.now() / 1000 - mostRecent.created_at) / (24 * 60 * 60);
-            console.log(`  Most recent event: ${daysSince.toFixed(1)} days ago, kind=${mostRecent.kind}, created=${new Date(mostRecent.created_at * 1000).toISOString()}`);
-            
+            const daysSince =
+              (Date.now() / 1000 - mostRecent.created_at) / (24 * 60 * 60);
+            console.log(
+              `  Most recent event: ${daysSince.toFixed(1)} days ago, kind=${mostRecent.kind}, created=${new Date(mostRecent.created_at * 1000).toISOString()}`,
+            );
+
             // Show all events for these debug users
-            console.log(`  All ${events.length} events for ${pubkey.substring(0, 8)}:`);
+            console.log(
+              `  All ${events.length} events for ${pubkey.substring(0, 8)}:`,
+            );
             events.forEach((event, i) => {
-              const eventDays = (Date.now() / 1000 - event.created_at) / (24 * 60 * 60);
-              console.log(`    ${i+1}. kind=${event.kind}, ${eventDays.toFixed(1)} days ago, ${new Date(event.created_at * 1000).toISOString()}`);
+              const eventDays =
+                (Date.now() / 1000 - event.created_at) / (24 * 60 * 60);
+              console.log(
+                `    ${i + 1}. kind=${event.kind}, ${eventDays.toFixed(1)} days ago, ${new Date(event.created_at * 1000).toISOString()}`,
+              );
             });
           } else {
-            console.log(`  ❌ NO EVENTS FOUND for ${pubkey.substring(0, 8)}... - this will be classified as ancient zombie`);
+            console.log(
+              `  ❌ NO EVENTS FOUND for ${pubkey.substring(0, 8)}... - this will be classified as ancient zombie`,
+            );
           }
         }
       }
@@ -81,104 +98,142 @@ class ZombieService {
 
     let processedCount = 0;
     const totalUsers = activityData.size;
-    
+
     for (const [pubkey, events] of activityData.entries()) {
       processedCount++;
-      
-      
+
       // Report progress more frequently for better UX (every 3 users or when a zombie is found)
-      const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
-      const shouldReport = processedCount % 3 === 0 || processedCount === totalUsers || currentZombieCount !== (this.lastReportedZombieCount || 0);
-      
+      const currentZombieCount =
+        zombies.burned.length +
+        zombies.fresh.length +
+        zombies.rotting.length +
+        zombies.ancient.length;
+      const shouldReport =
+        processedCount % 3 === 0 ||
+        processedCount === totalUsers ||
+        currentZombieCount !== (this.lastReportedZombieCount || 0);
+
       if (progressCallback && shouldReport) {
         this.lastReportedZombieCount = currentZombieCount;
-        
+
         progressCallback({
-          stage: 'Analyzing user activity and deleted accounts...',
-          currentNpub: pubkey.substring(0, 8) + '...',
-          zombiesFound: currentZombieCount
+          stage: "Analyzing user activity and deleted accounts...",
+          currentNpub: pubkey.substring(0, 8) + "...",
+          zombiesFound: currentZombieCount,
         });
       }
-      
+
       // Check if account is deleted first (highest priority) with improved validation
       if (profileData && profileData.has(pubkey)) {
         const profile = profileData.get(pubkey);
         if (profile.deleted) {
           const timeline = profile.deletionTimeline;
           const hasRecentActivity = events.length > 0;
-          const lastActivityTime = hasRecentActivity ? events[0].created_at : null;
-          
+          const lastActivityTime = hasRecentActivity
+            ? events[0].created_at
+            : null;
+
           // Cross-validate: Check if they've been active AFTER marking as deleted
           let isGenuinelyDeleted = true;
-          let validationReason = 'deleted_account';
-          
+          let validationReason = "deleted_account";
+
           if (timeline && hasRecentActivity) {
-            const activityAfterDeletion = lastActivityTime > timeline.markedDeletedAt;
-            const daysSinceDeletion = Math.floor((now - timeline.markedDeletedAt) / (24 * 60 * 60));
-            const daysSinceLastActivity = Math.floor((now - lastActivityTime) / (24 * 60 * 60));
-            
+            const activityAfterDeletion =
+              lastActivityTime > timeline.markedDeletedAt;
+            const daysSinceDeletion = Math.floor(
+              (now - timeline.markedDeletedAt) / (24 * 60 * 60),
+            );
+            const daysSinceLastActivity = Math.floor(
+              (now - lastActivityTime) / (24 * 60 * 60),
+            );
+
             if (activityAfterDeletion && daysSinceLastActivity < 7) {
               // They've been active within the last week AFTER marking as deleted
-              console.log(`⚠️  User ${pubkey.substring(0, 8)}... marked deleted ${daysSinceDeletion}d ago but posted ${daysSinceLastActivity}d ago - SUSPICIOUS`);
+              console.log(
+                `⚠️  User ${pubkey.substring(0, 8)}... marked deleted ${daysSinceDeletion}d ago but posted ${daysSinceLastActivity}d ago - SUSPICIOUS`,
+              );
               isGenuinelyDeleted = false;
-              validationReason = 'deleted_but_active';
+              validationReason = "deleted_but_active";
             }
           }
-          
+
           if (isGenuinelyDeleted) {
-            const deletionInfo = timeline ? {
-              markedDeletedAt: timeline.markedDeletedAt,
-              deletionAge: timeline.deletionAge,
-              profileUpdatesAfterDeletion: timeline.profileUpdatesAfterDeletion
-            } : null;
-            
-            console.log(`🔥 User ${pubkey.substring(0, 8)}... is BURNED zombie: account marked as deleted${timeline ? ` ${Math.floor(timeline.deletionAge / (24 * 60 * 60))}d ago` : ''}`);
-            
+            const deletionInfo = timeline
+              ? {
+                  markedDeletedAt: timeline.markedDeletedAt,
+                  deletionAge: timeline.deletionAge,
+                  profileUpdatesAfterDeletion:
+                    timeline.profileUpdatesAfterDeletion,
+                }
+              : null;
+
+            console.log(
+              `🔥 User ${pubkey.substring(0, 8)}... is BURNED zombie: account marked as deleted${timeline ? ` ${Math.floor(timeline.deletionAge / (24 * 60 * 60))}d ago` : ""}`,
+            );
+
             zombies.burned.push({
               pubkey,
               lastActivity: lastActivityTime,
-              daysSinceActivity: hasRecentActivity ? differenceInDays(now * 1000, lastActivityTime * 1000) : null,
+              daysSinceActivity: hasRecentActivity
+                ? differenceInDays(now * 1000, lastActivityTime * 1000)
+                : null,
               reason: validationReason,
-              deletionInfo: deletionInfo
+              deletionInfo: deletionInfo,
             });
-            
+
             // Immediately update progress when a zombie is found
             if (progressCallback) {
-              const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+              const currentZombieCount =
+                zombies.burned.length +
+                zombies.fresh.length +
+                zombies.rotting.length +
+                zombies.ancient.length;
               progressCallback({
-                stage: 'Found burned zombie (deleted account)...',
-                currentNpub: pubkey.substring(0, 8) + '...',
+                stage: "Found burned zombie (deleted account)...",
+                currentNpub: pubkey.substring(0, 8) + "...",
                 zombiesFound: currentZombieCount,
-                processed: processedCount
+                processed: processedCount,
               });
             }
             continue;
           } else {
             // They're marked as deleted but are still active - treat as regular zombie based on activity
-            console.log(`📝 User ${pubkey.substring(0, 8)}... marked deleted but still active - treating as regular zombie`);
+            console.log(
+              `📝 User ${pubkey.substring(0, 8)}... marked deleted but still active - treating as regular zombie`,
+            );
           }
         }
       }
-      
+
       if (events.length === 0) {
         // No activity found - but be very conservative here
         // Only classify as ancient if we really found nothing
-        console.log(`No activity found for ${pubkey.substring(0, 8)}... - classifying as ancient zombie`);
+        console.log(
+          `No activity found for ${pubkey.substring(0, 8)}... - classifying as ancient zombie`,
+        );
         zombies.ancient.push({
           pubkey,
           lastActivity: null,
           daysSinceActivity: null,
-          confidence: this.calculateConfidenceScore([], profileData ? profileData.get(pubkey) : null, pubkey)
+          confidence: this.calculateConfidenceScore(
+            [],
+            profileData ? profileData.get(pubkey) : null,
+            pubkey,
+          ),
         });
-        
+
         // Immediately update progress when a zombie is found
         if (progressCallback) {
-          const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+          const currentZombieCount =
+            zombies.burned.length +
+            zombies.fresh.length +
+            zombies.rotting.length +
+            zombies.ancient.length;
           progressCallback({
-            stage: 'Found ancient zombie (no activity)...',
-            currentNpub: pubkey.substring(0, 8) + '...',
+            stage: "Found ancient zombie (no activity)...",
+            currentNpub: pubkey.substring(0, 8) + "...",
             zombiesFound: currentZombieCount,
-            processed: processedCount
+            processed: processedCount,
           });
         }
         continue;
@@ -188,73 +243,101 @@ class ZombieService {
       const latestEvent = events[0];
       const daysSinceLastActivity = differenceInDays(
         now * 1000, // Convert to milliseconds
-        latestEvent.created_at * 1000 // Convert to milliseconds
+        latestEvent.created_at * 1000, // Convert to milliseconds
       );
 
       const zombieInfo = {
         pubkey,
         lastActivity: latestEvent.created_at,
         daysSinceActivity: daysSinceLastActivity,
-        confidence: this.calculateConfidenceScore(events, profileData ? profileData.get(pubkey) : null, pubkey)
+        confidence: this.calculateConfidenceScore(
+          events,
+          profileData ? profileData.get(pubkey) : null,
+          pubkey,
+        ),
       };
 
       // ULTRA CONSERVATIVE - if there's ANY activity within 120 days (4 months), mark as active
       // This prevents false positives by being extremely cautious
       const conservativeThreshold = 120; // 4 months - even more conservative
-      
+
       if (daysSinceLastActivity < conservativeThreshold) {
         zombies.active.push(zombieInfo);
-        console.log(`User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (< ${conservativeThreshold} days - CONSERVATIVE)`);
+        console.log(
+          `User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (< ${conservativeThreshold} days - CONSERVATIVE)`,
+        );
       } else if (daysSinceLastActivity >= this.zombieThresholds.ancient) {
         zombies.ancient.push(zombieInfo);
-        console.log(`User ${pubkey.substring(0, 8)}... is ANCIENT zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.ancient} days)`);
-        
+        console.log(
+          `User ${pubkey.substring(0, 8)}... is ANCIENT zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.ancient} days)`,
+        );
+
         // Immediately update progress when a zombie is found
         if (progressCallback) {
-          const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+          const currentZombieCount =
+            zombies.burned.length +
+            zombies.fresh.length +
+            zombies.rotting.length +
+            zombies.ancient.length;
           progressCallback({
-            stage: 'Found ancient zombie...',
-            currentNpub: pubkey.substring(0, 8) + '...',
+            stage: "Found ancient zombie...",
+            currentNpub: pubkey.substring(0, 8) + "...",
             zombiesFound: currentZombieCount,
-            processed: processedCount
+            processed: processedCount,
           });
         }
       } else if (daysSinceLastActivity >= this.zombieThresholds.rotting) {
         zombies.rotting.push(zombieInfo);
-        console.log(`User ${pubkey.substring(0, 8)}... is ROTTING zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.rotting} days)`);
-        
+        console.log(
+          `User ${pubkey.substring(0, 8)}... is ROTTING zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.rotting} days)`,
+        );
+
         // Immediately update progress when a zombie is found
         if (progressCallback) {
-          const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+          const currentZombieCount =
+            zombies.burned.length +
+            zombies.fresh.length +
+            zombies.rotting.length +
+            zombies.ancient.length;
           progressCallback({
-            stage: 'Found rotting zombie...',
-            currentNpub: pubkey.substring(0, 8) + '...',
+            stage: "Found rotting zombie...",
+            currentNpub: pubkey.substring(0, 8) + "...",
             zombiesFound: currentZombieCount,
-            processed: processedCount
+            processed: processedCount,
           });
         }
       } else if (daysSinceLastActivity >= this.zombieThresholds.fresh) {
         zombies.fresh.push(zombieInfo);
-        console.log(`User ${pubkey.substring(0, 8)}... is FRESH zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.fresh} days)`);
-        
+        console.log(
+          `User ${pubkey.substring(0, 8)}... is FRESH zombie: last activity ${daysSinceLastActivity} days ago (>= ${this.zombieThresholds.fresh} days)`,
+        );
+
         // Immediately update progress when a zombie is found
         if (progressCallback) {
-          const currentZombieCount = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
+          const currentZombieCount =
+            zombies.burned.length +
+            zombies.fresh.length +
+            zombies.rotting.length +
+            zombies.ancient.length;
           progressCallback({
-            stage: 'Found fresh zombie...',
-            currentNpub: pubkey.substring(0, 8) + '...',
+            stage: "Found fresh zombie...",
+            currentNpub: pubkey.substring(0, 8) + "...",
             zombiesFound: currentZombieCount,
-            processed: processedCount
+            processed: processedCount,
           });
         }
       } else {
         // This shouldn't happen, but failsafe to active
         zombies.active.push(zombieInfo);
-        console.log(`User ${pubkey.substring(0, 8)}... defaulted to ACTIVE: last activity ${daysSinceLastActivity} days ago`);
+        console.log(
+          `User ${pubkey.substring(0, 8)}... defaulted to ACTIVE: last activity ${daysSinceLastActivity} days ago`,
+        );
       }
     }
 
-    console.log(`Classification complete: active=${zombies.active.length}, burned=${zombies.burned.length}, fresh=${zombies.fresh.length}, rotting=${zombies.rotting.length}, ancient=${zombies.ancient.length}`);
+    console.log(
+      `Classification complete: active=${zombies.active.length}, burned=${zombies.burned.length}, fresh=${zombies.fresh.length}, rotting=${zombies.rotting.length}, ancient=${zombies.ancient.length}`,
+    );
 
     return zombies;
   }
@@ -267,7 +350,7 @@ class ZombieService {
    */
   calculateConfidenceScore(events, profile, pubkey, scanMetrics = {}) {
     let confidence = 0.5; // Start at medium confidence
-    
+
     // Factor 1: Number of events found (more events = higher confidence)
     if (events.length === 0) {
       confidence -= 0.3; // Very low confidence if no events found
@@ -278,77 +361,83 @@ class ZombieService {
     } else if (events.length >= 2) {
       confidence += 0.1; // Some confidence with multiple events
     }
-    
+
     // Factor 2: Enhanced relay coverage analysis
     const hasRelayList = nostrService.followsRelayLists.has(pubkey);
     if (hasRelayList) {
       confidence += 0.2; // More confident when we know their preferred relays
-      
+
       // Additional confidence boost if we successfully scanned their outbox relays
       if (scanMetrics.scannedUserSpecificRelays) {
         confidence += 0.1; // Higher confidence when we checked their preferred write/read relays
       }
-      
+
       // Check relay coverage quality
-      if (scanMetrics.relayResponseRate && scanMetrics.relayResponseRate > 0.7) {
+      if (
+        scanMetrics.relayResponseRate &&
+        scanMetrics.relayResponseRate > 0.7
+      ) {
         confidence += 0.05; // Better coverage from relay network
       }
     } else {
       confidence -= 0.15; // Less confident when we don't know their relay preferences (reduced penalty)
     }
-    
+
     // Factor 3: Profile completeness (complete profile = likely active user)
     if (profile && profile.name && profile.about) {
       confidence += 0.1; // Complete profiles are less likely to be zombies
     } else if (profile && (profile.name || profile.about)) {
       confidence += 0.05; // Partial profile information
     }
-    
+
     // Factor 4: Activity pattern consistency (recent events spread over time = higher confidence)
     if (events.length >= 2) {
-      const timeSpan = events[0].created_at - events[events.length - 1].created_at;
+      const timeSpan =
+        events[0].created_at - events[events.length - 1].created_at;
       const daySpan = timeSpan / (24 * 60 * 60);
       if (daySpan > 30) {
         confidence += 0.1; // Activity spread over time indicates consistent usage
       }
-      
+
       // Recent activity within 90 days significantly increases confidence
       const mostRecentActivity = events[0].created_at;
-      const daysSinceRecent = (Date.now() / 1000 - mostRecentActivity) / (24 * 60 * 60);
+      const daysSinceRecent =
+        (Date.now() / 1000 - mostRecentActivity) / (24 * 60 * 60);
       if (daysSinceRecent < 90) {
         confidence += 0.15; // Recent activity strongly indicates active user
       }
     }
-    
+
     // Factor 5: Account age (very new accounts might be missed due to indexing delays)
     if (events.length > 0) {
       const oldestEvent = events[events.length - 1];
-      const accountAge = (Date.now() / 1000 - oldestEvent.created_at) / (24 * 60 * 60);
+      const accountAge =
+        (Date.now() / 1000 - oldestEvent.created_at) / (24 * 60 * 60);
       if (accountAge < 30) {
         confidence -= 0.1; // Lower confidence for very new accounts
       } else if (accountAge > 365) {
         confidence += 0.05; // Slight boost for established accounts
       }
     }
-    
+
     // Factor 6: Event diversity (different event types suggest active usage)
     if (events.length > 0) {
-      const uniqueKinds = new Set(events.map(e => e.kind));
+      const uniqueKinds = new Set(events.map((e) => e.kind));
       if (uniqueKinds.size >= 3) {
         confidence += 0.1; // Multiple event types suggest active engagement
       } else if (uniqueKinds.size === 2) {
         confidence += 0.05; // Some diversity in activity
       }
     }
-    
+
     // Factor 7: Enhanced parallel scan results
     if (scanMetrics.foundViaEnhancedScan && events.length > 0) {
       confidence += 0.1; // Bonus confidence when enhanced scanning found activity
     }
-    
+
     // Clamp confidence to reasonable bounds
     confidence = Math.max(0.1, Math.min(0.95, confidence));
-    
+
     return Math.round(confidence * 100) / 100; // Round to 2 decimal places
   }
 
@@ -356,104 +445,125 @@ class ZombieService {
    * Enhanced zombie scanning with improved false positive reduction
    * Uses standard scanning first, then targeted outbox relay verification for suspected zombies
    */
-  async scanForZombiesEnhanced(fetchProfiles = true, progressCallback = null, createBackup = true) {
-    console.log('🚀 Starting enhanced zombie scan with false positive reduction...');
-    
+  async scanForZombiesEnhanced(
+    fetchProfiles = true,
+    progressCallback = null,
+    createBackup = true,
+  ) {
+    console.log(
+      "🚀 Starting enhanced zombie scan with false positive reduction...",
+    );
+
     try {
       // Initialize tracking for progress reporting
       this.lastReportedZombieCount = 0;
-      
+
       // Initialize immunity service
       await immunityService.init();
-      
+
       // Create backup before scanning (if enabled)
       if (createBackup) {
         if (progressCallback) {
           progressCallback({
-            stage: 'Creating pre-scan backup...',
+            stage: "Creating pre-scan backup...",
             processed: 0,
-            total: 0
+            total: 0,
           });
         }
-        
+
         try {
-          const backupService = (await import('./backupService')).default;
-          const backupResult = await backupService.createBackup(`Pre-scan backup (Enhanced) - ${new Date().toISOString()}`);
-          
+          const backupService = (await import("./backupService")).default;
+          const backupResult = await backupService.createBackup(
+            `Pre-scan backup (Enhanced) - ${new Date().toISOString()}`,
+          );
+
           if (!backupResult.success) {
-            console.warn('Failed to create pre-scan backup:', backupResult.message);
+            console.warn(
+              "Failed to create pre-scan backup:",
+              backupResult.message,
+            );
           } else {
-            console.log('✅ Pre-scan backup created successfully');
+            console.log("✅ Pre-scan backup created successfully");
           }
         } catch (error) {
-          console.warn('Failed to create pre-scan backup:', error);
+          console.warn("Failed to create pre-scan backup:", error);
         }
       }
-      
+
       // Get the user's follow list
       const allFollows = await nostrService.getFollowList();
-      
+
       if (!allFollows || allFollows.length === 0) {
         return {
           success: false,
-          message: 'No follows found'
-        };
-      }
-      
-      // Filter out immune users before scanning
-      const immunePubkeys = immunityService.getImmunePubkeys();
-      const followList = allFollows.filter(pubkey => !immunityService.hasImmunity(pubkey));
-      
-      const immuneCount = allFollows.length - followList.length;
-      if (immuneCount > 0) {
-        console.log(`🛡️ Excluded ${immuneCount} immune users from enhanced scan`);
-      }
-      
-      if (followList.length === 0) {
-        return {
-          success: false,
-          message: `All ${allFollows.length} follows are immune from scanning`
+          message: "No follows found",
         };
       }
 
-      console.log(`🔍 Enhanced scanning ${followList.length} follows (${immuneCount} immune users excluded)`);
+      // Filter out immune users before scanning
+      const immunePubkeys = immunityService.getImmunePubkeys();
+      const followList = allFollows.filter(
+        (pubkey) => !immunityService.hasImmunity(pubkey),
+      );
+
+      const immuneCount = allFollows.length - followList.length;
+      if (immuneCount > 0) {
+        console.log(
+          `🛡️ Excluded ${immuneCount} immune users from enhanced scan`,
+        );
+      }
+
+      if (followList.length === 0) {
+        return {
+          success: false,
+          message: `All ${allFollows.length} follows are immune from scanning`,
+        };
+      }
+
+      console.log(
+        `🔍 Enhanced scanning ${followList.length} follows (${immuneCount} immune users excluded)`,
+      );
 
       // Step 1: Fetch NIP-65 relay lists for all follows (enhanced for better outbox coverage)
       if (progressCallback) {
         progressCallback({
-          stage: 'Fetching user relay preferences...',
+          stage: "Fetching user relay preferences...",
           processed: 0,
-          total: followList.length
+          total: followList.length,
         });
       }
-      
+
       const relayListProgress = (progress) => {
         if (progressCallback) {
           progressCallback({
             stage: `Fetching relay preferences... (${progress.processed}/${progress.total})`,
             processed: progress.processed,
-            total: progress.total
+            total: progress.total,
           });
         }
       };
-      
+
       await nostrService.fetchFollowsRelayLists(followList, relayListProgress);
-      
+
       // Step 2: Standard activity scanning (much faster)
       if (progressCallback) {
         progressCallback({
-          stage: 'Initial activity scanning...',
+          stage: "Initial activity scanning...",
           processed: 0,
-          total: followList.length
+          total: followList.length,
         });
       }
-      
-      const activityResults = await nostrService.getProfilesActivity(followList, 10, progressCallback);
-      
+
+      const activityResults = await nostrService.getProfilesActivity(
+        followList,
+        10,
+        progressCallback,
+      );
+
       // Step 3: Identify suspected zombies for deeper verification
       const suspectedZombies = [];
       const confirmedActive = [];
-      
+
       for (const [pubkey, events] of activityResults.entries()) {
         if (events.length === 0) {
           // No activity found - these need deeper verification
@@ -463,9 +573,11 @@ class ZombieService {
           confirmedActive.push({ pubkey, events });
         }
       }
-      
-      console.log(`🔍 Standard scan complete: ${confirmedActive.length} confirmed active, ${suspectedZombies.length} suspected zombies need verification`);
-      
+
+      console.log(
+        `🔍 Standard scan complete: ${confirmedActive.length} confirmed active, ${suspectedZombies.length} suspected zombies need verification`,
+      );
+
       // Step 4: Enhanced verification for suspected zombies only
       let verificationResults = new Map();
       if (suspectedZombies.length > 0) {
@@ -473,135 +585,229 @@ class ZombieService {
           progressCallback({
             stage: `Enhanced verification of ${suspectedZombies.length} suspected zombies...`,
             processed: confirmedActive.length,
-            total: followList.length
+            total: followList.length,
           });
         }
-        
+
         // Use smart relay retry (existing method) for suspected zombies
-        verificationResults = await nostrService.smartRelayRetry(suspectedZombies, progressCallback);
-        
+        verificationResults = await nostrService.smartRelayRetry(
+          suspectedZombies,
+          progressCallback,
+        );
+
         // Merge verification results
         for (const [pubkey, events] of verificationResults.entries()) {
           if (events.length > 0) {
             confirmedActive.push({ pubkey, events });
-            console.log(`✅ Enhanced verification rescued ${pubkey.substring(0, 8)}... from false positive (${events.length} events found)`);
+            console.log(
+              `✅ Enhanced verification rescued ${pubkey.substring(0, 8)}... from false positive (${events.length} events found)`,
+            );
           } else {
             // Still no activity - likely genuine zombie
             activityResults.set(pubkey, []);
           }
         }
       }
-      
-      const rescuedFromFalsePositives = Array.from(verificationResults.entries()).filter(([_, events]) => events.length > 0).length;
-      console.log(`🎯 Enhanced verification complete: ${confirmedActive.length} total active, ${rescuedFromFalsePositives} rescued from false positives`);
-      
+
+      const rescuedFromFalsePositives = Array.from(
+        verificationResults.entries(),
+      ).filter(([_, events]) => events.length > 0).length;
+      console.log(
+        `🎯 Enhanced verification complete: ${confirmedActive.length} total active, ${rescuedFromFalsePositives} rescued from false positives`,
+      );
+
       // Update activity results with verification data
       confirmedActive.forEach(({ pubkey, events }) => {
         activityResults.set(pubkey, events);
       });
-      
+
       // Step 5: Process results with enhanced confidence scoring
-      const zombies = { active: [], burned: [], fresh: [], rotting: [], ancient: [] };
+      const zombies = {
+        active: [],
+        burned: [],
+        fresh: [],
+        rotting: [],
+        ancient: [],
+      };
       const scanStats = {
         totalUsers: followList.length,
         usersWithRelayLists: 0,
         enhancedScansSuccessful: 0,
-        totalEventsFound: 0
+        totalEventsFound: 0,
       };
 
       for (const [pubkey, events] of activityResults.entries()) {
         const hasRelayList = nostrService.followsRelayLists.has(pubkey);
         if (hasRelayList) scanStats.usersWithRelayLists++;
-        
+
         if (events.length > 0) {
           scanStats.enhancedScansSuccessful++;
           scanStats.totalEventsFound += events.length;
         }
-        
+
         // Get user profile if available
         const profile = nostrService.follows.get(pubkey);
-        
+
         // Enhanced confidence calculation with scan metrics
-        const wasVerified = confirmedActive.some(item => item.pubkey === pubkey);
+        const wasVerified = confirmedActive.some(
+          (item) => item.pubkey === pubkey,
+        );
         const scanMetrics = {
           scannedUserSpecificRelays: hasRelayList,
           foundViaEnhancedScan: wasVerified,
-          relayResponseRate: hasRelayList ? 0.8 : 0.6 // Estimated based on relay list availability
+          relayResponseRate: hasRelayList ? 0.8 : 0.6, // Estimated based on relay list availability
         };
-        
-        const confidence = this.calculateConfidenceScore(events, profile, pubkey, scanMetrics);
-        
+
+        const confidence = this.calculateConfidenceScore(
+          events,
+          profile,
+          pubkey,
+          scanMetrics,
+        );
+
         // Create zombie info with enhanced metrics
         const zombieInfo = {
           pubkey,
           profile,
           lastActivity: events.length > 0 ? events[0].created_at : null,
-          daysSinceActivity: events.length > 0 ? Math.floor((Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60)) : null,
+          daysSinceActivity:
+            events.length > 0
+              ? Math.floor(
+                  (Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60),
+                )
+              : null,
           confidence,
           scanMetrics,
           eventCount: events.length,
-          eventTypes: events.length > 0 ? [...new Set(events.map(e => e.kind))] : []
+          eventTypes:
+            events.length > 0 ? [...new Set(events.map((e) => e.kind))] : [],
         };
 
         // Enhanced classification with improved thresholds
         if (events.length === 0) {
           // No activity found - classify as ancient zombie
           zombieInfo.daysSinceActivity = 999; // Unknown/no activity
-          zombieInfo.type = 'ancient';
+          zombieInfo.type = "ancient";
           zombies.ancient.push(zombieInfo);
-          console.log(`User ${pubkey.substring(0, 8)}... is ANCIENT zombie: no activity found (confidence: ${confidence})`);
+          console.log(
+            `User ${pubkey.substring(0, 8)}... is ANCIENT zombie: no activity found (confidence: ${confidence})`,
+          );
         } else {
           // Activity found - classify by recency with enhanced logic
-          const daysSinceLastActivity = Math.floor((Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60));
-          
+          const daysSinceLastActivity = Math.floor(
+            (Date.now() / 1000 - events[0].created_at) / (24 * 60 * 60),
+          );
+
           // Use more conservative thresholds to reduce false positives
           const conservativeThreshold = 90; // Very conservative - 90 days for "active"
-          
+
           if (daysSinceLastActivity < conservativeThreshold) {
-            zombieInfo.type = 'active';
+            zombieInfo.type = "active";
             zombies.active.push(zombieInfo);
-            console.log(`User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+            console.log(
+              `User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`,
+            );
           } else if (daysSinceLastActivity >= this.zombieThresholds.ancient) {
-            zombieInfo.type = 'ancient';
+            zombieInfo.type = "ancient";
             zombies.ancient.push(zombieInfo);
-            console.log(`User ${pubkey.substring(0, 8)}... is ANCIENT zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+            console.log(
+              `User ${pubkey.substring(0, 8)}... is ANCIENT zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`,
+            );
           } else if (daysSinceLastActivity >= this.zombieThresholds.rotting) {
-            zombieInfo.type = 'rotting';
+            zombieInfo.type = "rotting";
             zombies.rotting.push(zombieInfo);
-            console.log(`User ${pubkey.substring(0, 8)}... is ROTTING zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+            console.log(
+              `User ${pubkey.substring(0, 8)}... is ROTTING zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`,
+            );
           } else if (daysSinceLastActivity >= this.zombieThresholds.fresh) {
-            zombieInfo.type = 'fresh';
+            zombieInfo.type = "fresh";
             zombies.fresh.push(zombieInfo);
-            console.log(`User ${pubkey.substring(0, 8)}... is FRESH zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+            console.log(
+              `User ${pubkey.substring(0, 8)}... is FRESH zombie: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`,
+            );
           } else {
-            zombieInfo.type = 'active';
+            zombieInfo.type = "active";
             zombies.active.push(zombieInfo);
-            console.log(`User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`);
+            console.log(
+              `User ${pubkey.substring(0, 8)}... is ACTIVE: last activity ${daysSinceLastActivity} days ago (confidence: ${confidence})`,
+            );
           }
         }
       }
 
-      const totalZombies = zombies.burned.length + zombies.fresh.length + zombies.rotting.length + zombies.ancient.length;
-      console.log(`🎯 Enhanced scan complete: active=${zombies.active.length}, burned=${zombies.burned.length}, fresh=${zombies.fresh.length}, rotting=${zombies.rotting.length}, ancient=${zombies.ancient.length}`);
-      console.log(`📊 Scan stats: ${scanStats.usersWithRelayLists}/${scanStats.totalUsers} had relay lists, ${scanStats.enhancedScansSuccessful} successful enhanced scans, ${scanStats.totalEventsFound} total events found`);
+      const totalZombies =
+        zombies.burned.length +
+        zombies.fresh.length +
+        zombies.rotting.length +
+        zombies.ancient.length;
+      console.log(
+        `🎯 Enhanced scan complete: active=${zombies.active.length}, burned=${zombies.burned.length}, fresh=${zombies.fresh.length}, rotting=${zombies.rotting.length}, ancient=${zombies.ancient.length}`,
+      );
+      console.log(
+        `📊 Scan stats: ${scanStats.usersWithRelayLists}/${scanStats.totalUsers} had relay lists, ${scanStats.enhancedScansSuccessful} successful enhanced scans, ${scanStats.totalEventsFound} total events found`,
+      );
+
+      // Fetch profile metadata to enrich zombie objects with display names/avatars
+      let profileData = new Map();
+      if (fetchProfiles) {
+        if (progressCallback) {
+          progressCallback({
+            stage: "Fetching profile metadata...",
+            processed: followList.length,
+            total: followList.length,
+          });
+        }
+        console.log("Fetching profile metadata for enhanced scan results...");
+        profileData = await nostrService.getProfileMetadata(
+          followList,
+          progressCallback,
+        );
+      }
+
+      // Enrich zombie objects with profile data
+      const enrichedZombies = {
+        active: zombies.active.map((z) => ({
+          ...z,
+          profile: profileData.get(z.pubkey) || z.profile || null,
+        })),
+        burned: zombies.burned.map((z) => ({
+          ...z,
+          profile: profileData.get(z.pubkey) || z.profile || null,
+        })),
+        fresh: zombies.fresh.map((z) => ({
+          ...z,
+          profile: profileData.get(z.pubkey) || z.profile || null,
+        })),
+        rotting: zombies.rotting.map((z) => ({
+          ...z,
+          profile: profileData.get(z.pubkey) || z.profile || null,
+        })),
+        ancient: zombies.ancient.map((z) => ({
+          ...z,
+          profile: profileData.get(z.pubkey) || z.profile || null,
+        })),
+      };
+
+      // Store the scan results
+      await this.storeScanResults(enrichedZombies, profileData);
 
       return {
         success: true,
-        zombieData: zombies,
+        zombieData: enrichedZombies,
+        profileData,
         totalFollows: allFollows.length,
         scannedFollows: followList.length,
         immuneCount: immuneCount,
         zombieCount: totalZombies,
         scanStats,
-        enhancedScan: true
+        enhancedScan: true,
       };
-
     } catch (error) {
-      console.error('Enhanced zombie scan failed:', error);
+      console.error("Enhanced zombie scan failed:", error);
       return {
         success: false,
         message: error.message,
-        enhancedScan: true
+        enhancedScan: true,
       };
     }
   }
@@ -609,153 +815,192 @@ class ZombieService {
   /**
    * Scan follow list and detect zombies with profile enrichment
    */
-  async scanForZombies(fetchProfiles = true, progressCallback = null, createBackup = true) {
+  async scanForZombies(
+    fetchProfiles = true,
+    progressCallback = null,
+    createBackup = true,
+  ) {
     try {
       // Initialize tracking for progress reporting
       this.lastReportedZombieCount = 0;
-      
+
       // Initialize immunity service
       await immunityService.init();
-      
+
       // Create backup before scanning (if enabled)
       if (createBackup) {
         if (progressCallback) {
           progressCallback({
-            stage: 'Creating pre-scan backup...',
+            stage: "Creating pre-scan backup...",
             processed: 0,
-            total: 0
+            total: 0,
           });
         }
-        
+
         try {
-          const backupService = (await import('./backupService')).default;
-          const backupResult = await backupService.createBackup(`Pre-scan backup - ${new Date().toISOString()}`);
-          
+          const backupService = (await import("./backupService")).default;
+          const backupResult = await backupService.createBackup(
+            `Pre-scan backup - ${new Date().toISOString()}`,
+          );
+
           if (!backupResult.success) {
-            console.warn('Failed to create pre-scan backup:', backupResult.message);
+            console.warn(
+              "Failed to create pre-scan backup:",
+              backupResult.message,
+            );
           } else {
-            console.log('✅ Pre-scan backup created successfully');
+            console.log("✅ Pre-scan backup created successfully");
           }
         } catch (error) {
-          console.warn('Failed to create pre-scan backup:', error);
+          console.warn("Failed to create pre-scan backup:", error);
         }
       }
-      
+
       // Get the user's follow list
       const allFollows = await nostrService.getFollowList();
-      
+
       if (!allFollows || allFollows.length === 0) {
         return {
           success: false,
-          message: 'No follows found'
+          message: "No follows found",
         };
       }
-      
+
       // Filter out immune users before scanning
       const immunePubkeys = immunityService.getImmunePubkeys();
-      const followList = allFollows.filter(pubkey => !immunityService.hasImmunity(pubkey));
-      
+      const followList = allFollows.filter(
+        (pubkey) => !immunityService.hasImmunity(pubkey),
+      );
+
       const immuneCount = allFollows.length - followList.length;
       if (immuneCount > 0) {
-        console.log(`🛡️ Excluded ${immuneCount} immune users from scan (${immunePubkeys.length} total immune)`);
+        console.log(
+          `🛡️ Excluded ${immuneCount} immune users from scan (${immunePubkeys.length} total immune)`,
+        );
       }
-      
+
       if (followList.length === 0) {
         return {
           success: false,
-          message: `All ${allFollows.length} follows are immune from scanning`
+          message: `All ${allFollows.length} follows are immune from scanning`,
         };
       }
-      
-      console.log(`Starting zombie scan for ${followList.length} follows (${immuneCount} immune users excluded)`);
-      console.log(`🎯 IMPORTANT: Users with activity in the past ${this.zombieThresholds.fresh} days will be marked as ACTIVE, not zombies.`);
-      console.log(`Zombie thresholds: Fresh >= ${this.zombieThresholds.fresh}d, Rotting >= ${this.zombieThresholds.rotting}d, Ancient >= ${this.zombieThresholds.ancient}d`);
-      
+
+      console.log(
+        `Starting zombie scan for ${followList.length} follows (${immuneCount} immune users excluded)`,
+      );
+      console.log(
+        `🎯 IMPORTANT: Users with activity in the past ${this.zombieThresholds.fresh} days will be marked as ACTIVE, not zombies.`,
+      );
+      console.log(
+        `Zombie thresholds: Fresh >= ${this.zombieThresholds.fresh}d, Rotting >= ${this.zombieThresholds.rotting}d, Ancient >= ${this.zombieThresholds.ancient}d`,
+      );
+
       // Report initial progress
       if (progressCallback) {
         progressCallback({
           total: followList.length,
           processed: 0,
           stage: `Loading follow list (${followList.length} follows)`,
-          zombiesFound: 0
+          zombiesFound: 0,
         });
       }
 
       // Fetch relay lists for follows to optimize activity scanning
-      console.log('📡 Fetching relay lists for follows to optimize activity scanning...');
+      console.log(
+        "📡 Fetching relay lists for follows to optimize activity scanning...",
+      );
       if (progressCallback) {
         progressCallback({
-          stage: 'Fetching relay lists for better accuracy...',
+          stage: "Fetching relay lists for better accuracy...",
           processed: 0,
-          total: followList.length
+          total: followList.length,
         });
       }
-      
+
       const relayListProgress = (progress) => {
         if (progressCallback) {
           progressCallback({
             stage: `Fetching relay lists... (${progress.processed}/${progress.total})`,
             processed: progress.processed,
-            total: progress.total
+            total: progress.total,
           });
         }
       };
-      
+
       await nostrService.fetchFollowsRelayLists(followList, relayListProgress);
-      console.log('✅ Relay list fetching complete');
-      
+      console.log("✅ Relay list fetching complete");
+
       // Get activity data for each follow
       if (progressCallback) {
         progressCallback({
-          stage: 'Fetching activity data from relays...',
-          processed: 0
+          stage: "Fetching activity data from relays...",
+          processed: 0,
         });
       }
-      
+
       // Use standard activity scanning (relay optimization is still beneficial for retry phase)
-      const activityData = await nostrService.getProfilesActivity(followList, 10, progressCallback);
-      
+      const activityData = await nostrService.getProfilesActivity(
+        followList,
+        10,
+        progressCallback,
+      );
+
       // SMART RETRY: Use relay-aware targeting for high-accuracy verification
-      const usersWithNoActivity = followList.filter(pubkey => {
+      const usersWithNoActivity = followList.filter((pubkey) => {
         const events = activityData.get(pubkey) || [];
         return events.length === 0;
       });
-      
+
       if (usersWithNoActivity.length > 0) {
-        console.log(`🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`);
-        
+        console.log(
+          `🎯 SMART RETRY: ${usersWithNoActivity.length} users need relay-aware verification to prevent false positives`,
+        );
+
         if (progressCallback) {
           progressCallback({
             stage: `High-accuracy verification for ${usersWithNoActivity.length} users...`,
-            processed: followList.length
+            processed: followList.length,
           });
         }
-        
-        const retryResults = await nostrService.smartRelayRetry(usersWithNoActivity, progressCallback);
-        
+
+        const retryResults = await nostrService.smartRelayRetry(
+          usersWithNoActivity,
+          progressCallback,
+        );
+
         // Merge retry results back into main activity data
         let recoveredUsers = 0;
         for (const [pubkey, events] of retryResults.entries()) {
           if (events.length > 0) {
             activityData.set(pubkey, events);
-            console.log(`✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`);
+            console.log(
+              `✅ RELAY RETRY SUCCESS: Found ${events.length} events for ${pubkey.substring(0, 8)}... using their preferred relays`,
+            );
             recoveredUsers++;
           }
         }
-        
-        console.log(`🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`);
-        
+
+        console.log(
+          `🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`,
+        );
+
         // Fall back to aggressive retry for remaining users without relay lists
-        const stillNoActivity = usersWithNoActivity.filter(pubkey => {
+        const stillNoActivity = usersWithNoActivity.filter((pubkey) => {
           const events = activityData.get(pubkey) || [];
           return events.length === 0;
         });
-        
+
         if (stillNoActivity.length > 0) {
-          console.log(`🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`);
-          
-          const aggressiveResults = await nostrService.aggressiveActivityRetry(stillNoActivity, progressCallback);
-          
+          console.log(
+            `🔍 FALLBACK RETRY: ${stillNoActivity.length} users without relay lists need aggressive retry`,
+          );
+
+          const aggressiveResults = await nostrService.aggressiveActivityRetry(
+            stillNoActivity,
+            progressCallback,
+          );
+
           let fallbackRecovered = 0;
           for (const [pubkey, events] of aggressiveResults.entries()) {
             if (events.length > 0) {
@@ -763,80 +1008,106 @@ class ZombieService {
               fallbackRecovered++;
             }
           }
-          
-          console.log(`🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`);
+
+          console.log(
+            `🔥 FALLBACK COMPLETE: Recovered ${fallbackRecovered}/${stillNoActivity.length} additional users`,
+          );
         }
       }
-      
+
       // Get profile data first for deleted account detection
       let profileData = new Map();
       if (fetchProfiles) {
         if (progressCallback) {
           progressCallback({
-            stage: `Fetching profiles for deleted account detection...`
+            stage: `Fetching profiles for deleted account detection...`,
           });
         }
-        console.log('Fetching profile metadata for deleted account detection...');
-        profileData = await nostrService.getProfileMetadata(followList, progressCallback);
+        console.log(
+          "Fetching profile metadata for deleted account detection...",
+        );
+        profileData = await nostrService.getProfileMetadata(
+          followList,
+          progressCallback,
+        );
       }
-      
+
       // Classify zombies
       if (progressCallback) {
         progressCallback({
-          stage: 'Classifying zombie status and deleted accounts...',
-          processed: followList.length
+          stage: "Classifying zombie status and deleted accounts...",
+          processed: followList.length,
         });
       }
-      
-      const rawZombieData = this.classifyZombies(activityData, profileData, progressCallback);
-      
+
+      const rawZombieData = this.classifyZombies(
+        activityData,
+        profileData,
+        progressCallback,
+      );
+
       // Filter out immune zombies
       const zombieData = immunityService.filterImmuneZombies(rawZombieData);
-      
+
       if (progressCallback) {
-        const zombiesFound = zombieData.fresh.length + zombieData.rotting.length + zombieData.ancient.length;
+        const zombiesFound =
+          zombieData.fresh.length +
+          zombieData.rotting.length +
+          zombieData.ancient.length;
         progressCallback({
-          stage: 'Filtering immune zombies...',
-          zombiesFound
+          stage: "Filtering immune zombies...",
+          zombiesFound,
         });
       }
-      
+
       // Profile data was already fetched above for deleted account detection
       // Just update progress callback
       if (fetchProfiles && progressCallback) {
-        const allZombieCount = (zombieData.burned?.length || 0) + zombieData.fresh.length + zombieData.rotting.length + zombieData.ancient.length;
+        const allZombieCount =
+          (zombieData.burned?.length || 0) +
+          zombieData.fresh.length +
+          zombieData.rotting.length +
+          zombieData.ancient.length;
         progressCallback({
-          stage: `Processing profiles for ${allZombieCount} zombies...`
+          stage: `Processing profiles for ${allZombieCount} zombies...`,
         });
       }
-      
+
       // Combine zombie data with profiles
       const enrichedZombieData = {
         active: zombieData.active,
-        burned: (zombieData.burned || []).map(z => ({
+        burned: (zombieData.burned || []).map((z) => ({
           ...z,
-          profile: profileData.get(z.pubkey) || null
+          profile: profileData.get(z.pubkey) || null,
         })),
-        fresh: zombieData.fresh.map(z => ({
+        fresh: zombieData.fresh.map((z) => ({
           ...z,
-          profile: profileData.get(z.pubkey) || null
+          profile: profileData.get(z.pubkey) || null,
         })),
-        rotting: zombieData.rotting.map(z => ({
+        rotting: zombieData.rotting.map((z) => ({
           ...z,
-          profile: profileData.get(z.pubkey) || null
+          profile: profileData.get(z.pubkey) || null,
         })),
-        ancient: zombieData.ancient.map(z => ({
+        ancient: zombieData.ancient.map((z) => ({
           ...z,
-          profile: profileData.get(z.pubkey) || null
-        }))
+          profile: profileData.get(z.pubkey) || null,
+        })),
       };
-      
+
       // Store the scan results
       await this.storeScanResults(enrichedZombieData, profileData);
-      
-      const filteredZombieCount = (enrichedZombieData.burned?.length || 0) + enrichedZombieData.fresh.length + enrichedZombieData.rotting.length + enrichedZombieData.ancient.length;
-      const totalZombieCount = (rawZombieData.burned?.length || 0) + rawZombieData.fresh.length + rawZombieData.rotting.length + rawZombieData.ancient.length;
-      
+
+      const filteredZombieCount =
+        (enrichedZombieData.burned?.length || 0) +
+        enrichedZombieData.fresh.length +
+        enrichedZombieData.rotting.length +
+        enrichedZombieData.ancient.length;
+      const totalZombieCount =
+        (rawZombieData.burned?.length || 0) +
+        rawZombieData.fresh.length +
+        rawZombieData.rotting.length +
+        rawZombieData.ancient.length;
+
       return {
         success: true,
         zombieData: enrichedZombieData,
@@ -846,13 +1117,13 @@ class ZombieService {
         immuneCount: immuneCount,
         activeCount: zombieData.active.length,
         zombieCount: filteredZombieCount,
-        immuneZombieCount: totalZombieCount - filteredZombieCount
+        immuneZombieCount: totalZombieCount - filteredZombieCount,
       };
     } catch (error) {
-      console.error('Failed to scan for zombies:', error);
+      console.error("Failed to scan for zombies:", error);
       return {
         success: false,
-        message: error.message
+        message: error.message,
       };
     }
   }
@@ -864,47 +1135,50 @@ class ZombieService {
     const scanResults = {
       timestamp: Date.now(),
       data: zombieData,
-      hasProfiles: !!profileData
+      hasProfiles: !!profileData,
     };
-    
-    await localforage.setItem('latestScan', scanResults);
-    
+
+    await localforage.setItem("latestScan", scanResults);
+
     // Store profile data separately to avoid bloat
     if (profileData) {
-      await localforage.setItem('latestProfiles', Object.fromEntries(profileData));
+      await localforage.setItem(
+        "latestProfiles",
+        Object.fromEntries(profileData),
+      );
     }
-    
+
     // Also keep a history of scans
-    let scanHistory = await localforage.getItem('scanHistory') || [];
+    let scanHistory = (await localforage.getItem("scanHistory")) || [];
     scanHistory.push({
       timestamp: scanResults.timestamp,
       activeCount: zombieData.active.length,
       burnedCount: zombieData.burned?.length || 0,
       freshCount: zombieData.fresh.length,
       rottingCount: zombieData.rotting.length,
-      ancientCount: zombieData.ancient.length
+      ancientCount: zombieData.ancient.length,
     });
-    
+
     // Keep only the last 10 scans
     if (scanHistory.length > 10) {
       scanHistory = scanHistory.slice(-10);
     }
-    
-    await localforage.setItem('scanHistory', scanHistory);
+
+    await localforage.setItem("scanHistory", scanHistory);
   }
 
   /**
    * Get the latest scan results
    */
   async getLatestScanResults() {
-    return await localforage.getItem('latestScan');
+    return await localforage.getItem("latestScan");
   }
 
   /**
    * Get scan history
    */
   async getScanHistory() {
-    return await localforage.getItem('scanHistory') || [];
+    return (await localforage.getItem("scanHistory")) || [];
   }
 
   /**
@@ -913,22 +1187,22 @@ class ZombieService {
    */
   createZombieBatches(zombies) {
     const allZombies = [
-      ...zombies.burned || [],  // Deleted accounts first (highest priority)
+      ...(zombies.burned || []), // Deleted accounts first (highest priority)
       ...zombies.ancient,
       ...zombies.rotting,
-      ...zombies.fresh
+      ...zombies.fresh,
     ];
-    
+
     // Extract just the pubkeys for batching
-    const pubkeys = allZombies.map(zombie => 
-      typeof zombie === 'string' ? zombie : zombie.pubkey
+    const pubkeys = allZombies.map((zombie) =>
+      typeof zombie === "string" ? zombie : zombie.pubkey,
     );
-    
+
     const batches = [];
     for (let i = 0; i < pubkeys.length; i += this.batchSize) {
       batches.push(pubkeys.slice(i, i + this.batchSize));
     }
-    
+
     return batches;
   }
 
@@ -938,16 +1212,16 @@ class ZombieService {
   async unfollowZombieBatch(batch) {
     try {
       const result = await nostrService.createUnfollowEvent(batch);
-      
+
       // Record the purge
       await this.recordZombiePurge(batch);
-      
+
       return result;
     } catch (error) {
-      console.error('Failed to unfollow zombie batch:', error);
+      console.error("Failed to unfollow zombie batch:", error);
       return {
         success: false,
-        message: error.message
+        message: error.message,
       };
     }
   }
@@ -957,34 +1231,36 @@ class ZombieService {
    */
   async recordZombiePurge(batch) {
     // Ensure we're only storing serializable pubkey strings
-    const cleanPubkeys = batch.map(item => {
-      if (typeof item === 'string') {
-        return item;
-      } else if (item && item.pubkey) {
-        return item.pubkey;
-      } else {
-        console.warn('Invalid zombie batch item:', item);
-        return null;
-      }
-    }).filter(pubkey => pubkey !== null);
+    const cleanPubkeys = batch
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        } else if (item && item.pubkey) {
+          return item.pubkey;
+        } else {
+          console.warn("Invalid zombie batch item:", item);
+          return null;
+        }
+      })
+      .filter((pubkey) => pubkey !== null);
 
     const purgeRecord = {
       timestamp: Date.now(),
       count: cleanPubkeys.length,
-      pubkeys: cleanPubkeys
+      pubkeys: cleanPubkeys,
     };
-    
-    console.log('Recording zombie purge:', purgeRecord);
-    
+
+    console.log("Recording zombie purge:", purgeRecord);
+
     try {
       // Get existing purge history
-      let purgeHistory = await localforage.getItem('purgeHistory') || [];
+      let purgeHistory = (await localforage.getItem("purgeHistory")) || [];
       purgeHistory.push(purgeRecord);
-      
-      await localforage.setItem('purgeHistory', purgeHistory);
-      console.log('Zombie purge recorded successfully');
+
+      await localforage.setItem("purgeHistory", purgeHistory);
+      console.log("Zombie purge recorded successfully");
     } catch (error) {
-      console.error('Failed to record zombie purge:', error);
+      console.error("Failed to record zombie purge:", error);
       throw error;
     }
   }
@@ -993,7 +1269,7 @@ class ZombieService {
    * Get purge history
    */
   async getPurgeHistory() {
-    return await localforage.getItem('purgeHistory') || [];
+    return (await localforage.getItem("purgeHistory")) || [];
   }
 
   /**
@@ -1002,40 +1278,51 @@ class ZombieService {
   async getZombieStatistics() {
     const scanHistory = await this.getScanHistory();
     const purgeHistory = await this.getPurgeHistory();
-    
+
     // Calculate total zombies purged
-    const totalPurged = purgeHistory.reduce((total, record) => total + record.count, 0);
-    
+    const totalPurged = purgeHistory.reduce(
+      (total, record) => total + record.count,
+      0,
+    );
+
     // Get latest scan if available
     const latestScan = await this.getLatestScanResults();
-    
+
     // Calculate percentages if we have a latest scan
     let percentages = null;
     if (latestScan) {
       const { active, burned, fresh, rotting, ancient } = latestScan.data;
       const burnedLength = burned?.length || 0;
-      const total = active.length + burnedLength + fresh.length + rotting.length + ancient.length;
-      
+      const total =
+        active.length +
+        burnedLength +
+        fresh.length +
+        rotting.length +
+        ancient.length;
+
       percentages = {
         active: (active.length / total) * 100,
         burned: (burnedLength / total) * 100,
         fresh: (fresh.length / total) * 100,
         rotting: (rotting.length / total) * 100,
-        ancient: (ancient.length / total) * 100
+        ancient: (ancient.length / total) * 100,
       };
     }
-    
+
     // Estimate bandwidth savings (very rough estimate)
     // Assume each zombie entry in a contact list is ~100 bytes
     const estimatedBandwidthSaved = totalPurged * 100; // in bytes
-    
+
     return {
       totalScans: scanHistory.length,
-      lastScanDate: scanHistory.length > 0 ? scanHistory[scanHistory.length - 1].timestamp : null,
+      lastScanDate:
+        scanHistory.length > 0
+          ? scanHistory[scanHistory.length - 1].timestamp
+          : null,
       totalPurged,
       purgeEvents: purgeHistory.length,
       percentages,
-      estimatedBandwidthSaved
+      estimatedBandwidthSaved,
     };
   }
 }
