@@ -1,10 +1,14 @@
 /**
  * Relay Backup Service
  *
- * Manages encrypted backups on Nostr relays using NIP-78 + NIP-04.
+ * Manages encrypted backups on Nostr relays using NIP-78.
  * Stores complete snapshots of all settings for recovery.
  * Automatically maintains the 3 most recent backups.
+ * Supports NIP-44 encryption (preferred) with NIP-04 fallback.
+ * Large follow lists are chunked across multiple events (500 pubkeys each).
  */
+
+const FOLLOW_CHUNK_SIZE = 500;
 
 import relayStorage from '../relayStorage';
 import syncManager from '../syncManager';
@@ -57,31 +61,55 @@ class RelayBackupService {
         console.warn('[RelayBackupService] Failed to backup follow list:', error);
       }
 
-      // Create backup structure
+      // Chunk the follow list for large lists
+      const follows = followListBackup?.follows || [];
+      const totalChunks = Math.max(1, Math.ceil(follows.length / FOLLOW_CHUNK_SIZE));
       const timestamp = Math.floor(Date.now() / 1000);
+
+      // Build chunk 0: settings + first chunk of follows + metadata
+      const chunk0Follows = follows.slice(0, FOLLOW_CHUNK_SIZE);
       const backup = {
-        version: 1,
+        version: 2,
         timestamp,
+        totalChunks,
         backupData: {
           settings: settingsData,
-          followList: followListBackup
+          followList: followListBackup ? {
+            ...followListBackup,
+            follows: chunk0Follows,
+            followCount: follows.length
+          } : null
         },
         metadata: {
           deviceInfo: this.getDeviceInfo(),
           appVersion: this.getAppVersion(),
           backupReason: reason,
-          followCount: followListBackup?.followCount || 0,
+          followCount: follows.length,
           ...metadata
         }
       };
 
-      // Use timestamp-based d-tag for sorting
-      const dTag = `${this.dTagPrefix}-${timestamp}`;
-
-      // Publish encrypted backup to relay
+      // Use timestamp-based d-tag with chunk index
+      const dTag = `${this.dTagPrefix}-${timestamp}:0`;
       const eventId = await relayStorage.publish(dTag, backup, true);
+      console.log(`[RelayBackupService] Published chunk 0/${totalChunks}: ${dTag}`);
 
-      console.log(`[RelayBackupService] Created backup: ${dTag}, event: ${eventId}`);
+      // Publish remaining follow chunks
+      for (let i = 1; i < totalChunks; i++) {
+        const chunkFollows = follows.slice(i * FOLLOW_CHUNK_SIZE, (i + 1) * FOLLOW_CHUNK_SIZE);
+        const chunkData = {
+          version: 2,
+          timestamp,
+          chunkIndex: i,
+          totalChunks,
+          follows: chunkFollows
+        };
+        const chunkDTag = `${this.dTagPrefix}-${timestamp}:${i}`;
+        await relayStorage.publish(chunkDTag, chunkData, true);
+        console.log(`[RelayBackupService] Published chunk ${i}/${totalChunks}: ${chunkDTag}`);
+      }
+
+      console.log(`[RelayBackupService] Created backup: ${dTag}, event: ${eventId}, chunks: ${totalChunks}`);
 
       // Clean up old backups (keep only 3 most recent)
       await this.cleanupOldBackups();
@@ -111,9 +139,15 @@ class RelayBackupService {
       // Get all data types from relay
       const allDataTypes = await relayStorage.listDataTypes();
 
-      // Filter for backup d-tags
+      // Filter for backup d-tags: include legacy (backup-TIMESTAMP) and chunk 0 (backup-TIMESTAMP:0)
+      // Exclude non-zero chunks (backup-TIMESTAMP:1, :2, etc.)
       const backupTags = allDataTypes
-        .filter(tag => tag.startsWith(this.dTagPrefix))
+        .filter(tag => {
+          if (!tag.startsWith(this.dTagPrefix)) return false;
+          const rest = tag.replace(`${this.dTagPrefix}-`, '');
+          // Include if no colon (legacy) or ends with :0 (chunk 0)
+          return !rest.includes(':') || rest.endsWith(':0');
+        })
         .sort()
         .reverse(); // Most recent first
 
@@ -157,11 +191,36 @@ class RelayBackupService {
     try {
       console.log(`[RelayBackupService] Restoring backup: ${dTag}`);
 
-      // Fetch the encrypted backup
+      // Fetch the encrypted backup (chunk 0 or legacy single event)
       const backup = await relayStorage.fetch(dTag, true);
 
       if (!backup || !backup.backupData) {
         throw new Error('Backup not found or invalid');
+      }
+
+      // If chunked (version 2+), reassemble follow list from all chunks
+      if (backup.version >= 2 && backup.totalChunks > 1 && backup.backupData.followList) {
+        let allFollows = backup.backupData.followList.follows || [];
+        const baseTag = dTag.replace(/:0$/, '');
+
+        console.log(`[RelayBackupService] Fetching ${backup.totalChunks - 1} additional follow chunks...`);
+        const chunkPromises = [];
+        for (let i = 1; i < backup.totalChunks; i++) {
+          chunkPromises.push(relayStorage.fetch(`${baseTag}:${i}`, true));
+        }
+
+        const chunks = await Promise.all(chunkPromises);
+        for (const chunk of chunks) {
+          if (chunk?.follows) {
+            allFollows = allFollows.concat(chunk.follows);
+          }
+        }
+
+        // Deduplicate
+        allFollows = [...new Set(allFollows)];
+        backup.backupData.followList.follows = allFollows;
+        backup.backupData.followList.followCount = allFollows.length;
+        console.log(`[RelayBackupService] Reassembled ${allFollows.length} follows from ${backup.totalChunks} chunks`);
       }
 
       console.log('[RelayBackupService] Backup data fetched, restoring...');
@@ -286,7 +345,6 @@ class RelayBackupService {
       // Save restored follow list as a local backup for the Backups tab
       if (followListData && results.followListRestored) {
         try {
-          console.log('[RelayBackupService] Saving restored backup to local backups...');
           await backupService.storeBackup({
             ...followListData,
             id: followListData.id || `restored-${Date.now()}`,
@@ -295,7 +353,6 @@ class RelayBackupService {
             isRestored: true,
             restoredAt: Date.now()
           });
-          console.log('[RelayBackupService] Saved to local backups');
         } catch (error) {
           console.warn('[RelayBackupService] Failed to save to local backups:', error);
         }
@@ -324,8 +381,33 @@ class RelayBackupService {
    */
   async deleteBackup(dTag) {
     try {
+      // Fetch to check if this is a chunked backup
+      let totalChunks = 1;
+      try {
+        const data = await relayStorage.fetch(dTag, true);
+        if (data?.version >= 2 && data?.totalChunks > 1) {
+          totalChunks = data.totalChunks;
+        }
+      } catch (e) {
+        // If fetch fails, just delete the main tag
+      }
+
+      // Delete the main event
       await relayStorage.delete(dTag);
-      console.log(`[RelayBackupService] Deleted backup: ${dTag}`);
+
+      // Delete chunk events if chunked
+      if (totalChunks > 1) {
+        const baseTag = dTag.replace(/:0$/, '');
+        for (let i = 1; i < totalChunks; i++) {
+          try {
+            await relayStorage.delete(`${baseTag}:${i}`);
+          } catch (e) {
+            console.warn(`[RelayBackupService] Failed to delete chunk ${i}:`, e.message);
+          }
+        }
+      }
+
+      console.log(`[RelayBackupService] Deleted backup: ${dTag} (${totalChunks} chunk(s))`);
       return true;
     } catch (error) {
       console.error(`[RelayBackupService] Failed to delete backup ${dTag}:`, error);

@@ -455,9 +455,13 @@ https://plebsvszombies.cc`;
       this.posting = true;
       
       try {
-        // Ensure extension is ready
-        if (!nostrService.isExtensionReady()) {
-          await nostrService.connectExtension();
+        // Ensure signing is ready
+        if (!nostrService.isSigningReady()) {
+          if (nostrService.signingMethod === 'nip07') {
+            await nostrService.connectExtension();
+          } else if (!nostrService.isSigningReady()) {
+            throw new Error('No signing method available. Please reconnect.');
+          }
         }
 
         // Decode the developer npub to get pubkey for tagging
@@ -479,7 +483,7 @@ https://plebsvszombies.cc`;
         };
 
         // Sign and publish the event
-        const signedEvent = await window.nostr.signEvent(event);
+        const signedEvent = await nostrService.signEventWithCurrentMethod(event);
         
         // Publish via our service using user's preferred relays
         await nostrService.initialize();

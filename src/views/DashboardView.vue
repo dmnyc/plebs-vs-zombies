@@ -2,6 +2,26 @@
   <div>
     <h2 class="page-title">Dashboard</h2>
 
+    <!-- NIP-46 large follow list warning -->
+    <div v-if="nip46SizeWarning" class="mb-4 p-4 bg-yellow-900/80 border border-yellow-600 rounded-lg">
+      <div class="flex items-start gap-3">
+        <span class="text-yellow-400 text-lg mt-0.5">⚠️</span>
+        <div class="flex-1">
+          <p class="text-yellow-100 font-medium text-sm">Large follow list with remote signer</p>
+          <p class="text-yellow-200/80 text-xs mt-1">
+            Your follow list ({{ followStats.total }} follows) exceeds the 64KB NIP-46 transport limit.
+            <template v-if="hasNip07Extension">
+              Your browser extension will be used automatically to sign large events.
+            </template>
+            <template v-else>
+              Install a browser extension (Alby, nos2x, or Nostr Connect) to sign follow list updates,
+              or reduce your follows below ~900 first.
+            </template>
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Prominent Hunt Zombies CTA -->
     <div class="mb-8 bg-gradient-to-r from-zombie-dark via-gray-800 to-zombie-dark p-6 rounded-lg border-2 border-zombie-green/50 shadow-2xl">
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -296,9 +316,17 @@ export default {
     },
     zombieScore() {
       if (this.zombieStats.total === 0) return 0;
-      
+
       const zombieCount = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
       return Math.round((zombieCount / this.zombieStats.total) * 100);
+    },
+    hasNip07Extension() {
+      return typeof window.nostr !== 'undefined' && typeof window.nostr.signEvent === 'function';
+    },
+    nip46SizeWarning() {
+      return nostrService.getSigningMethod() === 'nip46'
+        && this.followStats.total > 900
+        && !this.loading;
     }
   },
   methods: {

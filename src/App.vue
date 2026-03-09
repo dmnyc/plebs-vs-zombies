@@ -127,6 +127,10 @@
                     <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
                     <CopyButton :pubkey="userProfile?.pubkey" />
                   </div>
+                  <div class="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+                    {{ signerLabel }}
+                  </div>
                 </div>
                 <div class="p-1">
                   <button
@@ -294,73 +298,47 @@
             <p class="text-gray-300">Connect with your browser extension to manage your dormant follows.</p>
           </div>
 
-          <!-- Connection Info -->
-          <div class="mb-8">
-            <div class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg bg-gray-800/50">
-              <div class="text-2xl">🔌</div>
+          <div class="space-y-4 mb-8">
+            <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
+
+            <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
+                   :class="loginSigningMethod === 'nip07' ? 'border-zombie-green bg-green-900/20' : ''">
+              <input
+                type="radio"
+                value="nip07"
+                v-model="loginSigningMethod"
+                class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
+              />
               <div class="flex-grow">
                 <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
                 <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
                 <div class="flex flex-wrap gap-2 mt-2">
-                  <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
-                  <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
+                  <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Easy setup</span>
+                  <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">Fast signing</span>
                 </div>
               </div>
-            </div>
+            </label>
+
+            <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
+                   :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
+              <input
+                type="radio"
+                value="nip46"
+                v-model="loginSigningMethod"
+                class="w-5 h-5 text-purple-500 mt-0.5"
+              />
+              <div class="flex-grow">
+                <span class="text-lg font-medium text-gray-100">Remote Signer (NIP-46)</span>
+                <p class="text-sm text-gray-400 mt-1">Connect via Amber, Primal, or other remote signers</p>
+                <div class="flex flex-wrap gap-2 mt-2">
+                  <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">Mobile friendly</span>
+                  <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">Enhanced security</span>
+                </div>
+              </div>
+            </label>
           </div>
 
-        <!-- TEMPORARILY DISABLED - Multiple Signing Method Selection -->
-        <!--
-        <div class="text-center mb-8">
-          <div class="text-6xl mb-6">🧟‍♂️</div>
-          <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
-          <p class="text-gray-300">Choose your signing method to connect and manage your dormant follows.</p>
-        </div>
-
-        <div class="space-y-4 mb-8">
-          <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
-
-          <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
-            <input
-              type="radio"
-              value="nip07"
-              v-model="loginSigningMethod"
-              class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
-            />
-            <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
-              <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">✅ Easy setup</span>
-                <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">⚡ Fast signing</span>
-              </div>
-            </div>
-          </label>
-        </div>
-        -->
-
-          <!-- TEMPORARILY DISABLED - NIP-46 Remote Signer -->
-          <!--
-          <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
-                 :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
-            <input
-              type="radio"
-              value="nip46"
-              v-model="loginSigningMethod"
-              class="w-5 h-5 text-purple-500 mt-0.5"
-            />
-            <div class="flex-grow">
-              <span class="text-lg font-medium text-gray-100">Remote Signer (NIP-46)</span>
-              <p class="text-sm text-gray-400 mt-1">Connect to nsec.app, nsecBunker, or other remote signers</p>
-              <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">📱 Mobile friendly</span>
-                <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">🔒 Enhanced security</span>
-              </div>
-            </div>
-          </label>
-          -->
-
-          <div class="text-center">
+          <div class="text-center mb-6">
             <button
               @click="connectNostr"
               :disabled="isConnecting"
@@ -368,12 +346,48 @@
               :class="{'opacity-50 cursor-not-allowed': isConnecting}"
             >
               <span v-if="isConnecting">🔄 Signing in...</span>
+              <span v-else-if="loginSigningMethod === 'nip46'">Connect with Remote Signer</span>
               <span v-else>Connect with Browser Extension</span>
             </button>
           </div>
 
+          <!-- nsec login -->
+          <div class="pt-6">
+            <button
+              @click="showNsecLogin = !showNsecLogin"
+              class="text-sm text-gray-400 hover:text-gray-200 transition-colors w-full text-center mb-3"
+            >
+              Or sign in with your private key
+            </button>
+            <div v-if="showNsecLogin">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-yellow-400">⚠️</span>
+                <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere.</p>
+              </div>
+              <div class="flex gap-2">
+                <input
+                  v-model="nsecInput"
+                  type="password"
+                  placeholder="nsec1..."
+                  class="input flex-1 font-mono text-sm"
+                  :disabled="isConnecting"
+                  @keyup.enter="connectWithNsec"
+                />
+                <button
+                  @click="connectWithNsec"
+                  :disabled="isConnecting || !nsecInput.trim()"
+                  class="btn-secondary px-5 whitespace-nowrap"
+                  :class="{'opacity-50 cursor-not-allowed': isConnecting || !nsecInput.trim()}"
+                >
+                  <span v-if="isConnecting">Signing in...</span>
+                  <span v-else>Sign in</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Scout Mode Section -->
-          <div class="mt-8 pt-6 border-t border-gray-700">
+          <div class="mt-10 pt-6 border-t border-gray-700/50">
             <div class="text-center mb-6">
               <div class="text-4xl mb-3">👁️🔍</div>
               <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
@@ -425,7 +439,7 @@
           </div>
 
           <!-- The Resurrector Section -->
-          <div class="mt-8 pt-6 border-t border-gray-700">
+          <div class="mt-10 pt-6 border-t border-gray-700/50">
             <div class="text-center mb-6">
               <div class="text-4xl mb-3 flex items-center justify-center gap-2">
                 <span style="display: inline-block; transform: scaleX(-1);">⚡</span>
@@ -462,7 +476,7 @@
             </div>
           </div>
 
-          <div class="mt-8 pt-6 border-t border-gray-700 text-center">
+          <div class="mt-10 pt-6 border-t border-gray-700/50 text-center">
             <a
               href="https://mutable.top"
               target="_blank"
@@ -529,7 +543,7 @@
       <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
           <p class="text-gray-400 text-center lg:text-left">
-            <span class="block sm:inline">Plebs vs. Zombies &copy; {{ new Date().getFullYear() }}</span>
+            <span class="block sm:inline">Plebs vs. Zombies v{{ appVersion }} &copy; {{ new Date().getFullYear() }}</span>
             <span class="hidden sm:inline"> | </span>
             <span class="block sm:inline">Made with 🧠 for the Nostr community</span>
           </p>
@@ -704,8 +718,9 @@ import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
 import scoutService from './services/scoutService';
-import { nip19 } from 'nostr-tools';
+import { nip19, finalizeEvent, getPublicKey } from 'nostr-tools';
 import { Analytics } from '@vercel/analytics/vue';
+import { baseVersion } from './utils/version';
 
 export default {
   name: 'App',
@@ -733,6 +748,9 @@ export default {
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
       forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
+      showNsecLogin: false,
+      nsecInput: '',
+      appVersion: baseVersion,
       isConnecting: false, // Track connection state for visual feedback
       zapModal: {
         show: false,
@@ -771,6 +789,13 @@ export default {
   computed: {
     currentView() {
       return this.views[this.activeView];
+    },
+    signerLabel() {
+      const method = nostrService.signingMethod;
+      if (method === 'nip07') return 'Browser Extension';
+      if (method === 'nip46') return 'Remote Signer';
+      if (method === 'nsec') return 'Private Key';
+      return '';
     }
   },
   watch: {
@@ -1012,6 +1037,69 @@ export default {
         }
 
         alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
+      } finally {
+        this.isConnecting = false;
+      }
+    },
+
+    async connectWithNsec() {
+      const input = this.nsecInput.trim();
+      if (!input) return;
+
+      this.isConnecting = true;
+      try {
+        // Decode nsec
+        const decoded = nip19.decode(input);
+        if (decoded.type !== 'nsec') {
+          throw new Error('Invalid nsec key. Must start with nsec1...');
+        }
+
+        const secretKey = decoded.data;
+        const pubkey = getPublicKey(secretKey);
+
+        // Set up nostrService with nsec signing
+        nostrService.setSigningMethod('nsec');
+        nostrService.pubkey = pubkey;
+        nostrService.secretKey = secretKey;
+
+        // Provide a signEvent function that signs locally
+        nostrService.nsecSignEvent = (event) => {
+          return finalizeEvent(event, secretKey);
+        };
+
+        // Initialize NDK for relay connections
+        await nostrService.initialize();
+
+        this.isConnected = true;
+        this.userProfile = {
+          pubkey,
+          display_name: pubkey.substring(0, 8) + '...',
+          name: 'Nostr User',
+          picture: '/default-avatar.svg'
+        };
+
+        // Clear nsec from UI after setup
+        this.nsecInput = '';
+
+        backupService.init();
+        await immunityService.init();
+
+        // Load profile
+        setTimeout(() => {
+          nostrService.loadUserProfile().then(() => {
+            if (nostrService.userProfile) {
+              this.userProfile = {
+                ...nostrService.userProfile,
+                picture: nostrService.userProfile.picture || '/default-avatar.svg'
+              };
+            }
+          }).catch(() => {});
+        }, 100);
+
+        console.log('[App] Connected with nsec, pubkey:', pubkey.substring(0, 8) + '...');
+      } catch (error) {
+        console.error('nsec login failed:', error);
+        alert(`Failed to sign in: ${error.message}`);
       } finally {
         this.isConnecting = false;
       }

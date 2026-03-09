@@ -1065,25 +1065,7 @@ https://plebsvszombies.cc`;
         // Sign event using appropriate method
         let signedEvent;
         try {
-          if (nostrService.signingMethod === 'nip07') {
-            console.log('Attempting NIP-07 signing...');
-            console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-            
-            signedEvent = await Promise.race([
-              window.nostr.signEvent(event),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
-              )
-            ]);
-          } else if (nostrService.signingMethod === 'nip46') {
-            console.log('Attempting NIP-46 signing...');
-            console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
-            
-            signedEvent = await nostrService.nip46Service.signEvent(event);
-          } else {
-            throw new Error(`Invalid signing method: ${nostrService.signingMethod}`);
-          }
-          
+          signedEvent = await nostrService.signEventWithCurrentMethod(event);
           console.log('✅ Event signed successfully:', signedEvent.id);
         } catch (signingError) {
           console.error('❌ Signing failed:', signingError);
