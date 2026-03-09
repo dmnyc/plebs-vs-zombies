@@ -188,7 +188,7 @@
                             @click="openProfile(follow.pubkey)"
                             title="Click to view profile"
                           >
-                            {{ follow.profile?.display_name || follow.profile?.name || 'Unknown User' }}
+                            {{ follow.profile?.display_name || follow.profile?.name || (profilesLoading ? 'Profile loading...' : 'Unknown User') }}
                           </h4>
                         </div>
                         

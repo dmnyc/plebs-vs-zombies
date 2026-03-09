@@ -529,7 +529,7 @@
       <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
           <p class="text-gray-400 text-center lg:text-left">
-            <span class="block sm:inline">Plebs vs. Zombies &copy; 2025</span>
+            <span class="block sm:inline">Plebs vs. Zombies &copy; {{ new Date().getFullYear() }}</span>
             <span class="hidden sm:inline"> | </span>
             <span class="block sm:inline">Made with 🧠 for the Nostr community</span>
           </p>
