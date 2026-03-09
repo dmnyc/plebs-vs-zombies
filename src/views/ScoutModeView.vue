@@ -6,7 +6,7 @@
       <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-4">
           <div class="text-3xl flex-shrink-0">🔍</div>
-          <h2 class="text-2xl text-yellow-400">Scout Mode</h2>
+          <h2 class="page-title text-yellow-400 !mb-0">Scout Mode</h2>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
           <button 
@@ -136,7 +136,7 @@
           </div>
           
           <div class="text-center">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400"></div>
+            <div class="spinner-md border-yellow-400"></div>
           </div>
         </div>
         
@@ -424,7 +424,7 @@
 
       <!-- Detailed Breakdown -->
       <div class="card">
-        <h3 class="text-xl mb-4">Zombie Breakdown</h3>
+        <h3 class="section-title">Zombie Breakdown</h3>
         
         <div class="space-y-3">
           <!-- Active Users section removed since they don't count as zombies -->
@@ -623,7 +623,7 @@
     <!-- No Results State -->
     <div v-else-if="scoutComplete && !scoutResults" class="card p-8 text-center">
       <div class="text-6xl mb-4">🤔</div>
-      <h3 class="text-xl mb-4">Unable to Scout User</h3>
+      <h3 class="section-title">Unable to Scout User</h3>
       <p class="text-gray-400 mb-6">
         Could not analyze this user's follows. They may have a private profile or no follows to analyze.
       </p>
@@ -635,7 +635,7 @@
     <!-- Initial State -->
     <div v-else-if="!scanning && !scoutComplete" class="card p-8 text-center">
       <div class="text-6xl mb-4">🔍</div>
-      <h3 class="text-xl mb-4">Ready to Scout</h3>
+      <h3 class="section-title">Ready to Scout</h3>
       <p class="text-gray-400 mb-6">
         Scout mode will analyze {{ targetDisplay }}'s zombie follows.
       </p>
@@ -1065,25 +1065,7 @@ https://plebsvszombies.cc`;
         // Sign event using appropriate method
         let signedEvent;
         try {
-          if (nostrService.signingMethod === 'nip07') {
-            console.log('Attempting NIP-07 signing...');
-            console.log('⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...');
-            
-            signedEvent = await Promise.race([
-              window.nostr.signEvent(event),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Signing timeout - please approve the signing request in your extension')), 60000)
-              )
-            ]);
-          } else if (nostrService.signingMethod === 'nip46') {
-            console.log('Attempting NIP-46 signing...');
-            console.log('⏳ Requesting signature from bunker - check your bunker app for signing prompt...');
-            
-            signedEvent = await nostrService.nip46Service.signEvent(event);
-          } else {
-            throw new Error(`Invalid signing method: ${nostrService.signingMethod}`);
-          }
-          
+          signedEvent = await nostrService.signEventWithCurrentMethod(event);
           console.log('✅ Event signed successfully:', signedEvent.id);
         } catch (signingError) {
           console.error('❌ Signing failed:', signingError);

@@ -1,6 +1,26 @@
 <template>
   <div>
-    <h2 class="text-2xl mb-6">Dashboard</h2>
+    <h2 class="page-title">Dashboard</h2>
+
+    <!-- NIP-46 large follow list warning -->
+    <div v-if="nip46SizeWarning" class="mb-4 p-4 bg-yellow-900/80 border border-yellow-600 rounded-lg">
+      <div class="flex items-start gap-3">
+        <span class="text-yellow-400 text-lg mt-0.5">⚠️</span>
+        <div class="flex-1">
+          <p class="text-yellow-100 font-medium text-sm">Large follow list with remote signer</p>
+          <p class="text-yellow-200/80 text-xs mt-1">
+            Your follow list ({{ followStats.total }} follows) exceeds the 64KB NIP-46 transport limit.
+            <template v-if="hasNip07Extension">
+              Your browser extension will be used automatically to sign large events.
+            </template>
+            <template v-else>
+              Install a browser extension (Alby, nos2x, or Nostr Connect) to sign follow list updates,
+              or reduce your follows below ~900 first.
+            </template>
+          </p>
+        </div>
+      </div>
+    </div>
 
     <!-- Prominent Hunt Zombies CTA -->
     <div class="mb-8 bg-gradient-to-r from-zombie-dark via-gray-800 to-zombie-dark p-6 rounded-lg border-2 border-zombie-green/50 shadow-2xl">
@@ -25,9 +45,9 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div class="card">
-        <h3 class="text-xl mb-4">Follow List Overview</h3>
+        <h3 class="section-title">Follow List Overview</h3>
         <div v-if="loading" class="text-center py-4">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+          <div class="spinner-md"></div>
           <p class="mt-2 text-gray-400">Loading follow data...</p>
         </div>
         <div v-else>
@@ -135,7 +155,7 @@
       </ZombieStats>
       
       <div class="card">
-        <h3 class="text-xl mb-4">Hunt Status</h3>
+        <h3 class="section-title">Hunt Status</h3>
         <div class="space-y-4">
           <div class="flex justify-between items-center">
             <span class="text-gray-300">Zombies purged:</span>
@@ -166,7 +186,7 @@
     </div>
     
     <div class="mt-8">
-      <h3 class="text-xl mb-4">Recent Activity</h3>
+      <h3 class="section-title">Recent Activity</h3>
       <div class="card">
         <div v-if="recentActivity.length === 0" class="text-center py-4">
           <p class="text-gray-400">No recent activity</p>
@@ -296,9 +316,17 @@ export default {
     },
     zombieScore() {
       if (this.zombieStats.total === 0) return 0;
-      
+
       const zombieCount = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
       return Math.round((zombieCount / this.zombieStats.total) * 100);
+    },
+    hasNip07Extension() {
+      return typeof window.nostr !== 'undefined' && typeof window.nostr.signEvent === 'function';
+    },
+    nip46SizeWarning() {
+      return nostrService.getSigningMethod() === 'nip46'
+        && this.followStats.total > 900
+        && !this.loading;
     }
   },
   methods: {

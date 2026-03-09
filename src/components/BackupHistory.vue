@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <h3 class="text-xl mb-4">Backup History</h3>
+    <h3 class="section-title">Backup History</h3>
     
     <!-- Success Modal -->
     <ConfirmModal
@@ -39,7 +39,7 @@
     />
     
     <div v-if="loading" class="text-center py-8">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+      <div class="spinner-md"></div>
       <p class="mt-2 text-gray-400">Loading backups...</p>
     </div>
     
@@ -62,7 +62,7 @@
         <!-- Restoring Indicator -->
         <div v-if="restoring === backup.id" class="mb-3 p-3 bg-zombie-green/10 border border-zombie-green/30 rounded-lg">
           <div class="flex items-center gap-3">
-            <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-zombie-green"></div>
+            <div class="spinner h-5 w-5"></div>
             <div>
               <div class="text-zombie-green font-semibold">Restoring Backup...</div>
               <div class="text-xs text-gray-400 mt-1">This may take a moment. Please wait.</div>

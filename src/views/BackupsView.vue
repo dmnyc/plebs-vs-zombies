@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2 class="text-2xl mb-6">Backups & Restoration</h2>
+    <h2 class="page-title">Backups & Restoration</h2>
 
     <!-- Hunt Zombies CTA - Persistent at top after backup -->
     <div v-if="showHuntCTA" class="mb-6 bg-gradient-to-r from-green-900/30 via-zombie-dark to-green-900/30 p-6 rounded-lg border-2 border-zombie-green shadow-2xl">

@@ -1,15 +1,15 @@
 <template>
   <div>
-    <h2 class="text-2xl mb-6">Follows Manager</h2>
+    <h2 class="page-title">Follows Manager</h2>
     
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Follow List Management -->
       <div class="lg:col-span-1">
         <div class="card mb-6">
-          <h3 class="text-xl mb-4">Follow List Management</h3>
+          <h3 class="section-title">Follow List Management</h3>
           
           <div v-if="loading" class="text-center py-4">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+            <div class="spinner-md"></div>
             <p class="mt-2 text-gray-400">Loading follow list...</p>
           </div>
           
@@ -83,7 +83,7 @@
           </div>
           
           <div v-if="loading" class="text-center py-8">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+            <div class="spinner-md"></div>
             <p class="mt-2 text-gray-400">Loading follows...</p>
           </div>
           

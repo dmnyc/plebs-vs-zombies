@@ -253,22 +253,22 @@
           You need a remote signer (bunker) to provide the connection URL. Popular options:
         </p>
         <div class="space-y-2">
-          <a 
-            href="https://nsec.app" 
+          <a
+            href="https://www.getamber.app"
             target="_blank"
             class="flex items-center gap-2 text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
           >
-            <span class="w-2 h-2 bg-blue-400 rounded-full"></span>
-            nsec.app - Web-based bunker service
+            <span class="w-2 h-2 bg-orange-400 rounded-full"></span>
+            Amber - Android signer app (bunker)
             <span class="ml-auto">↗</span>
           </a>
-          <a 
-            href="https://nsecbunker.com" 
+          <a
+            href="https://primal.net"
             target="_blank"
             class="flex items-center gap-2 text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
           >
-            <span class="w-2 h-2 bg-green-400 rounded-full"></span>
-            nsecBunker - Self-hosted option
+            <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
+            Primal - Mobile &amp; desktop with nostrconnect
             <span class="ml-auto">↗</span>
           </a>
         </div>
@@ -300,6 +300,7 @@ export default {
       generatingString: false,
       connectionStringCopied: false,
       showFullConnectionString: false,
+      pendingConnectionData: null,
       reconnecting: false,
       deleting: false,
       connectionStatus: {
@@ -390,24 +391,49 @@ export default {
       this.error = null;
 
       try {
-        console.log('🔗 Generating connection string...');
-        const result = await nostrService.nip46Service.generateConnectionString();
-        this.generatedConnectionString = result.connectionString;
-        console.log('✅ Connection string generated:', result.connectionString);
-        
+        const connectionData = nostrService.nip46Service.generateConnectionString();
+        this.generatedConnectionString = connectionData.connectionString;
+        this.pendingConnectionData = connectionData;
+
         // Generate QR code
-        this.generateQRCode(result.connectionString);
-        
-        // Start listening for bunker connection
-        console.log('👂 Starting to listen for bunker connection...');
-        await nostrService.nip46Service.startListeningForConnection(result);
-        console.log('✅ Now listening for bunker connection');
-        
+        this.generateQRCode(connectionData.connectionString);
+
+        // Wait for remote signer to connect (BunkerSigner.fromURI handles the full handshake)
+        this.waitForConnection(connectionData);
       } catch (error) {
-        console.error('❌ Failed to generate connection string:', error);
+        console.error('Failed to generate connection string:', error);
         this.error = 'Failed to generate connection string: ' + error.message;
       } finally {
         this.generatingString = false;
+      }
+    },
+
+    async waitForConnection(connectionData) {
+      try {
+        const result = await nostrService.nip46Service.connectFromURI(connectionData, 120000);
+
+        // Switch nostrService to NIP-46 mode
+        nostrService.setSigningMethod('nip46');
+        nostrService.pubkey = result.pubkey;
+
+        this.updateConnectionStatus();
+        this.generatedConnectionString = '';
+        this.pendingConnectionData = null;
+
+        this.$emit('connected', result);
+
+        // Dispatch event for App.vue to pick up
+        window.dispatchEvent(new CustomEvent('nip46-connected', {
+          detail: { success: true, pubkey: result.pubkey, bunkerPubkey: result.bunkerPubkey, relay: result.relay }
+        }));
+      } catch (error) {
+        if (!error.message?.includes('timed out')) {
+          this.error = 'Connection failed: ' + error.message;
+        } else {
+          this.error = 'Connection timed out. Please try again.';
+        }
+        this.generatedConnectionString = '';
+        this.pendingConnectionData = null;
       }
     },
 
@@ -459,6 +485,7 @@ export default {
 
     resetConnectionString() {
       this.generatedConnectionString = '';
+      this.pendingConnectionData = null;
       this.connectionStringCopied = false;
       this.showFullConnectionString = false;
     },

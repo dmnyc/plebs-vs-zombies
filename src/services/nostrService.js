@@ -1,5 +1,5 @@
 import NDK, { NDKEvent, NDKNip07Signer } from "@nostr-dev-kit/ndk";
-import { nip19 } from "nostr-tools";
+import { nip19, finalizeEvent } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 
@@ -49,12 +49,8 @@ class NostrService {
         typeof window.nostr !== "undefined"
       ) {
         signer = new NDKNip07Signer();
-      } else if (
-        this.signingMethod === "nip46" &&
-        this.nip46Service.isConnected()
-      ) {
-        signer = this.nip46Service.getSigner();
       }
+      // NIP-46: signing is handled directly through nip46Service, not through NDK's signer
 
       this.ndk = new NDK({
         explicitRelayUrls: this.relays,
@@ -105,13 +101,90 @@ class NostrService {
   getSigner() {
     if (this.signingMethod === "nip07" && typeof window.nostr !== "undefined") {
       return new NDKNip07Signer();
-    } else if (
-      this.signingMethod === "nip46" &&
-      this.nip46Service.isConnected()
-    ) {
-      return this.nip46Service.getSigner();
     }
+    // NIP-46: signing is handled directly through nip46Service.signEvent()
     return null;
+  }
+
+  /**
+   * Encrypt data to self, preferring NIP-44 with NIP-04 fallback.
+   * @param {string} plaintext
+   * @param {string} pubkey
+   * @returns {Promise<{ciphertext: string, algorithm: string}>}
+   */
+  async encryptData(plaintext, pubkey) {
+    if (this.signingMethod === 'nip07') {
+      // Try NIP-44 first (modern extensions support it)
+      if (window.nostr?.nip44?.encrypt) {
+        try {
+          const ciphertext = await window.nostr.nip44.encrypt(pubkey, plaintext);
+          return { ciphertext, algorithm: 'nip44' };
+        } catch (e) {
+          console.warn('[NostrService] NIP-44 encrypt failed, falling back to NIP-04:', e.message);
+        }
+      }
+      // Fall back to NIP-04
+      if (window.nostr?.nip04?.encrypt) {
+        const ciphertext = await window.nostr.nip04.encrypt(pubkey, plaintext);
+        return { ciphertext, algorithm: 'nip04' };
+      }
+      throw new Error('No encryption method available from browser extension');
+    }
+
+    if (this.signingMethod === 'nip46') {
+      if (!this.nip46Service.isConnected()) {
+        throw new Error('NIP-46 bunker not connected');
+      }
+      // NIP-46 bunkers prefer NIP-44 (many deny NIP-04)
+      try {
+        const ciphertext = await this.nip46Service.nip44Encrypt(pubkey, plaintext);
+        return { ciphertext, algorithm: 'nip44' };
+      } catch (e) {
+        console.warn('[NostrService] NIP-46 nip44_encrypt failed, trying nip04:', e.message);
+        try {
+          const ciphertext = await this.nip46Service.nip04Encrypt(pubkey, plaintext);
+          return { ciphertext, algorithm: 'nip04' };
+        } catch (e2) {
+          throw new Error(`Encryption failed: NIP-44 (${e.message}), NIP-04 (${e2.message})`);
+        }
+      }
+    }
+
+    throw new Error('No signing method configured');
+  }
+
+  /**
+   * Decrypt data using the algorithm specified by the enc tag.
+   * @param {string} ciphertext
+   * @param {string} pubkey
+   * @param {string} algorithm - 'nip44' or 'nip04' (from enc tag, defaults to nip04 for legacy)
+   * @returns {Promise<string>}
+   */
+  async decryptData(ciphertext, pubkey, algorithm = 'nip04') {
+    if (this.signingMethod === 'nip07') {
+      if (algorithm === 'nip44' && window.nostr?.nip44?.decrypt) {
+        return await window.nostr.nip44.decrypt(pubkey, ciphertext);
+      }
+      if (algorithm === 'nip04' && window.nostr?.nip04?.decrypt) {
+        return await window.nostr.nip04.decrypt(pubkey, ciphertext);
+      }
+      throw new Error(`Decryption not available for ${algorithm} from browser extension`);
+    }
+
+    if (this.signingMethod === 'nip46') {
+      if (!this.nip46Service.isConnected()) {
+        throw new Error('NIP-46 bunker not connected');
+      }
+      if (algorithm === 'nip44') {
+        return await this.nip46Service.nip44Decrypt(pubkey, ciphertext);
+      }
+      if (algorithm === 'nip04') {
+        return await this.nip46Service.nip04Decrypt(pubkey, ciphertext);
+      }
+      throw new Error(`Unknown encryption algorithm: ${algorithm}`);
+    }
+
+    throw new Error('No signing method configured');
   }
 
   /**
@@ -260,8 +333,8 @@ class NostrService {
    * Set the signing method to use
    */
   setSigningMethod(method) {
-    if (!["nip07", "nip46"].includes(method)) {
-      throw new Error('Invalid signing method. Must be "nip07" or "nip46"');
+    if (!["nip07", "nip46", "nsec"].includes(method)) {
+      throw new Error('Invalid signing method. Must be "nip07", "nip46", or "nsec"');
     }
 
     // Only change if it's different
@@ -327,8 +400,33 @@ class NostrService {
   /**
    * Check if any signing method is ready
    */
+  isNsecReady() {
+    return this.signingMethod === "nsec" && this.secretKey && this.pubkey;
+  }
+
   isSigningReady() {
-    return this.isExtensionReady() || this.isBunkerReady();
+    return this.isExtensionReady() || this.isBunkerReady() || this.isNsecReady();
+  }
+
+  /**
+   * Sign an event using the current signing method (NIP-07, NIP-46, or nsec).
+   * Centralizes signing logic so callers don't need to branch on signingMethod.
+   */
+  async signEventWithCurrentMethod(event) {
+    if (this.signingMethod === "nsec") {
+      if (!this.secretKey) throw new Error("No secret key available");
+      return finalizeEvent(event, this.secretKey);
+    } else if (this.signingMethod === "nip46") {
+      return await this.nip46Service.signEvent(event);
+    } else if (this.signingMethod === "nip07") {
+      return await Promise.race([
+        window.nostr.signEvent(event),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Signing timeout - please approve the signing request in your extension")), 60000)
+        ),
+      ]);
+    }
+    throw new Error(`No signing method available (${this.signingMethod})`);
   }
 
   async getPublicKey() {
@@ -1290,6 +1388,13 @@ class NostrService {
       );
     }
 
+    // Note NIP-46 transport limit — nip46Service.signEvent() handles NIP-07 fallback automatically
+    if (this.signingMethod === 'nip46' && estimatedSize > 60000) {
+      console.log(
+        `[NostrService] Event size (${Math.round(estimatedSize / 1024)} KB) exceeds NIP-46 limit. Will use NIP-07 fallback if available.`,
+      );
+    }
+
     console.log("Preserved all non-user tags and filtered user follows only");
 
     // Create the event with preserved content and all tags
@@ -1337,36 +1442,7 @@ class NostrService {
     // Sign event using appropriate method
     let signedEvent;
     try {
-      if (this.signingMethod === "nip07") {
-        console.log("Attempting NIP-07 signing...");
-        console.log(
-          "⏳ Calling window.nostr.signEvent() - check your extension for signing prompt...",
-        );
-
-        signedEvent = await Promise.race([
-          window.nostr.signEvent(event),
-          new Promise((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    "Signing timeout - please approve the signing request in your extension",
-                  ),
-                ),
-              60000,
-            ),
-          ),
-        ]);
-      } else if (this.signingMethod === "nip46") {
-        console.log("Attempting NIP-46 signing...");
-        console.log(
-          "⏳ Requesting signature from bunker - check your bunker app for signing prompt...",
-        );
-
-        signedEvent = await this.nip46Service.signEvent(event);
-      } else {
-        throw new Error(`Invalid signing method: ${this.signingMethod}`);
-      }
+      signedEvent = await this.signEventWithCurrentMethod(event);
 
       console.log("✅ Event signed successfully:", signedEvent.id);
 
@@ -1867,26 +1943,7 @@ class NostrService {
 
     let signedEvent;
     try {
-      if (this.signingMethod === "nip07") {
-        signedEvent = await Promise.race([
-          window.nostr.signEvent(event),
-          new Promise((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    "Signing timeout - please approve the signing request in your extension",
-                  ),
-                ),
-              60000,
-            ),
-          ),
-        ]);
-      } else if (this.signingMethod === "nip46") {
-        signedEvent = await this.nip46Service.signEvent(event);
-      } else {
-        throw new Error(`Invalid signing method: ${this.signingMethod}`);
-      }
+      signedEvent = await this.signEventWithCurrentMethod(event);
 
       const publishResults = await this.publishEventToRelays(signedEvent);
 

@@ -27,7 +27,7 @@
     >
       <!-- Loading state -->
       <div v-if="searching" class="p-3 text-center text-gray-400 text-sm">
-        <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400 mr-2"></div>
+        <div class="spinner-sm border-yellow-400 mr-2"></div>
         Searching...
       </div>
 

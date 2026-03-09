@@ -1,69 +1,39 @@
-import NDK, { NDKNip46Signer } from '@nostr-dev-kit/ndk';
+/**
+ * NIP-46 Service - Remote Signer Connection
+ *
+ * Uses nostr-tools BunkerSigner directly for reliable NIP-46 connections.
+ * Supports both bunker:// URLs (server-initiated) and nostrconnect:// (client-initiated/QR).
+ * Based on Mutable's proven implementation pattern.
+ */
+
+import {
+  BunkerSigner,
+  parseBunkerInput,
+  createNostrConnectURI,
+} from 'nostr-tools/nip46';
 import { generateSecretKey, getPublicKey } from 'nostr-tools';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+
+const DEFAULT_RELAYS = [
+  'wss://relay.damus.io',
+  'wss://relay.primal.net',
+  'wss://nos.lol',
+];
 
 class Nip46Service {
   constructor() {
-    this.signer = null;
+    this.bunkerSigner = null;
+    this.clientSecretKey = null;
+    this.bunkerPointer = null;
     this.connected = false;
     this.connecting = false;
-    this.bunkerPubkey = null;
-    this.bunkerRelays = [];
-    this.localPrivateKey = null;
-    this.connectionSecret = null;
     this.appName = 'Plebs vs Zombies';
   }
 
   /**
-   * Parse a bunker URL and extract connection details
-   * Format: bunker://pubkey?relay=wss://relay.com&secret=xxx&name=AppName
+   * Connect using a bunker:// URL (server-initiated flow)
    */
-  parseBunkerUrl(bunkerUrl) {
-    try {
-      console.log('🔍 Parsing bunker URL:', bunkerUrl);
-      
-      if (!bunkerUrl.startsWith('bunker://')) {
-        throw new Error('Invalid bunker URL format. Must start with bunker://');
-      }
-
-      const url = new URL(bunkerUrl);
-      const pubkey = url.hostname;
-      const relay = url.searchParams.get('relay');
-      const secret = url.searchParams.get('secret');
-      const name = url.searchParams.get('name');
-      
-      console.log('📋 Parsed URL components:');
-      console.log('  - pubkey:', pubkey, '(length:', pubkey?.length, ')');
-      console.log('  - relay:', relay);
-      console.log('  - secret:', secret ? '[REDACTED]' : 'null');
-      console.log('  - name:', name);
-
-      if (!pubkey || pubkey.length !== 64) {
-        throw new Error(`Invalid pubkey in bunker URL. Expected 64 hex chars, got: ${pubkey?.length || 0}`);
-      }
-
-      if (!relay || !relay.startsWith('wss://')) {
-        throw new Error(`Invalid or missing relay in bunker URL. Got: ${relay}`);
-      }
-
-      const result = {
-        pubkey,
-        relay,
-        secret,
-        name: name || this.appName
-      };
-      
-      console.log('✅ Successfully parsed bunker URL');
-      return result;
-    } catch (error) {
-      console.error('❌ Failed to parse bunker URL:', error);
-      throw new Error(`Invalid bunker URL: ${error.message}`);
-    }
-  }
-
-  /**
-   * Connect using a bunker URL
-   */
-  async connectWithBunkerUrl(bunkerUrl, localPrivateKey = null) {
+  async connectWithBunkerUrl(bunkerUrl) {
     if (this.connecting) {
       throw new Error('Connection already in progress');
     }
@@ -71,150 +41,184 @@ class Nip46Service {
     this.connecting = true;
 
     try {
-      console.log('🔌 Connecting to NIP-46 bunker...');
-      
-      const bunkerDetails = this.parseBunkerUrl(bunkerUrl);
-      
-      // Generate local private key if not provided (for client-side session)
-      if (!localPrivateKey) {
-        const { generateSecretKey } = await import('nostr-tools/pure');
-        localPrivateKey = generateSecretKey();
-        console.log('✅ Generated local private key for session');
+      console.log('[NIP-46] Connecting with bunker URL...');
+
+      const bunkerPointer = await parseBunkerInput(bunkerUrl);
+      if (!bunkerPointer) {
+        throw new Error('Invalid bunker URL');
       }
 
-      console.log('📋 Setting connection details:');
-      console.log('  - bunkerPubkey:', bunkerDetails.pubkey);
-      console.log('  - bunkerRelay:', bunkerDetails.relay);
-      console.log('  - hasSecret:', !!bunkerDetails.secret);
-      
-      this.localPrivateKey = localPrivateKey;
-      this.bunkerPubkey = bunkerDetails.pubkey;
-      this.bunkerRelays = [bunkerDetails.relay];
-      this.connectionSecret = bunkerDetails.secret;
+      const secretKey = generateSecretKey();
 
-      // Create NDK instance for bunker communication
-      console.log('🌐 Creating NDK instance with relays:', this.bunkerRelays);
-      const bunkerNdk = new NDK({
-        explicitRelayUrls: this.bunkerRelays
-      });
+      const params = {};
+      this.bunkerSigner = BunkerSigner.fromBunker(secretKey, bunkerPointer, params);
 
-      console.log('🔌 Connecting to bunker relays...');
-      await bunkerNdk.connect();
-      console.log('✅ Connected to bunker relays');
+      await this.bunkerSigner.connect();
 
-      // Create NIP-46 signer
-      console.log('🔐 Creating NDKNip46Signer with:');
-      console.log('  - bunkerPubkey:', this.bunkerPubkey);
-      console.log('  - localPrivateKey length:', localPrivateKey?.length);
-      
-      try {
-        // Create the signer with the remote bunker pubkey
-        this.signer = new NDKNip46Signer(
-          bunkerNdk,
-          this.bunkerPubkey,
-          localPrivateKey
-        );
-        
-        // Set the remote pubkey directly to avoid NIP-05 lookup
-        if (this.signer.remotePubkey !== this.bunkerPubkey) {
-          console.log('🔄 Setting remote pubkey directly to avoid NIP-05 lookup');
-          this.signer.remotePubkey = this.bunkerPubkey;
-        }
-        
-        console.log('✅ NDKNip46Signer created successfully');
-      } catch (signerError) {
-        console.error('❌ Failed to create NDKNip46Signer:', signerError);
-        throw signerError;
-      }
-
-      // Test connection by getting public key without NIP-05 lookup
-      console.log('🔐 Testing bunker connection...');
-      try {
-        // Set the target directly to avoid NIP-05 lookup
-        this.signer.target = this.bunkerPubkey;
-        this.signer.remotePubkey = this.bunkerPubkey;
-        
-        // Skip user object creation to avoid NIP-05 lookup - we already have the pubkey
-        console.log('✅ NIP-46 connection established');
-        console.log('👤 Remote pubkey:', this.bunkerPubkey.substring(0, 8) + '...');
-        
-      } catch (testError) {
-        console.error('❌ Bunker connection test failed:', testError);
-        throw new Error(`Bunker connection test failed: ${testError.message}`);
-      }
-      
-      // Use bunker pubkey directly for return value
-      const testPubkey = this.bunkerPubkey;
-
+      this.clientSecretKey = secretKey;
+      this.bunkerPointer = bunkerPointer;
       this.connected = true;
       this.connecting = false;
 
-      // Save connection details for reconnection
+      const pubkey = await this.bunkerSigner.getPublicKey();
+      console.log('[NIP-46] Connected via bunker URL, pubkey:', pubkey.substring(0, 8) + '...');
+
       this.saveConnectionDetails({
-        bunkerPubkey: this.bunkerPubkey,
-        bunkerRelays: this.bunkerRelays,
-        localPrivateKey: Array.from(this.localPrivateKey), // Convert Uint8Array to array for storage
-        connectionSecret: this.connectionSecret,
-        timestamp: Date.now()
+        bunkerPointer: this.bunkerPointer,
+        clientSecretKey: bytesToHex(this.clientSecretKey),
+        timestamp: Date.now(),
       });
 
       return {
         success: true,
-        pubkey: testPubkey,
-        bunkerPubkey: this.bunkerPubkey,
-        relay: bunkerDetails.relay
+        pubkey,
+        bunkerPubkey: bunkerPointer.pubkey,
+        relay: bunkerPointer.relays[0],
       };
-
     } catch (error) {
       this.connecting = false;
       this.connected = false;
-      console.error('❌ NIP-46 connection failed:', error);
+      console.error('[NIP-46] Bunker connection failed:', error);
       throw new Error(`Failed to connect to bunker: ${error.message}`);
     }
   }
 
   /**
-   * Connect with manual details
+   * Generate a nostrconnect:// URI for QR code scanning (client-initiated flow)
+   * Returns the URI and connection data needed for connectFromURI()
    */
-  async connectWithDetails(pubkey, relays, secret, localPrivateKey = null) {
-    const bunkerUrl = `bunker://${pubkey}?relay=${relays[0]}&secret=${secret}&name=${encodeURIComponent(this.appName)}`;
-    return await this.connectWithBunkerUrl(bunkerUrl, localPrivateKey);
+  generateConnectionString() {
+    const secretKey = generateSecretKey();
+    const clientPubkey = getPublicKey(secretKey);
+    const secret = bytesToHex(generateSecretKey()).substring(0, 16);
+
+    const logoUrl = window.location.hostname === 'localhost'
+      ? 'https://plebsvszombies.cc/logo.svg'
+      : `${window.location.origin}/logo.svg`;
+
+    const uri = createNostrConnectURI({
+      clientPubkey,
+      relays: DEFAULT_RELAYS.slice(0, 3),
+      secret,
+      name: this.appName,
+      url: window.location.origin,
+      image: logoUrl,
+    });
+
+    console.log('[NIP-46] Generated nostrconnect URI');
+
+    return {
+      connectionString: uri,
+      secretKey,
+      secret,
+      localPubkey: clientPubkey,
+      relayUrls: DEFAULT_RELAYS.slice(0, 3),
+    };
   }
 
   /**
-   * Restore connection from saved details
+   * Wait for a remote signer to connect via the nostrconnect:// URI
+   * This replaces the old startListeningForConnection + handleIncomingConnection flow.
+   * BunkerSigner.fromURI handles all the NIP-46 handshake internally.
+   *
+   * @param {Object} connectionData - From generateConnectionString()
+   * @param {number} maxWait - Max wait time in ms (default 60s)
+   * @returns {Promise<Object>} Connection result with pubkey
+   */
+  async connectFromURI(connectionData, maxWait = 60000) {
+    if (this.connecting) {
+      throw new Error('Connection already in progress');
+    }
+
+    this.connecting = true;
+
+    try {
+      console.log('[NIP-46] Waiting for remote signer to connect...');
+
+      const params = {};
+
+      this.bunkerSigner = await BunkerSigner.fromURI(
+        connectionData.secretKey,
+        connectionData.connectionString,
+        params,
+        maxWait,
+      );
+
+      this.clientSecretKey = connectionData.secretKey;
+      this.bunkerPointer = this.bunkerSigner.bp;
+      this.connected = true;
+      this.connecting = false;
+
+      const pubkey = await this.bunkerSigner.getPublicKey();
+      console.log('[NIP-46] Connected via nostrconnect, pubkey:', pubkey.substring(0, 8) + '...');
+
+      this.saveConnectionDetails({
+        bunkerPointer: this.bunkerPointer,
+        clientSecretKey: bytesToHex(this.clientSecretKey),
+        timestamp: Date.now(),
+      });
+
+      return {
+        success: true,
+        pubkey,
+        bunkerPubkey: this.bunkerPointer.pubkey,
+        relay: this.bunkerPointer.relays[0],
+      };
+    } catch (error) {
+      this.connecting = false;
+      this.connected = false;
+      console.error('[NIP-46] nostrconnect failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore a saved connection session.
+   * Does NOT send connect() again - the remote signer remembers our client keypair.
+   * Signers like Primal reject reconnection with new secrets.
    */
   async restoreConnection() {
     try {
-      const savedConnection = this.getSavedConnectionDetails();
-      
-      if (!savedConnection) {
-        console.log('ℹ️ No saved NIP-46 connection found');
+      const saved = this.getSavedConnectionDetails();
+
+      if (!saved) {
+        console.log('[NIP-46] No saved connection found');
         return false;
       }
 
       // Check if connection is not too old (7 days)
       const maxAge = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - savedConnection.timestamp > maxAge) {
-        console.log('⚠️ Saved NIP-46 connection expired');
+      if (Date.now() - saved.timestamp > maxAge) {
+        console.log('[NIP-46] Saved connection expired');
         this.clearSavedConnection();
         return false;
       }
 
-      console.log('🔄 Restoring NIP-46 connection...');
-      
-      // Convert array back to Uint8Array
-      const localPrivateKey = new Uint8Array(savedConnection.localPrivateKey);
-      
-      // Reconstruct bunker URL
-      const bunkerUrl = `bunker://${savedConnection.bunkerPubkey}?relay=${savedConnection.bunkerRelays[0]}&secret=${savedConnection.connectionSecret}&name=${encodeURIComponent(this.appName)}`;
-      
-      await this.connectWithBunkerUrl(bunkerUrl, localPrivateKey);
-      console.log('✅ NIP-46 connection restored');
-      return true;
+      console.log('[NIP-46] Restoring connection...');
 
+      const clientSecretKey = hexToBytes(saved.clientSecretKey);
+      const bunkerPointer = saved.bunkerPointer;
+
+      const params = {};
+      this.bunkerSigner = BunkerSigner.fromBunker(clientSecretKey, bunkerPointer, params);
+
+      // Don't call connect() - remote signer remembers our keypair.
+      // Just verify connectivity with a ping.
+      try {
+        await this.bunkerSigner.ping();
+      } catch {
+        // If ping fails, connection may still work - some signers don't implement ping
+        console.warn('[NIP-46] Ping failed during restore, connection may still work');
+      }
+
+      this.clientSecretKey = clientSecretKey;
+      this.bunkerPointer = bunkerPointer;
+      this.connected = true;
+
+      console.log('[NIP-46] Connection restored');
+      return true;
     } catch (error) {
-      console.warn('⚠️ Failed to restore NIP-46 connection:', error.message);
+      console.warn('[NIP-46] Failed to restore connection:', error.message);
       this.clearSavedConnection();
       return false;
     }
@@ -223,416 +227,173 @@ class Nip46Service {
   /**
    * Disconnect from bunker
    */
-  async disconnect() {
+  async disconnect(clearSavedConnection = false) {
     try {
-      if (this.signer && this.signer.ndk) {
-        await this.signer.ndk.pool.close();
+      if (this.bunkerSigner) {
+        await this.bunkerSigner.close();
       }
     } catch (error) {
-      console.warn('Error during NIP-46 disconnect:', error);
+      console.warn('[NIP-46] Error during disconnect:', error);
     }
 
-    this.signer = null;
+    this.bunkerSigner = null;
+    this.clientSecretKey = null;
+    this.bunkerPointer = null;
     this.connected = false;
     this.connecting = false;
-    this.bunkerPubkey = null;
-    this.bunkerRelays = [];
-    this.localPrivateKey = null;
-    this.connectionSecret = null;
 
-    // Clear saved connection
-    this.clearSavedConnection();
-    
-    console.log('✅ NIP-46 disconnected');
+    if (clearSavedConnection) {
+      this.clearSavedConnection();
+    }
+
+    console.log('[NIP-46] Disconnected');
   }
 
-  /**
-   * Check if connected and ready
-   */
+  // --- Status ---
+
   isConnected() {
-    return this.connected && this.signer && !this.connecting;
+    return this.connected && this.bunkerSigner && !this.connecting;
   }
 
-  /**
-   * Get connection status
-   */
   getConnectionStatus() {
     return {
       connected: this.connected,
       connecting: this.connecting,
-      bunkerPubkey: this.bunkerPubkey,
-      bunkerRelays: this.bunkerRelays,
-      hasLocalKey: !!this.localPrivateKey
+      bunkerPubkey: this.bunkerPointer?.pubkey || null,
+      bunkerRelays: this.bunkerPointer?.relays || [],
+      hasLocalKey: !!this.clientSecretKey,
     };
   }
 
-  /**
-   * Sign an event using the bunker
-   */
+  // --- Signing & Encryption ---
+
   async signEvent(event) {
     if (!this.isConnected()) {
       throw new Error('NIP-46 bunker not connected');
     }
 
+    // Check if event exceeds NIP-46 transport limit (~64KB NIP-44 plaintext)
+    const estimatedSize = JSON.stringify(event).length + 100; // +100 for RPC wrapper
+    if (estimatedSize > 60000) {
+      console.warn(`[NIP-46] Event too large for remote signer (${Math.round(estimatedSize / 1024)} KB). Attempting NIP-07 fallback...`);
+      return await this._signLargeEventWithFallback(event, estimatedSize);
+    }
+
     try {
-      console.log('🔐 Requesting signature from bunker...');
-      const signedEvent = await this.signer.signEvent(event);
-      console.log('✅ Event signed by bunker');
-      return signedEvent;
+      return await this.bunkerSigner.signEvent(event);
     } catch (error) {
-      console.error('❌ Bunker signing failed:', error);
-      
-      if (error.message.includes('user rejected')) {
+      const msg = error.message || '';
+      if (msg.includes('user rejected') || msg.includes('rejected')) {
         throw new Error('Signing was rejected in the bunker app');
-      } else if (error.message.includes('timeout')) {
+      } else if (msg.includes('timeout')) {
         throw new Error('Signing request timed out. Please check your bunker app.');
-      } else {
-        throw new Error(`Bunker signing failed: ${error.message}`);
+      } else if (msg.includes('plaintext size') || msg.includes('65535')) {
+        // Shouldn't reach here due to pre-check, but handle just in case
+        return await this._signLargeEventWithFallback(event, estimatedSize);
       }
+      throw new Error(`Bunker signing failed: ${msg}`);
     }
   }
 
   /**
-   * Get the remote user's public key
+   * For events exceeding the NIP-46 64KB transport limit, fall back to NIP-07
+   * browser extension signing if available.
    */
+  async _signLargeEventWithFallback(event, estimatedSize) {
+    if (typeof window.nostr !== 'undefined' && typeof window.nostr.signEvent === 'function') {
+      console.log('[NIP-46] Using browser extension (NIP-07) to sign oversized event');
+      try {
+        const signed = await Promise.race([
+          window.nostr.signEvent(event),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Browser extension signing timed out')), 60000)
+          ),
+        ]);
+        console.log('[NIP-46] Large event signed via NIP-07 fallback');
+        return signed;
+      } catch (fallbackError) {
+        throw new Error(
+          `Event too large for remote signer (${Math.round(estimatedSize / 1024)} KB) ` +
+          `and browser extension signing also failed: ${fallbackError.message}`
+        );
+      }
+    }
+
+    throw new Error(
+      `Event too large for remote signer (${Math.round(estimatedSize / 1024)} KB). ` +
+      `NIP-46 has a 64KB transport limit. Install a browser extension (NIP-07) to sign large events, ` +
+      `or reduce your follow list in smaller batches.`
+    );
+  }
+
   async getPublicKey() {
     if (!this.isConnected()) {
       throw new Error('NIP-46 bunker not connected');
     }
-
-    try {
-      // Return the bunker pubkey directly to avoid NIP-05 lookup
-      return this.bunkerPubkey;
-    } catch (error) {
-      console.error('Failed to get public key from bunker:', error);
-      throw new Error('Failed to get public key from bunker');
-    }
+    return await this.bunkerSigner.getPublicKey();
   }
 
+  async nip44Encrypt(pubkey, plaintext) {
+    if (!this.isConnected()) throw new Error('NIP-46 not connected');
+    return await this.bunkerSigner.nip44Encrypt(pubkey, plaintext);
+  }
+
+  async nip44Decrypt(pubkey, ciphertext) {
+    if (!this.isConnected()) throw new Error('NIP-46 not connected');
+    return await this.bunkerSigner.nip44Decrypt(pubkey, ciphertext);
+  }
+
+  async nip04Encrypt(pubkey, plaintext) {
+    if (!this.isConnected()) throw new Error('NIP-46 not connected');
+    return await this.bunkerSigner.nip04Encrypt(pubkey, plaintext);
+  }
+
+  async nip04Decrypt(pubkey, ciphertext) {
+    if (!this.isConnected()) throw new Error('NIP-46 not connected');
+    return await this.bunkerSigner.nip04Decrypt(pubkey, ciphertext);
+  }
+
+  // --- Signer for NDK integration ---
+
   /**
-   * Save connection details to localStorage
+   * Get the BunkerSigner instance.
+   * nostrService uses this as a signer for NDK operations.
    */
+  getSigner() {
+    return this.bunkerSigner;
+  }
+
+  // --- Persistence ---
+
   saveConnectionDetails(details) {
     try {
       localStorage.setItem('nip46_connection', JSON.stringify(details));
     } catch (error) {
-      console.warn('Failed to save NIP-46 connection details:', error);
+      console.warn('[NIP-46] Failed to save connection details:', error);
     }
   }
 
-  /**
-   * Get saved connection details from localStorage
-   */
   getSavedConnectionDetails() {
     try {
       const saved = localStorage.getItem('nip46_connection');
       return saved ? JSON.parse(saved) : null;
     } catch (error) {
-      console.warn('Failed to load NIP-46 connection details:', error);
       return null;
     }
   }
 
-  /**
-   * Check if there are saved connection details
-   */
   hasSavedConnection() {
-    try {
-      const saved = localStorage.getItem('nip46_connection');
-      return !!saved;
-    } catch (error) {
-      return false;
-    }
+    return !!this.getSavedConnectionDetails();
   }
 
-  /**
-   * Clear saved connection details
-   */
   clearSavedConnection() {
     try {
       localStorage.removeItem('nip46_connection');
     } catch (error) {
-      console.warn('Failed to clear NIP-46 connection details:', error);
-    }
-  }
-
-  /**
-   * Get the NDK signer instance (for integration with NDK)
-   */
-  getSigner() {
-    if (this.signer && this.bunkerPubkey) {
-      // Ensure bunker properties are set
-      this.signer.remotePubkey = this.bunkerPubkey;
-      this.signer.target = this.bunkerPubkey;
-      
-      // Set bunker pubkey property if it exists (for newer NDK versions)
-      if ('bunkerPubkey' in this.signer) {
-        this.signer.bunkerPubkey = this.bunkerPubkey;
-      }
-    }
-    return this.signer;
-  }
-
-  /**
-   * Modify disconnect to support preserving saved connections
-   */
-  async disconnect(clearSavedConnection = false) {
-    try {
-      if (this.signer && this.signer.ndk) {
-        // Try different methods for closing NDK connection
-        if (this.signer.ndk.pool && typeof this.signer.ndk.pool.close === 'function') {
-          await this.signer.ndk.pool.close();
-        } else if (typeof this.signer.ndk.disconnect === 'function') {
-          await this.signer.ndk.disconnect();
-        } else if (typeof this.signer.ndk.close === 'function') {
-          await this.signer.ndk.close();
-        }
-      }
-    } catch (error) {
-      console.warn('Error during NIP-46 disconnect:', error);
-    }
-
-    this.signer = null;
-    this.connected = false;
-    this.connecting = false;
-    this.bunkerPubkey = null;
-    this.bunkerRelays = [];
-    this.localPrivateKey = null;
-    this.connectionSecret = null;
-
-    // Only clear saved connection if explicitly requested (e.g. user clicks "Disconnect" in settings)
-    if (clearSavedConnection) {
-      console.log('🗑️ Clearing saved connection as requested');
-      this.clearSavedConnection();
-    } else {
-      console.log('💾 Preserving saved connection for quick reconnect');
-    }
-    
-    console.log('✅ NIP-46 disconnected');
-  }
-
-  /**
-   * Enhanced saveConnectionDetails with debugging
-   */
-  saveConnectionDetails(details) {
-    try {
-      console.log('💾 Saving NIP-46 connection details to localStorage');
-      const detailsToSave = {
-        bunkerPubkey: details.bunkerPubkey.substring(0, 8) + '...',
-        bunkerRelays: details.bunkerRelays,
-        hasLocalPrivateKey: !!details.localPrivateKey,
-        hasConnectionSecret: !!details.connectionSecret,
-        timestamp: new Date().toISOString()
-      };
-      console.log('📋 Details to save:', detailsToSave);
-      
-      // Save the actual details (not the debug version)
-      const actualDetails = {
-        bunkerPubkey: details.bunkerPubkey,
-        bunkerRelays: details.bunkerRelays,
-        localPrivateKey: Array.from(details.localPrivateKey), // Convert Uint8Array to regular array
-        connectionSecret: details.connectionSecret,
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem('nip46_connection', JSON.stringify(actualDetails));
-      console.log('✅ Successfully saved NIP-46 connection to localStorage');
-      
-      // Verify it was saved
-      const saved = localStorage.getItem('nip46_connection');
-      console.log('🔍 Verification - localStorage has nip46_connection:', !!saved);
-    } catch (error) {
-      console.error('❌ Failed to save NIP-46 connection details:', error);
-    }
-  }
-
-  /**
-   * Generate connection string for bunker apps
-   */
-  async generateConnectionString() {
-    try {
-      console.log('🔗 Generating connection string...');
-      
-      // Generate a local private key for this connection
-      const localPrivateKeyUint8 = generateSecretKey();
-      const localPubkey = getPublicKey(localPrivateKeyUint8);
-      
-      // Store for later use
-      this.localPrivateKey = localPrivateKeyUint8;
-      this.connectionSecret = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      // Define relay URLs to use
-      const relayUrls = ['wss://relay.nsec.app', 'wss://relay.damus.io'];
-      
-      console.log('✅ Generated nostrconnect:// connection string');
-      console.log('📋 Local pubkey:', localPubkey);
-      console.log('🔗 Relay URLs:', relayUrls);
-      
-      // Use production URL for logo so external signers can access it
-      const logoUrl = window.location.hostname === 'localhost'
-        ? 'https://plebsvszombies.cc/logo.svg'
-        : `${window.location.origin}/logo.svg`;
-      
-      console.log('🖼️ Using logo URL:', logoUrl);
-      
-      // Build the nostrconnect:// URL with metadata as URL parameters
-      const params = new URLSearchParams();
-      relayUrls.forEach(relay => params.append('relay', relay));
-      params.set('secret', this.connectionSecret);
-      
-      // Add metadata as direct URL parameters per NIP-46 spec
-      params.set('name', 'Plebs vs Zombies');
-      params.set('url', window.location.origin);
-      params.set('image', logoUrl);
-      
-      const connectionString = `nostrconnect://${localPubkey}?${params.toString()}`;
-      
-      return {
-        connectionString,
-        localPubkey,
-        localPrivateKey: this.localPrivateKey,
-        connectionSecret: this.connectionSecret,
-        relayUrls
-      };
-      
-    } catch (error) {
-      console.error('❌ Failed to generate connection string:', error);
-      throw new Error(`Failed to generate connection string: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Start listening for bunker connection on the generated connection string
-   */
-  async startListeningForConnection(connectionData) {
-    try {
-      console.log('👂 Starting to listen for bunker connection...');
-      
-      // Create NDK instance for listening
-      const listenNdk = new NDK({
-        explicitRelayUrls: connectionData.relayUrls
-      });
-      
-      await listenNdk.connect();
-      console.log('✅ Connected to relays for listening');
-      
-      // Store listening state
-      this.listeningNdk = listenNdk;
-      this.listeningConnectionData = connectionData;
-      
-      // Listen for NIP-46 connection events directed at our local pubkey
-      const filter = {
-        kinds: [24133], // NIP-46 request events
-        '#p': [connectionData.localPubkey],
-        since: Math.floor(Date.now() / 1000) - 60 // Listen for events from the last minute
-      };
-      
-      console.log('👂 Listening for bunker connection events...');
-      console.log('🔍 Filter:', filter);
-      
-      const subscription = listenNdk.subscribe(filter);
-      
-      subscription.on('event', async (event) => {
-        console.log('📨 Received NIP-46 event from pubkey:', event.pubkey);
-        console.log('🕒 Event created at:', new Date(event.created_at * 1000));
-        console.log('📄 Event content:', event.content);
-        console.log('🏷️ Event tags:', event.tags);
-        
-        // Handle the incoming connection
-        try {
-          await this.handleIncomingConnection(event);
-        } catch (error) {
-          console.error('❌ Failed to handle incoming connection:', error);
-        }
-      });
-      
-      subscription.on('eose', () => {
-        console.log('📡 Reached end of stored events, now listening for new events...');
-      });
-      
-      // Set timeout for listening
-      setTimeout(() => {
-        console.log('⏰ Connection listening timeout (2 minutes)');
-        subscription.stop();
-        listenNdk.pool?.disconnect();
-      }, 120000);
-      
-      return true;
-    } catch (error) {
-      console.error('❌ Failed to start listening for connection:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Handle incoming bunker connection
-   */
-  async handleIncomingConnection(event) {
-    console.log('🤝 Processing incoming bunker connection...');
-    console.log('📋 Bunker pubkey:', event.pubkey);
-    
-    // Prevent multiple connection attempts
-    if (this.connecting) {
-      console.log('⚠️ Connection already in progress, skipping this event');
-      return false;
-    }
-    
-    try {
-      // Instead of trying to decrypt, let's directly establish the connection
-      // since we know this is a connection request from our bunker
-      console.log('✅ Detected connection attempt from bunker');
-      
-      // Use the bunker's pubkey and our stored connection details
-      const bunkerPubkey = event.pubkey;
-      const bunkerRelay = this.listeningConnectionData.relayUrls[0]; // Use first relay
-      const connectionSecret = this.listeningConnectionData.connectionSecret;
-      
-      // Build the bunker URL for connection
-      const bunkerUrl = `bunker://${bunkerPubkey}?relay=${encodeURIComponent(bunkerRelay)}&secret=${connectionSecret}`;
-      console.log('🔗 Creating bunker connection with URL:', bunkerUrl);
-      
-      // Establish the connection
-      const result = await this.connectWithBunkerUrl(bunkerUrl, this.listeningConnectionData.localPrivateKey);
-      
-      console.log('🎉 NIP-46 connection established via connection string!');
-      
-      // CRITICAL: Set up nostrService integration (same as manual connection)
-      const { default: nostrService } = await import('./nostrService.js');
-      nostrService.setSigningMethod('nip46');
-      nostrService.pubkey = result.pubkey;
-      console.log('✅ Set nostrService.pubkey from connection string:', result.pubkey.substring(0, 8) + '...');
-      
-      // Clean up listening
-      if (this.listeningNdk) {
-        try {
-          await this.listeningNdk.pool?.disconnect();
-          console.log('✅ Cleaned up listening NDK connection');
-        } catch (cleanupError) {
-          console.warn('⚠️ Could not clean up listening connection:', cleanupError.message);
-        }
-      }
-      
-      // Notify the UI about successful connection (same as the Vue component does)
-      console.log('🚀 Dispatching nip46-connected event for UI updates');
-      const connectionEvent = new CustomEvent('nip46-connected', {
-        detail: {
-          success: true,
-          pubkey: result.pubkey,
-          bunkerPubkey: bunkerPubkey,
-          relay: bunkerRelay
-        }
-      });
-      window.dispatchEvent(connectionEvent);
-      
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Failed to establish connection:', error);
-      return false;
+      console.warn('[NIP-46] Failed to clear connection details:', error);
     }
   }
 }
 
-// Create singleton instance
 const nip46Service = new Nip46Service();
 export default nip46Service;

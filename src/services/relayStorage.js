@@ -53,12 +53,10 @@ class RelayStorage {
           throw new Error('No pubkey available for encryption');
         }
 
-        // Use NIP-04 encryption (encrypt to self)
-        if (window.nostr && window.nostr.nip04) {
-          event.content = await window.nostr.nip04.encrypt(pubkey, content);
-        } else {
-          throw new Error('NIP-04 encryption not supported by signer');
-        }
+        // Encrypt to self, preferring NIP-44 with NIP-04 fallback
+        const { ciphertext, algorithm } = await nostrService.encryptData(content, pubkey);
+        event.content = ciphertext;
+        event.tags.push(['enc', algorithm]);
       } else {
         event.content = JSON.stringify(dataWithTimestamp);
       }
@@ -138,11 +136,10 @@ class RelayStorage {
       // Decrypt if needed
       let content = latestEvent.content;
       if (encrypted) {
-        if (window.nostr && window.nostr.nip04) {
-          content = await window.nostr.nip04.decrypt(targetPubkey, content);
-        } else {
-          throw new Error('NIP-04 decryption not supported by signer');
-        }
+        // Read enc tag to determine algorithm (default to nip04 for legacy events)
+        const encTag = latestEvent.tags.find(t => t[0] === 'enc');
+        const algorithm = encTag ? encTag[1] : 'nip04';
+        content = await nostrService.decryptData(content, targetPubkey, algorithm);
       }
 
       const data = JSON.parse(content);

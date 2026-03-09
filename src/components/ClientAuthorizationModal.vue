@@ -1,6 +1,6 @@
 <template>
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click="handleBackdropClick">
-    <div class="bg-zinc-900 border border-gray-600 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" @click.stop>
+    <div class="bg-gray-800 border border-gray-600 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" @click.stop>
       <!-- Header -->
       <div class="text-center mb-6">
         <h2 class="text-white text-xl font-semibold">Permission request</h2>
@@ -47,7 +47,7 @@
       <div class="flex space-x-3">
         <button 
           @click="handleDeny"
-          class="flex-1 px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+          class="btn-tertiary flex-1 py-3 rounded-lg font-medium"
         >
           Disallow Always
         </button>
