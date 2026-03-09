@@ -12,7 +12,6 @@ export default {
         'pleb-gold': '#ffd700',
         'pleb-blue': '#1e90ff',
         'pleb-purple': '#8e30eb',
-        'zombie-rot-green': '#5BDB5C',
       },
       fontFamily: {
         'horror': ['"Creepster"', 'cursive'],

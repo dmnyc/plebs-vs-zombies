@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,6 +36,48 @@
   }
   .card {
     @apply bg-zombie-dark p-6 rounded-lg shadow-lg border border-gray-700;
+  }
+  .btn-tertiary {
+    @apply btn bg-gray-700 text-gray-300 hover:bg-gray-600;
+  }
+  .btn-warn {
+    @apply btn bg-amber-600 text-white hover:bg-amber-500;
+  }
+  .btn-nostr {
+    @apply btn bg-pleb-purple text-white hover:bg-purple-700;
+  }
+  .btn-sm {
+    @apply text-sm px-3 py-1.5;
+  }
+  .btn-lg {
+    @apply text-lg px-6 py-3;
+  }
+  .page-title {
+    @apply text-2xl mb-6;
+  }
+  .section-title {
+    @apply text-xl mb-4;
+  }
+  .card-info {
+    @apply card bg-gray-800/50 border-yellow-500/30;
+  }
+  .card-success {
+    @apply card border-green-500/50;
+  }
+  .card-danger {
+    @apply card border-red-500/50;
+  }
+  .spinner {
+    @apply inline-block animate-spin rounded-full border-b-2 border-zombie-green;
+  }
+  .spinner-sm {
+    @apply spinner h-4 w-4;
+  }
+  .spinner-md {
+    @apply spinner h-8 w-8;
+  }
+  .spinner-lg {
+    @apply spinner h-12 w-12;
   }
   .input {
     @apply bg-gray-800 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-zombie-green;

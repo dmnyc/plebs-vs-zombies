@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <h3 class="text-xl mb-4">{{ title }}</h3>
+    <h3 class="section-title">{{ title }}</h3>
     <div class="space-y-4">
       <div class="flex justify-between items-center">
         <span class="text-gray-300">Total:</span>

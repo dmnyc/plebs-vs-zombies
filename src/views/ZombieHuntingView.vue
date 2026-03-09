@@ -1,14 +1,14 @@
 <template>
   <div>
-    <h2 class="text-2xl mb-6">Zombie Hunting</h2>
+    <h2 class="page-title">Zombie Hunting</h2>
     
     <div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
       <div class="xl:col-span-1 lg:col-span-1">
         <div class="card mb-6">
-          <h3 class="text-xl mb-4">Hunt Controls</h3>
+          <h3 class="section-title">Hunt Controls</h3>
           
           <div v-if="loading" class="text-center py-4">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+            <div class="spinner-md"></div>
             <p class="mt-2 text-gray-400">Loading data...</p>
           </div>
           
@@ -162,7 +162,7 @@
               </div>
               
               <div class="text-center">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+                <div class="spinner-md"></div>
               </div>
             </div>
             
@@ -185,8 +185,8 @@
         </div>
         
         <div v-else-if="purging" class="card mb-6 p-8 text-center">
-          <h3 class="text-xl mb-4">Purging Zombies...</h3>
-          <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-zombie-green mb-4"></div>
+          <h3 class="section-title">Purging Zombies...</h3>
+          <div class="spinner-lg mb-4"></div>
           <p class="text-gray-300">Please wait while we purge the selected zombies.</p>
           <p class="text-gray-400 mt-2">This process requires signing an event with your Nostr extension.</p>
         </div>
@@ -216,7 +216,7 @@
         </div>
         
         <div v-else-if="scanComplete && !zombiesFiltered.length" class="card p-8 text-center">
-          <h3 class="text-xl mb-4">No Zombies Found</h3>
+          <h3 class="section-title">No Zombies Found</h3>
           <div class="text-6xl mb-4">🧠</div>
           <p class="text-gray-300">
             Great job! No zombies found matching the current threshold.
@@ -240,7 +240,7 @@
         </div>
         
         <div v-else class="card p-8 text-center">
-          <h3 class="text-xl mb-4">Ready to Hunt?</h3>
+          <h3 class="section-title">Ready to Hunt?</h3>
           <div class="text-6xl mb-4">🧟</div>
           <p class="text-gray-300">
             Use the controls on the left to scan for dormant follows.

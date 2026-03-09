@@ -1,9 +1,9 @@
 <template>
   <div class="card">
-    <h3 class="text-xl mb-4">{{ title }}</h3>
+    <h3 class="section-title">{{ title }}</h3>
     <div class="zombie-selection-list">
       <div v-if="loading" class="text-center py-4">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+        <div class="spinner-md"></div>
         <p class="mt-2 text-gray-400">Loading zombies...</p>
       </div>
       

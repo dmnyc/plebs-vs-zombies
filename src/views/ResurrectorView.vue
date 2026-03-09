@@ -7,14 +7,14 @@
         <span>🧟‍♂️</span>
         <span>⚡</span>
       </div>
-      <h1 class="text-4xl font-bold mb-2 text-zombie-green">The Resurrector</h1>
+      <h2 class="page-title text-4xl !mb-2">The Resurrector</h2>
       <p class="text-gray-300">
         Bring your deleted Nostr profile back to life!
       </p>
     </div>
 
     <!-- Info Card -->
-    <div class="card mb-6 bg-gray-800/50 border-yellow-500/30">
+    <div class="card-info mb-6">
       <div class="flex items-start gap-3">
         <div class="text-2xl">💡</div>
         <div class="flex-1">
@@ -103,9 +103,8 @@
         <button
           @click="scanProfile"
           :disabled="isScanning || (scanMode === 'other' && !npubInput)"
-          class="btn-primary text-lg px-8 py-4"
+          class="btn-primary btn-lg px-8 py-4"
           :class="{'opacity-50 cursor-not-allowed': isScanning || (scanMode === 'other' && !npubInput)}"
-          style="background: #5cdb5c"
         >
           <span v-if="isScanning">🔍 Checking...</span>
           <span v-else>🔍 Check Profile</span>
@@ -115,9 +114,8 @@
           v-if="scanMode === 'self'"
           @click="forceResurrection"
           :disabled="isResurrecting"
-          class="btn-primary text-lg px-8 py-4"
+          class="btn-warn btn-lg px-8 py-4"
           :class="{'opacity-50 cursor-not-allowed': isResurrecting}"
-          style="background: #d97706"
         >
           <span v-if="isResurrecting">⚡ Resurrecting...</span>
           <span v-else>⚡ Resurrect Profile</span>
@@ -134,7 +132,7 @@
     </div>
 
     <!-- Results Section -->
-    <div v-if="deletedProfiles.length > 0" class="card mb-6 border-red-500/50">
+    <div v-if="deletedProfiles.length > 0" class="card-danger mb-6">
       <h2 class="text-2xl font-bold mb-4 text-red-400">⚠️ Deleted Profile Found!</h2>
 
       <div v-if="scanMode === 'other'" class="bg-yellow-900/30 border border-yellow-600/50 p-3 rounded-lg mb-4">
@@ -186,7 +184,7 @@
     </div>
 
     <!-- No Deleted Profiles -->
-    <div v-else-if="hasScanned && deletedProfiles.length === 0" class="card mb-6 border-green-500/50">
+    <div v-else-if="hasScanned && deletedProfiles.length === 0" class="card-success mb-6">
       <div class="flex items-center gap-3">
         <div class="text-3xl">✅</div>
         <div class="flex-1">

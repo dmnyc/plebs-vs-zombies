@@ -537,10 +537,7 @@
             <a
               href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h"
               target="_blank"
-              class="text-xs px-3 py-1 rounded-full transition-colors inline-flex items-center gap-1"
-              style="background-color: #8e30eb; color: white;"
-              onmouseover="this.style.backgroundColor='#7a2bc7'"
-              onmouseout="this.style.backgroundColor='#8e30eb'"
+              class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
             >
               Follow on Nostr 🟣
             </a>

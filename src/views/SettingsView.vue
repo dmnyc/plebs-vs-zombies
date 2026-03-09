@@ -1,10 +1,10 @@
 <template>
   <div>
-    <h2 class="text-2xl mb-6">Settings</h2>
+    <h2 class="page-title">Settings</h2>
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="card">
-        <h3 class="text-xl mb-4">Nostr Settings</h3>
+        <h3 class="section-title">Nostr Settings</h3>
         
         <!-- Account Status -->
         <div class="mb-6">
@@ -174,7 +174,7 @@
       </div>
       
       <div class="card">
-        <h3 class="text-xl mb-4">Zombie Settings</h3>
+        <h3 class="section-title">Zombie Settings</h3>
         
         <div class="mb-6">
           <h4 class="text-lg mb-3">Zombie Classification</h4>
@@ -287,10 +287,10 @@
     </div>
     
     <div class="mt-6 card">
-      <h3 class="text-xl mb-4">🛡️ Zombie Immunity List</h3>
+      <h3 class="section-title">🛡️ Zombie Immunity List</h3>
       
       <div v-if="loading" class="text-center py-4">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-zombie-green"></div>
+        <div class="spinner-md"></div>
         <p class="mt-2 text-gray-400">Loading immunity records...</p>
       </div>
       
@@ -411,7 +411,7 @@
 
     <!-- Relay Storage Sync Section -->
     <div id="relay-backup" v-if="isConnected" class="mt-6 card">
-      <h3 class="text-xl mb-4">☁️ Relay Storage & Sync</h3>
+      <h3 class="section-title">☁️ Relay Storage & Sync</h3>
 
       <div class="mb-6">
         <p class="text-gray-300 mb-3">
@@ -436,7 +436,7 @@
 
           <div v-if="syncStatus.isSyncing" class="mb-3">
             <div class="flex items-center gap-2 text-sm text-gray-300">
-              <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-zombie-green"></div>
+              <div class="spinner-sm"></div>
               <span>Syncing...</span>
             </div>
           </div>
@@ -500,7 +500,7 @@
 
           <!-- Loading Backups -->
           <div v-if="loadingBackups" class="text-center py-4">
-            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-zombie-green"></div>
+            <div class="spinner h-6 w-6"></div>
             <p class="text-sm text-gray-400 mt-2">Loading backups...</p>
           </div>
 
@@ -517,7 +517,7 @@
               <!-- Restoring Indicator -->
               <div v-if="restoringBackup === backup.dTag" class="mb-3 p-3 bg-zombie-green/10 border border-zombie-green/30 rounded-lg">
                 <div class="flex items-center gap-3">
-                  <div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-zombie-green"></div>
+                  <div class="spinner h-5 w-5"></div>
                   <div>
                     <div class="text-zombie-green font-semibold">Restoring Backup...</div>
                     <div class="text-xs text-gray-400 mt-1">This may take a moment. Please wait.</div>
@@ -604,7 +604,7 @@
     </div>
 
     <div class="mt-6 card">
-      <h3 class="text-xl mb-4">App Information</h3>
+      <h3 class="section-title">App Information</h3>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div>

@@ -101,12 +101,9 @@
               @click="postToNostr"
               :disabled="posting || posted"
               :class="[
-                posted ? 'btn-success' : 'post-to-nostr-glow',
+                posted ? 'btn-success' : 'btn-nostr post-to-nostr-glow',
                 'w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-lg'
               ]"
-              :style="!posted ? 'background-color: #8e30eb; color: white;' : ''"
-              :onmouseover="!posted ? 'this.style.backgroundColor=\'#7a2bc7\'' : ''"
-              :onmouseout="!posted ? 'this.style.backgroundColor=\'#8e30eb\'' : ''"
             >
               <span v-if="posting">⏳</span>
               <span v-else-if="posted">✅</span>
@@ -134,10 +131,7 @@
             <a 
               href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h" 
               target="_blank"
-              class="text-xs px-3 py-1 rounded-full transition-colors inline-flex items-center gap-1"
-              style="background-color: #8e30eb;"
-              onmouseover="this.style.backgroundColor='#7a2bc7'"
-              onmouseout="this.style.backgroundColor='#8e30eb'"
+              class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
             >
               Follow on Nostr 🟣
             </a>
@@ -226,10 +220,7 @@
         <div class="flex gap-3 mt-6">
           <button 
             @click="zapOnNostr"
-            class="flex-1 text-white px-4 py-2 rounded transition-colors text-sm"
-            style="background-color: #8e30eb;"
-            onmouseover="this.style.backgroundColor='#7a2bc7'"
-            onmouseout="this.style.backgroundColor='#8e30eb'"
+            class="btn-nostr flex-1 text-sm"
           >
             Zap on Nostr
           </button>
