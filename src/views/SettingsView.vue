@@ -746,7 +746,7 @@ import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
 import { format, formatDistanceToNow } from 'date-fns';
 import { nip19 } from 'nostr-tools';
-import { baseVersion } from '../utils/version';
+import { getVersionSync } from '../utils/version';
 import Nip46Connection from '../components/Nip46Connection.vue';
 import { useRelaySync } from '../composables/useRelaySync';
 import relayBackupService from '../services/settings/relayBackupService';
@@ -819,7 +819,7 @@ export default {
       }
     },
     appVersion() {
-      return baseVersion;
+      return getVersionSync();
     }
   },
   methods: {

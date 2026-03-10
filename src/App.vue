@@ -135,9 +135,9 @@
                 <div class="p-1">
                   <button
                     @click="logout"
-                    class="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+                    class="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
                   >
-                    Logout
+                    🚪 Logout
                   </button>
                 </div>
               </div>
@@ -175,13 +175,17 @@
                   <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
                   <CopyButton :pubkey="userProfile?.pubkey" />
                 </div>
+                <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+                  {{ signerLabel }}
+                </div>
               </div>
             </div>
             <button
               @click="logout"
-              class="w-full px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors text-left"
+              class="w-full px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors text-left flex items-center gap-2"
             >
-              Logout
+              🚪 Logout
             </button>
           </div>
 

@@ -36,8 +36,8 @@
       <div class="flex flex-col gap-6">
         <div class="card">
           <h3 class="text-xl mb-4 flex items-center">
-            Remote Backup
-            <span class="ml-2 px-2 py-0.5 text-xs bg-blue-700 text-blue-100 rounded-full">External</span>
+            External Backup
+            <span class="ml-2 px-2 py-0.5 text-xs bg-blue-700 text-blue-100 rounded-full">Promoted</span>
           </h3>
 
           <div class="mb-6">
