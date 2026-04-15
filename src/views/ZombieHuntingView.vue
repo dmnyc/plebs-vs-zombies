@@ -15,8 +15,8 @@
           <div v-else>
             <div class="mb-4">
               <label class="block text-gray-300 mb-2">Zombie Age Threshold</label>
-              <select 
-                v-model="selectedThreshold" 
+              <select
+                v-model="selectedThreshold"
                 class="input w-full"
                 @change="updateThreshold"
               >
@@ -26,6 +26,37 @@
                 <option value="365">Ancient Zombies (365+ days)</option>
                 <option value="all">All Zombies</option>
               </select>
+            </div>
+
+            <div v-if="selectedThreshold !== 'burned'" class="mb-4">
+              <label class="block text-gray-300 mb-2">Inactive Date Range (days)</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  v-model.number="dateRangeMin"
+                  min="0"
+                  placeholder="Min"
+                  class="input w-full text-sm"
+                />
+                <span class="text-gray-500">to</span>
+                <input
+                  type="number"
+                  v-model.number="dateRangeMax"
+                  min="0"
+                  placeholder="Max"
+                  class="input w-full text-sm"
+                />
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                Filter by days since last activity. Leave empty for no limit.
+              </p>
+              <button
+                v-if="dateRangeMin || dateRangeMax"
+                @click="dateRangeMin = null; dateRangeMax = null"
+                class="text-xs text-gray-400 hover:text-gray-200 mt-1"
+              >
+                Clear range
+              </button>
             </div>
             
             <div class="mb-4">
@@ -325,6 +356,8 @@ export default {
       purgeSuccess: false,
       showCelebration: false,
       selectedThreshold: 'all',
+      dateRangeMin: null,
+      dateRangeMax: null,
       batchSize: 30,
       zombieData: null,
       lastPurgeResult: null,
@@ -414,21 +447,18 @@ export default {
         ];
       }
       
-      // Debug: log zombie filtering process
-      if (zombies.length > 0) {
-        console.log(`🎯 zombiesFiltered: ${zombies.length} zombies after filtering by threshold '${this.selectedThreshold}'`);
-        
-        // Check for our problematic users
-        const debugPrefixes = ['d4338b7c', '8c7c6312', '2e5c7e3'];
-        for (const zombie of zombies) {
-          for (const prefix of debugPrefixes) {
-            if (zombie.pubkey?.startsWith(prefix)) {
-              console.log(`🎯 Debug user ${zombie.pubkey.substring(0, 8)}... in filtered zombies:`, zombie);
-            }
-          }
-        }
+      // Apply date range filter if set
+      if (this.dateRangeMin != null || this.dateRangeMax != null) {
+        zombies = zombies.filter(z => {
+          // Burned zombies with no activity data pass through if no min is set
+          if (z.daysSinceActivity == null) return this.dateRangeMin == null;
+          const days = z.daysSinceActivity;
+          if (this.dateRangeMin != null && days < this.dateRangeMin) return false;
+          if (this.dateRangeMax != null && days > this.dateRangeMax) return false;
+          return true;
+        });
       }
-      
+
       return zombies;
     }
   },
