@@ -1073,6 +1073,36 @@ class NostrService {
           activityMap.set(pubkey, currentEvents.slice(0, limit));
         }
 
+        // Quick individual recheck for users in this batch with no results
+        // Batch queries can miss quiet users when prolific posters fill the limit
+        const missedUsers = batch.filter(
+          (pk) => (activityMap.get(pk) || []).length === 0,
+        );
+        if (missedUsers.length > 0 && missedUsers.length <= batchSize) {
+          const recheckPromises = missedUsers.map(async (pk) => {
+            try {
+              const individualEvents = await this.ndk.fetchEvents({
+                kinds: [1, 6, 7],
+                authors: [pk],
+                limit: 3,
+              });
+              if (individualEvents && individualEvents.size > 0) {
+                const evts = Array.from(individualEvents)
+                  .sort((a, b) => b.created_at - a.created_at)
+                  .slice(0, limit)
+                  .map((e) => ({
+                    id: e.id,
+                    created_at: e.created_at,
+                    content: e.content,
+                    kind: e.kind,
+                  }));
+                activityMap.set(pk, evts);
+              }
+            } catch (_) {}
+          });
+          await Promise.all(recheckPromises);
+        }
+
         // Report batch completion with progress update
         if (progressCallback) {
           const processed = Math.min(i + batchSize, pubkeys.length);
