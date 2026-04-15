@@ -1010,12 +1010,13 @@ class NostrService {
       const batchNum = Math.floor(i / batchSize) + 1;
 
       try {
-        // Comprehensive filter - multiple event types, reasonable time window
+        // Comprehensive filter - multiple event types, full year lookback
+        // Must cover the full zombie threshold range (up to 365 days)
         const filter = {
           kinds: [0, 1, 3, 6, 7, 9735], // Profiles, posts, contacts, reposts, reactions, zaps
           authors: batch,
           limit: limit * batch.length, // Proportional limit
-          since: Math.floor(Date.now() / 1000) - 120 * 24 * 60 * 60, // 120 days - good balance
+          since: Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60, // 365 days - matches zombie thresholds
         };
 
         console.log(
@@ -2474,23 +2475,41 @@ class NostrService {
    */
   async fetchUserActivitySingle(pubkey, relays, limit = 5) {
     const filter = {
-      kinds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      kinds: [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063,
+        1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001,
+        30008, 30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923, 31924,
+        31925, 31989, 31990, 34550,
+      ],
       authors: [pubkey],
       limit: limit,
-      since: Math.floor((Date.now() - 180 * 24 * 60 * 60 * 1000) / 1000), // Only look back 6 months for retry
+      since: Math.floor((Date.now() - 365 * 24 * 60 * 60 * 1000) / 1000), // 1 year lookback
     };
 
     const events = [];
 
+    // Use per-user relays if provided, otherwise fall back to default NDK
+    const relaysToUse =
+      relays && relays.length > 0 ? relays : this.relays;
+
     try {
-      // Use main NDK instance but query specific relays temporarily
-      const subscription = this.ndk.subscribe(filter, { closeOnEose: true });
+      // Create temporary NDK instance with the user's specific relays
+      // This ensures we actually query their write relays per NIP-65
+      const specificNdk = new NDK({
+        explicitRelayUrls: relaysToUse,
+      });
+
+      await specificNdk.connect();
+
+      const subscription = specificNdk.subscribe(filter);
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
-          resolve(events);
-        }, 5000); // Shorter timeout for retry
+          try { specificNdk.pool.close(); } catch (_) {}
+          events.sort((a, b) => b.created_at - a.created_at);
+          resolve(events.slice(0, limit));
+        }, 10000); // 10 second timeout
 
         subscription.on("event", (event) => {
           events.push(event);
@@ -2499,6 +2518,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
+          try { specificNdk.pool.close(); } catch (_) {}
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         });
@@ -2506,6 +2526,7 @@ class NostrService {
         subscription.on("error", () => {
           clearTimeout(timeout);
           subscription.stop();
+          try { specificNdk.pool.close(); } catch (_) {}
           resolve(events);
         });
       });
