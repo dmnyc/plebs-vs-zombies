@@ -1001,8 +1001,9 @@ class NostrService {
       `🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`,
     );
 
-    // Balanced approach: reasonable batches, good event coverage, sufficient time window
-    const batchSize = 25; // Balanced batch size
+    // Smaller batches ensure each user gets relay coverage
+    // Larger batches cause prolific posters to crowd out quieter users in results
+    const batchSize = 10;
     const totalBatches = Math.ceil(pubkeys.length / batchSize);
 
     for (let i = 0; i < pubkeys.length; i += batchSize) {
@@ -1010,12 +1011,14 @@ class NostrService {
       const batchNum = Math.floor(i / batchSize) + 1;
 
       try {
-        // Comprehensive filter - multiple event types, reasonable time window
+        // Comprehensive filter - multiple event types, full year lookback
+        // Must cover the full zombie threshold range (up to 365 days)
+        // Higher per-user limit to avoid prolific posters crowding out quiet users
         const filter = {
           kinds: [0, 1, 3, 6, 7, 9735], // Profiles, posts, contacts, reposts, reactions, zaps
           authors: batch,
-          limit: limit * batch.length, // Proportional limit
-          since: Math.floor(Date.now() / 1000) - 120 * 24 * 60 * 60, // 120 days - good balance
+          limit: 20 * batch.length, // 20 events per user to ensure coverage
+          since: Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60, // 365 days - matches zombie thresholds
         };
 
         console.log(
