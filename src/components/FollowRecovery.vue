@@ -163,7 +163,7 @@
             class="text-sm text-gray-400 hover:text-gray-200 flex items-center gap-1"
           >
             <span>{{ showAllCandidates ? '▼' : '▶' }}</span>
-            <span>{{ showAllCandidates ? 'Hide' : 'Show' }} all {{ result.candidates.length }} version{{ result.candidates.length === 1 ? '' : 's' }} found</span>
+            <span>{{ showAllCandidates ? 'Hide' : 'Show' }} {{ result.candidates.length }} version{{ result.candidates.length === 1 ? '' : 's' }} found</span>
           </button>
           <div v-if="showAllCandidates" class="mt-3 space-y-2">
             <CandidateRow
