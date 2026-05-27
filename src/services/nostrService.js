@@ -1073,15 +1073,30 @@ class NostrService {
           activityMap.set(pubkey, currentEvents.slice(0, limit));
         }
 
-        // Quick individual recheck for users in this batch with no results.
-        // Batch queries can miss quiet users when prolific posters fill the limit.
-        // Recheck filter mirrors the batch filter so we don't strip activity
-        // signals (profile updates, contacts, zaps) on the second pass.
-        const missedUsers = batch.filter(
-          (pk) => (activityMap.get(pk) || []).length === 0,
-        );
-        if (missedUsers.length > 0) {
-          const recheckPromises = missedUsers.map(async (pk) => {
+        // Per-user recheck for users whose batch results are missing or stale.
+        // Batch queries can let prolific posters crowd out quieter users'
+        // recent activity even when the relay has it. A single-user query has
+        // no such crowding and reliably returns each user's most recent events.
+        //
+        // We recheck:
+        //   (a) users with zero events in the batch (would be misclassified ancient)
+        //   (b) users whose newest event is older than RECHECK_STALE_THRESHOLD
+        //       (might be misclassified as a zombie when they're actually active)
+        const RECHECK_STALE_THRESHOLD_DAYS = 60;
+        const staleCutoff =
+          Math.floor(Date.now() / 1000) - RECHECK_STALE_THRESHOLD_DAYS * 86400;
+
+        const usersToRecheck = batch.filter((pk) => {
+          const events = activityMap.get(pk) || [];
+          if (events.length === 0) return true; // (a) no events
+          return events[0].created_at < staleCutoff; // (b) newest is stale
+        });
+
+        if (usersToRecheck.length > 0) {
+          console.log(
+            `🔁 Batch ${batchNum}: rechecking ${usersToRecheck.length} user(s) (missing or stale)`,
+          );
+          const recheckPromises = usersToRecheck.map(async (pk) => {
             try {
               const individualEvents = await this.ndk.fetchEvents({
                 kinds: [0, 1, 3, 6, 7, 9735],
@@ -1098,7 +1113,16 @@ class NostrService {
                     content: e.content,
                     kind: e.kind,
                   }));
-                activityMap.set(pk, evts);
+                // Only overwrite if the recheck found something newer than what
+                // we already had — protects against the recheck returning only
+                // older events than the batch already cached.
+                const existing = activityMap.get(pk) || [];
+                if (
+                  existing.length === 0 ||
+                  evts[0].created_at > existing[0].created_at
+                ) {
+                  activityMap.set(pk, evts);
+                }
               }
             } catch (_) {}
           });
