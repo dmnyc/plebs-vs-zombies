@@ -13,7 +13,7 @@
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded font-semibold transition-colors;
+    @apply font-main px-4 py-2 rounded font-semibold transition-colors;
   }
   .btn-primary {
     @apply btn bg-zombie-green text-zombie-dark hover:bg-green-400;
@@ -119,9 +119,14 @@
   }
 }
 
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  .btn-hunt {
+  .btn-hunt,
+  .animate-pulse-glow {
     animation: none;
   }
   @keyframes pulse-glow {

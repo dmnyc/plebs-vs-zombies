@@ -13,7 +13,6 @@ const DEBUG_NPUB = process.argv[2] || 'npub1yaul8k059377u9lsu67de7y637w4jtgeuwcm
 // Default relays used by scout service
 const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.nostr.band', 
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://nostr.wine'

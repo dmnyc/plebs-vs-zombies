@@ -25,7 +25,6 @@ import fs from 'fs';
 // Default relay list for comprehensive scanning (fallback)
 const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.nostr.band',
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://nostr.wine',

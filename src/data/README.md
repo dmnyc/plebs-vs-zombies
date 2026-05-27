@@ -56,16 +56,14 @@ npm run update-profiles
 node scripts/fetch-well-known-profiles.js
 ```
 
-**Note**: The script previously fetched trending profiles from the nostr.band API, which is no longer operational. It now falls back to a curated manual list of well-known profiles.
+**Note**: The script previously fetched trending profiles from the nostr.band API, which is no longer operational. It now writes only a curated manual list maintained inline in the script. The Vertex API integration will replace this entirely.
 
 #### Automated Updates
 
-We use **GitHub Actions** to automatically update the list monthly:
+A GitHub Action regenerates the JSON file monthly to keep it in sync with the inline curated list:
 - Runs on the 1st of each month at 3am UTC
-- Creates a PR with the updated profiles
-- You can also trigger manually from the GitHub Actions tab
-
-This means the list stays fresh without manual intervention!
+- Creates a PR if the file differs from the script's output
+- Can be triggered manually from the GitHub Actions tab
 
 ### Finding Popular Profiles Manually
 
