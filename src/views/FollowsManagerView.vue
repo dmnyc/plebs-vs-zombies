@@ -2,9 +2,9 @@
   <div>
     <h2 class="page-title">Follows Manager</h2>
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
       <!-- Follow List Management -->
-      <div class="lg:col-span-1">
+      <div class="lg:col-span-1 lg:flex lg:flex-col">
         <div class="card mb-6">
           <h3 class="section-title">Follow List Management</h3>
           
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Hunt Zombies CTA -->
-        <div v-if="followList.length > 50" class="card bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-zombie-green/40">
+        <div v-if="followList.length > 50" class="card mb-6 bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-zombie-green/40">
           <div class="text-center">
             <div class="text-5xl mb-3">🧟‍♂️</div>
             <h3 class="text-xl font-bold text-zombie-green mb-2">
@@ -55,6 +55,26 @@
               class="btn-hunt w-full"
             >
               🎯 Scan for Zombies
+            </button>
+          </div>
+        </div>
+
+        <!-- Follow List Recovery CTA -->
+        <div class="card bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-blue-600/40 lg:flex-1 lg:flex lg:items-center lg:justify-center">
+          <div class="text-center">
+            <div class="text-5xl mb-3">🛟</div>
+            <h3 class="text-xl font-bold text-blue-300 mb-2">
+              Follow list get eaten?
+            </h3>
+            <p class="text-gray-300 text-sm mb-4">
+              Scan your relays for older versions and republish a prior follow list. No backup required.
+            </p>
+            <button
+              @click="goToRecovery"
+              class="btn-primary w-full inline-flex items-center justify-center gap-2"
+            >
+              <span>🛟</span>
+              <span>Open Recovery Tool</span>
             </button>
           </div>
         </div>
@@ -587,6 +607,9 @@ export default {
     },
     goToZombieHunting() {
       this.$router.push('/hunt');
+    },
+    goToRecovery() {
+      this.$router.push('/recover');
     },
     handleAvatarError(event) {
       const img = event.target;
