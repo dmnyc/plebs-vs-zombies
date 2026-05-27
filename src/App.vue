@@ -1,8 +1,8 @@
 <template>
   <div class="min-h-screen flex flex-col bg-gray-900">
-    <header class="bg-zombie-dark border-b border-gray-700 shadow-lg" :key="forceUpdateKey">
-      <div class="container mx-auto px-4 py-4">
-        <div class="flex justify-between items-center">
+    <header :class="isConnected ? 'bg-zombie-dark border-b border-gray-700 shadow-lg' : 'bg-gray-900'" :key="forceUpdateKey">
+      <div class="container mx-auto px-4" :class="isConnected ? 'py-4' : 'pt-8 pb-0'">
+        <div class="flex items-center" :class="isConnected ? 'justify-between' : 'justify-center'">
           <div class="flex items-center gap-3" :class="isScoutMode ? '' : 'cursor-pointer'" @click="!isScoutMode && setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
             <div class="flex flex-col">
@@ -295,11 +295,12 @@
       <!-- Login Screen -->
       <div v-else-if="!isConnected">
         <!-- Login Card -->
-        <div class="card max-w-2xl mx-auto my-12">
+        <div class="card max-w-2xl mx-auto mt-2 mb-12">
           <div class="text-center mb-8">
             <div class="text-6xl mb-6">🧟‍♂️</div>
             <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
-            <p class="text-gray-300">Connect with your browser extension to manage your dormant follows.</p>
+            <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
+            <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
           </div>
 
           <div class="space-y-4 mb-8">

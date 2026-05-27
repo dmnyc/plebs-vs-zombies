@@ -2,9 +2,9 @@
   <div>
     <h2 class="page-title">Follows Manager</h2>
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Follow List Management -->
-      <div class="lg:col-span-1 lg:flex lg:flex-col">
+      <div class="lg:col-span-1">
         <div class="card mb-6">
           <h3 class="section-title">Follow List Management</h3>
           
@@ -60,7 +60,7 @@
         </div>
 
         <!-- Follow List Recovery CTA -->
-        <div class="card bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-blue-600/40 lg:flex-1 lg:flex lg:items-center lg:justify-center">
+        <div class="card bg-gradient-to-br from-zombie-dark to-gray-900 border-2 border-blue-600/40">
           <div class="text-center">
             <div class="text-5xl mb-3">🛟</div>
             <h3 class="text-xl font-bold text-blue-300 mb-2">
