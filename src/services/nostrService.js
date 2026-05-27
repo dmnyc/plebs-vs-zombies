@@ -1073,18 +1073,20 @@ class NostrService {
           activityMap.set(pubkey, currentEvents.slice(0, limit));
         }
 
-        // Quick individual recheck for users in this batch with no results
-        // Batch queries can miss quiet users when prolific posters fill the limit
+        // Quick individual recheck for users in this batch with no results.
+        // Batch queries can miss quiet users when prolific posters fill the limit.
+        // Recheck filter mirrors the batch filter so we don't strip activity
+        // signals (profile updates, contacts, zaps) on the second pass.
         const missedUsers = batch.filter(
           (pk) => (activityMap.get(pk) || []).length === 0,
         );
-        if (missedUsers.length > 0 && missedUsers.length <= batchSize) {
+        if (missedUsers.length > 0) {
           const recheckPromises = missedUsers.map(async (pk) => {
             try {
               const individualEvents = await this.ndk.fetchEvents({
-                kinds: [1, 6, 7],
+                kinds: [0, 1, 3, 6, 7, 9735],
                 authors: [pk],
-                limit: 3,
+                limit: 10,
               });
               if (individualEvents && individualEvents.size > 0) {
                 const evts = Array.from(individualEvents)
