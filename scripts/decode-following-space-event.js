@@ -28,7 +28,6 @@ try {
     // Fetch the event from relays
     const relayUrls = relays && relays.length > 0 ? relays : [
       'wss://relay.damus.io',
-      'wss://relay.nostr.band',
       'wss://nos.lol',
       'wss://relay.primal.net'
     ];

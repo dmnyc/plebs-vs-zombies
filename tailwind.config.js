@@ -15,7 +15,7 @@ export default {
       },
       fontFamily: {
         'horror': ['"Creepster"', 'cursive'],
-        'main': ['"Inter"', 'sans-serif'],
+        'main': ['"Geist"', 'sans-serif'],
       }
     },
   },

@@ -30,7 +30,6 @@ import readline from 'readline';
 // Default fallback relays if NIP-65 relay list is not found
 const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.nostr.band',
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://nostr.wine',

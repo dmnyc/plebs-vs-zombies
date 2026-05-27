@@ -24,7 +24,6 @@ const D_TAG = 'a9pxvkdhuo61';
 const EVENT_KIND = 39089;
 const RELAYS = [
   'wss://relay.damus.io',
-  'wss://relay.nostr.band',
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://relay.snort.social',

@@ -33,6 +33,12 @@ const routes = [
     meta: { title: 'Backups - Plebs vs Zombies' }
   },
   {
+    path: '/recover',
+    name: 'Recover',
+    component: BackupsView,
+    meta: { title: 'Follow List Recovery - Plebs vs Zombies', defaultTab: 'recover' }
+  },
+  {
     path: '/resurrector',
     name: 'Resurrector',
     component: ResurrectorView,

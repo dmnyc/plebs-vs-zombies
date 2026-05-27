@@ -23,21 +23,82 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
-      <!-- Backup Controls with Information -->
-      <BackupControls
-        @backup-created="handleBackupCreated"
-        @backup-imported="handleBackupImported"
-      />
+    <!-- Tab Navigation -->
+    <nav class="flex border-b border-gray-700 mb-6 overflow-x-auto" role="tablist" aria-label="Backup sections">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        :id="`tab-${tab.id}`"
+        role="tab"
+        :aria-selected="activeTab === tab.id"
+        :aria-controls="`panel-${tab.id}`"
+        :tabindex="activeTab === tab.id ? 0 : -1"
+        @click="activeTab = tab.id"
+        @keydown="handleTabKeydown($event, tab.id)"
+        class="px-4 py-3 text-sm md:text-base font-medium whitespace-nowrap transition-colors border-b-2 -mb-px focus:outline-none focus:ring-2 focus:ring-zombie-green focus:ring-offset-2 focus:ring-offset-zombie-dark"
+        :class="activeTab === tab.id
+          ? 'border-zombie-green text-zombie-green'
+          : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'"
+      >
+        <span class="mr-2">{{ tab.icon }}</span>{{ tab.label }}
+      </button>
+    </nav>
 
-      <!-- Backup History -->
-      <BackupHistory ref="backupHistory" @backup-restored="handleBackupRestored" />
+    <!-- Backups Tab -->
+    <section
+      v-show="activeTab === 'backups'"
+      id="panel-backups"
+      role="tabpanel"
+      aria-labelledby="tab-backups"
+    >
+      <!-- Recovery discovery callout -->
+      <div class="mb-6 bg-gradient-to-r from-blue-900/30 via-zombie-dark to-blue-900/30 border border-blue-700/50 rounded-lg p-5">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div class="flex items-start gap-4">
+            <div class="text-4xl flex-shrink-0">🛟</div>
+            <div>
+              <h3 class="text-lg font-bold text-blue-200 mb-1">Follow list get eaten?</h3>
+              <p class="text-sm text-blue-300">
+                If another client wiped or shrank your follows, the Recovery tool can scan your relays for older versions and republish a prior one. No backup required.
+              </p>
+            </div>
+          </div>
+          <button
+            @click="activeTab = 'recover'"
+            class="btn-primary whitespace-nowrap inline-flex items-center justify-center gap-2"
+          >
+            <span>Go to Recovery</span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
 
-      <div class="flex flex-col gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BackupControls
+          @backup-created="handleBackupCreated"
+          @backup-imported="handleBackupImported"
+        />
+        <BackupHistory ref="backupHistory" @backup-restored="handleBackupRestored" />
+      </div>
+    </section>
+
+    <!-- Recover Tab -->
+    <section
+      v-show="activeTab === 'recover'"
+      id="panel-recover"
+      role="tabpanel"
+      aria-labelledby="tab-recover"
+    >
+      <!-- Follow List Recovery (new feature) -->
+      <FollowRecovery class="mb-6" />
+
+      <!-- External + Encrypted Relay Backup cards -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- nostr.land Backup -->
         <div class="card">
           <h3 class="text-xl mb-4 flex items-center">
-            External Backup
-            <span class="ml-2 px-2 py-0.5 text-xs bg-blue-700 text-blue-100 rounded-full">Promoted</span>
+            nostr.land Backup
+            <span class="ml-2 px-2 py-0.5 text-xs bg-blue-700 text-blue-100 rounded-full">Public</span>
           </h3>
 
           <div class="mb-6">
@@ -94,41 +155,41 @@
               </div>
             </div>
 
-          <div class="flex flex-col gap-3">
-            <a
-              href="https://nostr.land/restore"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn-primary w-full text-center inline-flex items-center justify-center"
-            >
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-              </svg>
-              Restore from Nostr.land
-            </a>
-            <button
-              @click="publishNip65Relay"
-              class="btn-secondary w-full text-center inline-flex items-center justify-center"
-              :disabled="nip65Publishing || nip65RelayAdded"
-            >
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"></path>
-              </svg>
-              {{ nip65ButtonLabel }}
-            </button>
-            <p v-if="nip65Status" class="text-xs text-green-400">{{ nip65Status }}</p>
-            <p v-else-if="nip65Error" class="text-xs text-red-400">{{ nip65Error }}</p>
-            <p v-else class="text-xs text-gray-500">
-              Publishes wss://hist.nostr.land to your announced relays (NIP-65).
-            </p>
+            <div class="flex flex-col gap-3">
+              <a
+                href="https://nostr.land/restore"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn-primary w-full text-center inline-flex items-center justify-center"
+              >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+                Restore from Nostr.land
+              </a>
+              <button
+                @click="publishNip65Relay"
+                class="btn-secondary w-full text-center inline-flex items-center justify-center"
+                :disabled="nip65Publishing || nip65RelayAdded"
+              >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"></path>
+                </svg>
+                {{ nip65ButtonLabel }}
+              </button>
+              <p v-if="nip65Status" class="text-xs text-green-400">{{ nip65Status }}</p>
+              <p v-else-if="nip65Error" class="text-xs text-red-400">{{ nip65Error }}</p>
+              <p v-else class="text-xs text-gray-500">
+                Publishes wss://hist.nostr.land to your announced relays (NIP-65).
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-        <!-- Relay Backup Section -->
+        <!-- Encrypted Relay Backup -->
         <div class="card">
           <h3 class="text-xl mb-4 flex items-center">
-            Relay Backup
+            Encrypted Relay Backup
             <span class="ml-2 px-2 py-0.5 text-xs bg-purple-700 text-purple-100 rounded-full">Encrypted</span>
           </h3>
 
@@ -187,23 +248,30 @@
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
 <script>
 import BackupControls from '../components/BackupControls.vue';
 import BackupHistory from '../components/BackupHistory.vue';
+import FollowRecovery from '../components/FollowRecovery.vue';
 import nostrService from '../services/nostrService';
 
 export default {
   name: 'BackupsView',
   components: {
     BackupControls,
-    BackupHistory
+    BackupHistory,
+    FollowRecovery
   },
   data() {
     return {
+      activeTab: 'backups',
+      tabs: [
+        { id: 'backups', label: 'Backups', icon: '💾' },
+        { id: 'recover', label: 'Recover', icon: '🛟' }
+      ],
       relayCopied: false,
       showHuntCTA: false,
       userRelayList: null,
@@ -227,6 +295,21 @@ export default {
     }
   },
   methods: {
+    handleTabKeydown(event, tabId) {
+      const idx = this.tabs.findIndex((t) => t.id === tabId);
+      if (idx === -1) return;
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        const next = this.tabs[(idx + 1) % this.tabs.length];
+        this.activeTab = next.id;
+        this.$nextTick(() => document.getElementById(`tab-${next.id}`)?.focus());
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const prev = this.tabs[(idx - 1 + this.tabs.length) % this.tabs.length];
+        this.activeTab = prev.id;
+        this.$nextTick(() => document.getElementById(`tab-${prev.id}`)?.focus());
+      }
+    },
     normalizeRelayUrl(relayUrl) {
       return relayUrl.trim().replace(/\/$/, '');
     },
@@ -245,7 +328,6 @@ export default {
     },
     goToRelayBackups() {
       this.$router.push('/settings');
-      // Scroll to relay backup section after navigation
       this.$nextTick(() => {
         const element = document.getElementById('relay-backup');
         if (element) {
@@ -284,17 +366,13 @@ export default {
       }
     },
     handleBackupCreated(backup) {
-      // Refresh the backup history
       if (this.$refs.backupHistory) {
         this.$refs.backupHistory.loadBackups(true);
       }
-
-      // Show Hunt CTA after successful backup (persists until user navigates away)
       this.showHuntCTA = true;
     },
     handleBackupImported(result) {
       console.log('📢 BackupsView received backup-imported event:', result);
-      // Refresh the backup history
       if (this.$refs.backupHistory) {
         console.log('🔄 Refreshing BackupHistory component');
         this.$refs.backupHistory.loadBackups(true);
@@ -304,12 +382,17 @@ export default {
     },
     handleBackupRestored(result) {
       console.log('📢 Backup restored in parent:', result);
-      // The BackupHistory component already shows detailed success feedback
-      // Could potentially refresh other components here if needed
     }
   },
   mounted() {
     this.userRelayList = nostrService.userRelayList;
+    // Tab selection priority: ?tab=foo query > route meta defaultTab > 'backups'
+    const tabFromQuery = this.$route?.query?.tab;
+    const tabFromMeta = this.$route?.meta?.defaultTab;
+    const requested = tabFromQuery || tabFromMeta;
+    if (requested && this.tabs.some((t) => t.id === requested)) {
+      this.activeTab = requested;
+    }
   }
 };
 </script>

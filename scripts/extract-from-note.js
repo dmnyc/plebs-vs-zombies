@@ -23,7 +23,6 @@ import { nip19 } from 'nostr-tools';
 // Nostr relays to query
 const RELAYS = [
     'wss://relay.damus.io',
-    'wss://relay.nostr.band',
     'wss://nos.lol',
     'wss://relay.primal.net',
     'wss://nostr.wine'
