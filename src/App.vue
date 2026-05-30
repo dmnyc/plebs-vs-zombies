@@ -6,7 +6,13 @@
           <div class="flex items-center gap-3" :class="isScoutMode ? '' : 'cursor-pointer'" @click="!isScoutMode && setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
             <div class="flex flex-col">
-              <h1 class="text-2xl sm:text-3xl transition-colors" :class="isScoutMode ? '' : 'hover:text-zombie-green'">
+              <h1
+                class="transition-colors"
+                :class="[
+                  isLoginScreen ? 'text-3xl sm:text-5xl' : 'text-2xl sm:text-3xl',
+                  isScoutMode ? '' : 'hover:text-zombie-green'
+                ]"
+              >
                 Plebs vs. Zombies
               </h1>
             </div>
