@@ -1,8 +1,8 @@
 <template>
   <div class="min-h-screen flex flex-col bg-gray-900">
-    <header :class="isConnected ? 'bg-zombie-dark border-b border-gray-700 shadow-lg' : 'bg-gray-900'" :key="forceUpdateKey">
-      <div class="container mx-auto px-4" :class="isConnected ? 'py-4' : 'pt-8 pb-0'">
-        <div class="flex items-center" :class="isConnected ? 'justify-between' : 'justify-center'">
+    <header :class="isLoginScreen ? 'bg-gray-900' : 'bg-zombie-dark border-b border-gray-700 shadow-lg'" :key="forceUpdateKey">
+      <div class="container mx-auto px-4" :class="isLoginScreen ? 'pt-8 pb-0' : 'py-4'">
+        <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
           <div class="flex items-center gap-3" :class="isScoutMode ? '' : 'cursor-pointer'" @click="!isScoutMode && setActiveView('dashboard')">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
             <div class="flex flex-col">
@@ -801,6 +801,13 @@ export default {
       if (method === 'nip46') return 'Remote Signer';
       if (method === 'nsec') return 'Private Key';
       return '';
+    },
+    // The actual sign-in landing page. Scout Mode is also unauthenticated
+    // but renders its own nav (Start Over, etc.) in the header, so it must
+    // keep the original styled header — only the real sign-in screen gets
+    // the stripped-down treatment.
+    isLoginScreen() {
+      return !this.isConnected && !this.isScoutMode;
     }
   },
   watch: {
