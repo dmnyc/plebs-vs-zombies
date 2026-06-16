@@ -31,6 +31,10 @@ export default defineConfig({
           else if (req.url === '/competition') {
             req.url = '/competition.html'
           }
+          // Rewrite /zombiecheck to /zombiecheck.html
+          else if (req.url === '/zombiecheck') {
+            req.url = '/zombiecheck.html'
+          }
           next()
         })
       }

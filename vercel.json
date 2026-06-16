@@ -16,6 +16,10 @@
       "destination": "/resurrector.html"
     },
     {
+      "source": "/zombiecheck",
+      "destination": "/zombiecheck.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
