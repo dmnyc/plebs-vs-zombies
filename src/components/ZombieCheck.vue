@@ -88,7 +88,7 @@ import ProfileSearchInput from './ProfileSearchInput.vue';
 
 const CATEGORY_DISPLAY = {
   active: {
-    emoji: '💚',
+    emoji: '🫀',
     label: 'Alive!',
     borderClass: 'border-zombie-green bg-green-900/10',
     textClass: 'text-zombie-green',
