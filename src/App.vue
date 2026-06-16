@@ -64,29 +64,51 @@
                 <li>
                   <a
                     href="#"
-                    @click.prevent="setActiveView('resurrector')"
-                    :class="{'text-zombie-green': activeView === 'resurrector', 'hover:text-zombie-green transition-colors': activeView !== 'resurrector'}"
-                  >
-                    Resurrector
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#"
                     @click.prevent="setActiveView('settings')"
                     :class="{'text-zombie-green': activeView === 'settings', 'hover:text-zombie-green transition-colors': activeView !== 'settings'}"
                   >
                     Settings
                   </a>
                 </li>
-                <li>
+                <li class="relative more-dropdown">
                   <a
                     href="#"
-                    @click.prevent="showScoutModeMenu"
-                    :class="{'text-zombie-green': isScoutMode, 'hover:text-zombie-green transition-colors': !isScoutMode}"
+                    @click.prevent="moreDropdownOpen = !moreDropdownOpen"
+                    class="inline-flex items-center gap-1"
+                    :class="{'text-zombie-green': isMoreActive, 'hover:text-zombie-green transition-colors': !isMoreActive}"
                   >
-                    Scout Mode
+                    More
+                    <span class="text-xs" :class="{'rotate-180': moreDropdownOpen}">▾</span>
                   </a>
+                  <div
+                    v-if="moreDropdownOpen"
+                    class="absolute right-0 mt-2 w-44 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50 p-1"
+                  >
+                    <a
+                      href="#"
+                      @click.prevent="showScoutModeMenu(); moreDropdownOpen = false"
+                      class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                      :class="isScoutMode ? 'text-zombie-green' : ''"
+                    >
+                      Scout Mode
+                    </a>
+                    <a
+                      href="#"
+                      @click.prevent="setActiveView('zombieCheck'); moreDropdownOpen = false"
+                      class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                      :class="activeView === 'zombieCheck' && !isScoutMode ? 'text-zombie-green' : ''"
+                    >
+                      Zombie Check
+                    </a>
+                    <a
+                      href="#"
+                      @click.prevent="setActiveView('resurrector'); moreDropdownOpen = false"
+                      class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                      :class="activeView === 'resurrector' && !isScoutMode ? 'text-zombie-green' : ''"
+                    >
+                      Resurrector
+                    </a>
+                  </div>
                 </li>
               </ul>
             </nav>
@@ -239,22 +261,18 @@
             <li>
               <a
                 href="#"
-                @click.prevent="setActiveView('resurrector'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'resurrector'}"
-                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
-              >
-                Resurrector
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
                 @click.prevent="setActiveView('settings'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-gray-800': activeView === 'settings'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Settings
               </a>
+            </li>
+
+            <li class="pt-2 mt-2 border-t border-gray-700/50">
+              <span class="block px-4 pt-1 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                More
+              </span>
             </li>
             <li>
               <a
@@ -264,6 +282,26 @@
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Scout Mode
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                @click.prevent="setActiveView('zombieCheck'); mobileMenuOpen = false"
+                :class="{'text-zombie-green bg-gray-800': activeView === 'zombieCheck' && !isScoutMode}"
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Zombie Check
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                @click.prevent="setActiveView('resurrector'); mobileMenuOpen = false"
+                :class="{'text-zombie-green bg-gray-800': activeView === 'resurrector' && !isScoutMode}"
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Resurrector
               </a>
             </li>
           </ul>
@@ -447,6 +485,11 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Zombie Check Section -->
+          <div class="mt-10 pt-6 border-t border-gray-700/50">
+            <ZombieCheck />
           </div>
 
           <!-- The Resurrector Section -->
@@ -720,11 +763,13 @@ import BackupsView from './views/BackupsView.vue';
 import SettingsView from './views/SettingsView.vue';
 import FollowsManagerView from './views/FollowsManagerView.vue';
 import ScoutModeView from './views/ScoutModeView.vue';
+import ZombieCheckView from './views/ZombieCheckView.vue';
 import ResurrectorView from './views/ResurrectorView.vue';
 import CopyButton from './components/CopyButton.vue';
 import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import ProfileSearchInput from './components/ProfileSearchInput.vue';
+import ZombieCheck from './components/ZombieCheck.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -747,7 +792,8 @@ export default {
     Analytics,
     Nip46Connection,
     ClientAuthorizationModal,
-    ProfileSearchInput
+    ProfileSearchInput,
+    ZombieCheck
   },
   data() {
     return {
@@ -755,6 +801,7 @@ export default {
       activeView: 'dashboard',
       mobileMenuOpen: false,
       userDropdownOpen: false,
+      moreDropdownOpen: false,
       userProfile: null,
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
       forceUpdateKey: 0,
@@ -785,7 +832,8 @@ export default {
         settings: markRaw(SettingsView),
         follows: markRaw(FollowsManagerView),
         resurrector: markRaw(ResurrectorView),
-        scout: markRaw(ScoutModeView)
+        scout: markRaw(ScoutModeView),
+        zombieCheck: markRaw(ZombieCheckView)
       },
       // Scout Mode state
       isScoutMode: false,
@@ -814,6 +862,15 @@ export default {
     // the stripped-down treatment.
     isLoginScreen() {
       return !this.isConnected && !this.isScoutMode;
+    },
+    // True when the active view lives inside the "More" dropdown, so the
+    // dropdown trigger can show the active-highlight state.
+    isMoreActive() {
+      return (
+        this.isScoutMode ||
+        this.activeView === 'zombieCheck' ||
+        this.activeView === 'resurrector'
+      );
     }
   },
   watch: {
@@ -826,7 +883,8 @@ export default {
         'Backups': 'backups',
         'Resurrector': 'resurrector',
         'Settings': 'settings',
-        'Scout': 'scout'
+        'Scout': 'scout',
+        'Zombie Check': 'zombieCheck'
       };
 
       const viewName = routeToView[to.name];
@@ -845,7 +903,8 @@ export default {
         'backups': '/backups',
         'resurrector': '/resurrector',
         'settings': '/settings',
-        'scout': '/scout'
+        'scout': '/scout',
+        'zombieCheck': '/zombiecheck'
       };
 
       const routePath = viewToRoute[view];
@@ -1406,6 +1465,9 @@ export default {
       }
       if (this.userDropdownOpen && !e.target.closest('.relative')) {
         this.userDropdownOpen = false;
+      }
+      if (this.moreDropdownOpen && !e.target.closest('.more-dropdown')) {
+        this.moreDropdownOpen = false;
       }
     });
 

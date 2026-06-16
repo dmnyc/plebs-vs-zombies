@@ -6,6 +6,7 @@ import BackupsView from '../views/BackupsView.vue';
 import ResurrectorView from '../views/ResurrectorView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import ScoutModeView from '../views/ScoutModeView.vue';
+import ZombieCheckView from '../views/ZombieCheckView.vue';
 
 const routes = [
   {
@@ -55,6 +56,12 @@ const routes = [
     name: 'Scout',
     component: ScoutModeView,
     meta: { title: 'Scout Mode - Plebs vs Zombies' }
+  },
+  {
+    path: '/zombiecheck',
+    name: 'Zombie Check',
+    component: ZombieCheckView,
+    meta: { title: 'Zombie Check - Plebs vs Zombies' }
   }
 ];
 

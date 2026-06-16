@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!--
+
+Zombie Check - Standalone Nostr Activity Checker
+
+Part of: Plebs vs. Zombies (https://plebsvszombies.cc)
+
+Checks whether any Nostr user is a "zombie" (inactive) and shows how long
+they've been gone, by scanning relays for their most recent activity.
+Self-contained (mirrors resurrector.html) so the shared /zombiecheck link
+shows a real social preview AND a working tool to crawlers and humans alike.
+
+Classification bands mirror the in-app ZombieCheck.vue component:
+  < 60d         Alive
+  60-119d       Possible Infection
+  120-179d      Fresh Zombie
+  180-364d      Rotting Zombie
+  365d+ / none  Ancient Zombie
+  deleted flag  Burned
+
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Zombie Check | Is that Nostr user a zombie?</title>
+  <meta name="description" content="Check whether any Nostr user is a zombie and see how long they've been gone. No sign-in required." />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://plebsvszombies.cc/zombiecheck">
+  <meta property="og:title" content="Zombie Check | Is that Nostr user a zombie?">
+  <meta property="og:description" content="Check whether any Nostr user is a zombie and see how long they've been gone. No sign-in required.">
+  <meta property="og:image" content="https://plebsvszombies.cc/zombiecheck-social-share.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Plebs vs. Zombies">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://plebsvszombies.cc/zombiecheck">
+  <meta property="twitter:title" content="Zombie Check | Is that Nostr user a zombie?">
+  <meta property="twitter:description" content="Check whether any Nostr user is a zombie and see how long they've been gone. No sign-in required.">
+  <meta property="twitter:image" content="https://plebsvszombies.cc/zombiecheck-social-share.png">
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Google Fonts - matching main app -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'zombie-green': '#5cdb5c',
+            'zombie-dark': '#2c3531',
+            'pleb-gold': '#ffd700',
+            'pleb-blue': '#1e90ff',
+            'pleb-purple': '#8e30eb',
+          },
+          fontFamily: {
+            'horror': ['"Creepster"', 'cursive'],
+            'main': ['"Geist"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background: #111827;
+      color: #e5e7eb;
+      font-family: 'Geist', sans-serif;
+    }
+    h1, h2, h3 {
+      font-family: 'Creepster', cursive;
+      color: #5cdb5c;
+    }
+    .card {
+      background: #2c3531;
+      border: 1px solid #374151;
+      border-radius: 0.75rem;
+    }
+    .btn-primary {
+      background: #5cdb5c;
+      color: #2c3531;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #4ade80; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .input {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 0.5rem;
+    }
+    .input:focus { outline: none; border-color: #5cdb5c; }
+    .spinner {
+      border: 2px solid rgba(92,219,92,0.25);
+      border-top-color: #5cdb5c;
+      border-radius: 9999px;
+      width: 1.25rem; height: 1.25rem;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="container mx-auto px-4 pt-8 pb-2">
+    <a href="/" class="flex items-center justify-center gap-3 hover:opacity-90 transition-opacity">
+      <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
+      <h1 class="text-3xl sm:text-4xl">Plebs vs. Zombies</h1>
+    </a>
+  </header>
+
+  <main class="container mx-auto px-4 py-8">
+    <div class="max-w-2xl mx-auto card p-6">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-3">🧟‍♀️🔍</div>
+        <h2 class="text-2xl mb-2">Zombie Check</h2>
+        <p class="text-gray-400 text-sm">
+          Check whether any Nostr user is a zombie and see how long they've been gone.
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2" for="npub-input">
+            Paste an npub, nprofile, or hex pubkey:
+          </label>
+          <input
+            id="npub-input"
+            type="text"
+            placeholder="npub1…"
+            class="input w-full px-3 py-2 text-sm font-mono"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <button id="check-btn" class="btn-primary w-full rounded-lg px-4 py-2 flex items-center justify-center gap-2">
+          <span id="check-spinner" class="spinner hidden"></span>
+          <span id="check-label">🧟 Check for Zombie</span>
+        </button>
+
+        <p id="progress" class="text-xs text-gray-400 text-center"></p>
+        <p id="error" class="text-red-400 text-xs text-center"></p>
+      </div>
+
+      <!-- Result -->
+      <div id="result" class="mt-6 rounded-lg border-2 p-5 hidden">
+        <div class="flex items-center gap-4 mb-4">
+          <img id="r-avatar" src="/default-avatar.svg" alt="" class="w-14 h-14 rounded-full object-cover bg-gray-700 flex-shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div id="r-name" class="font-bold text-white truncate">Anonymous</div>
+            <a id="r-npub" href="#" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-400 hover:text-gray-200 font-mono truncate block"></a>
+          </div>
+        </div>
+        <div class="text-center py-2">
+          <div id="r-emoji" class="text-5xl mb-2"></div>
+          <div id="r-label" class="text-2xl font-bold"></div>
+          <p id="r-detail" class="text-sm text-gray-300 mt-2"></p>
+          <p id="r-lastseen" class="text-xs text-gray-500 mt-1"></p>
+        </div>
+      </div>
+
+      <div class="mt-8 pt-6 border-t border-gray-700/50 text-center">
+        <a href="/" class="text-sm text-zombie-green hover:underline">
+          ← Back to Plebs vs. Zombies
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { SimplePool, nip19 } from 'https://esm.sh/nostr-tools@2.17.0';
+
+    const RELAYS = [
+      'wss://relay.damus.io',
+      'wss://nos.lol',
+      'wss://relay.primal.net',
+      'wss://relay.snort.social',
+      'wss://purplepag.es',
+      'wss://relay.nostr.net',
+      'wss://offchain.pub',
+      'wss://nostr.mom',
+      'wss://relay.noswhere.com',
+      'wss://relay.0xchat.com',
+    ];
+    const KINDS = [0, 1, 3, 6, 7, 9735];
+
+    // Display bands — mirrors src/components/ZombieCheck.vue
+    function classify(days, deleted) {
+      if (deleted) {
+        return { emoji: '🔥', label: 'Burned', color: '#d1d5db', border: '#4b5563',
+          detail: 'This account has been marked as deleted.' };
+      }
+      if (days == null) {
+        return { emoji: '💀', label: 'Ancient Zombie', color: '#f87171', border: '#b91c1c',
+          detail: 'No activity found in the past year.' };
+      }
+      if (days < 60) {
+        return { emoji: '💚', label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
+          detail: `Active — last seen ${formatGone(days)} ago.` };
+      }
+      if (days < 120) {
+        return { emoji: '💛', label: 'Possible Infection', color: '#fde047', border: '#eab308',
+          detail: `Quiet for ${formatGone(days)}. Has anyone done a wellness visit lately?` };
+      }
+      if (days < 180) {
+        return { emoji: '🧟', label: 'Fresh Zombie', color: '#facc15', border: '#ca8a04',
+          detail: `Gone for ${formatGone(days)}.` };
+      }
+      if (days < 365) {
+        return { emoji: '🧟‍♂️', label: 'Rotting Zombie', color: '#fb923c', border: '#ea580c',
+          detail: `Gone for ${formatGone(days)}.` };
+      }
+      return { emoji: '💀', label: 'Ancient Zombie', color: '#f87171', border: '#b91c1c',
+        detail: `Gone for ${formatGone(days)}.` };
+    }
+
+    function formatGone(days) {
+      if (days == null) return null;
+      if (days < 1) return 'less than a day';
+      if (days < 30) return `${days} day${days === 1 ? '' : 's'}`;
+      if (days < 365) {
+        const m = Math.floor(days / 30);
+        return `${m} month${m === 1 ? '' : 's'}`;
+      }
+      const y = Math.floor(days / 365);
+      const rem = Math.floor((days % 365) / 30);
+      const ys = `${y} year${y === 1 ? '' : 's'}`;
+      return rem > 0 ? `${ys}, ${rem} month${rem === 1 ? '' : 's'}` : ys;
+    }
+
+    function resolveHex(raw) {
+      const value = raw.trim();
+      if (!value) throw new Error('Enter an npub, nprofile, or hex pubkey');
+      if (value.startsWith('npub1') || value.startsWith('nprofile1')) {
+        const decoded = nip19.decode(value);
+        if (decoded.type === 'nprofile') return decoded.data.pubkey;
+        if (decoded.type === 'npub') return decoded.data;
+        throw new Error('Unsupported identifier');
+      }
+      if (/^[0-9a-f]{64}$/i.test(value)) return value.toLowerCase();
+      throw new Error('Enter a valid npub, nprofile, or hex pubkey');
+    }
+
+    const els = {
+      input: document.getElementById('npub-input'),
+      btn: document.getElementById('check-btn'),
+      spinner: document.getElementById('check-spinner'),
+      label: document.getElementById('check-label'),
+      progress: document.getElementById('progress'),
+      error: document.getElementById('error'),
+      result: document.getElementById('result'),
+      avatar: document.getElementById('r-avatar'),
+      name: document.getElementById('r-name'),
+      npub: document.getElementById('r-npub'),
+      emoji: document.getElementById('r-emoji'),
+      rlabel: document.getElementById('r-label'),
+      detail: document.getElementById('r-detail'),
+      lastseen: document.getElementById('r-lastseen'),
+    };
+
+    async function check() {
+      els.error.textContent = '';
+      els.result.classList.add('hidden');
+      els.spinner.classList.remove('hidden');
+      els.label.textContent = 'Checking…';
+      els.btn.disabled = true;
+      els.progress.textContent = 'Resolving identifier…';
+
+      const pool = new SimplePool();
+      try {
+        const hex = resolveHex(els.input.value);
+        els.progress.textContent = 'Scanning relays for activity…';
+
+        const since = Math.floor(Date.now() / 1000) - 365 * 86400;
+        const [activity, profileEvents] = await Promise.all([
+          pool.querySync(RELAYS, { kinds: KINDS, authors: [hex], since, limit: 50 }),
+          pool.querySync(RELAYS, { kinds: [0], authors: [hex], limit: 5 }),
+        ]);
+
+        const sorted = activity.slice().sort((a, b) => b.created_at - a.created_at);
+        const newest = sorted[0] || null;
+        const days = newest ? Math.floor((Date.now() / 1000 - newest.created_at) / 86400) : null;
+
+        let profile = {};
+        let deleted = false;
+        if (profileEvents.length) {
+          const latest = profileEvents.slice().sort((a, b) => b.created_at - a.created_at)[0];
+          try { profile = JSON.parse(latest.content) || {}; } catch (_) { profile = {}; }
+          deleted = profile.deleted === true || profile.deleted === 'true';
+        }
+
+        render(hex, profile, classify(days, deleted), newest);
+      } catch (e) {
+        console.error('Zombie Check failed:', e);
+        els.error.textContent = e?.message || 'Failed to check this user. Try again.';
+      } finally {
+        try { pool.close(RELAYS); } catch (_) {}
+        els.spinner.classList.add('hidden');
+        els.label.textContent = '🧟 Check for Zombie';
+        els.btn.disabled = false;
+        els.progress.textContent = '';
+      }
+    }
+
+    function render(hex, profile, verdict, newest) {
+      const npub = nip19.npubEncode(hex);
+      els.avatar.src = profile.picture || '/default-avatar.svg';
+      els.avatar.onerror = () => { els.avatar.src = '/default-avatar.svg'; };
+      els.name.textContent = profile.display_name || profile.name || 'Anonymous';
+      els.npub.textContent = `${npub.slice(0, 12)}…${npub.slice(-6)}`;
+      els.npub.href = `https://njump.me/${npub}`;
+
+      els.emoji.textContent = verdict.emoji;
+      els.rlabel.textContent = verdict.label;
+      els.rlabel.style.color = verdict.color;
+      els.detail.textContent = verdict.detail;
+      els.lastseen.textContent = newest
+        ? `Last activity: ${new Date(newest.created_at * 1000).toLocaleDateString()}`
+        : '';
+
+      els.result.style.borderColor = verdict.border;
+      els.result.classList.remove('hidden');
+    }
+
+    els.btn.addEventListener('click', check);
+    els.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') check(); });
+
+    // Allow deep-linking a target: /zombiecheck?npub=npub1...
+    const params = new URLSearchParams(location.search);
+    const preset = params.get('npub') || params.get('pubkey');
+    if (preset) {
+      els.input.value = preset;
+      check();
+    }
+  </script>
+</body>
+</html>
