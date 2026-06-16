@@ -111,6 +111,24 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* "lub-dub" heartbeat — two quick beats, then a rest */
+    @keyframes heartbeat {
+      0%   { transform: scale(1); }
+      14%  { transform: scale(1.12); }
+      28%  { transform: scale(1); }
+      42%  { transform: scale(1.12); }
+      56%  { transform: scale(1); }
+      100% { transform: scale(1); }
+    }
+    .animate-heartbeat {
+      display: inline-block;
+      transform-origin: center;
+      animation: heartbeat 1.5s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .animate-heartbeat { animation: none; }
+    }
   </style>
 </head>
 <body class="min-h-screen">
@@ -217,7 +235,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
       if (days < 60) {
         return { emoji: '🫀', label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
-          detail: `Active — last seen ${formatGone(days)} ago.` };
+          detail: `Active — last seen ${formatGone(days)} ago.`, beat: true };
       }
       if (days < 120) {
         return { emoji: '💛', label: 'Possible Infection', color: '#fde047', border: '#eab308',
@@ -451,6 +469,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.npub.href = `https://njump.me/${npub}`;
 
       els.emoji.textContent = verdict.emoji;
+      els.emoji.classList.toggle('animate-heartbeat', !!verdict.beat);
       els.rlabel.textContent = verdict.label;
       els.rlabel.style.color = verdict.color;
       els.detail.textContent = verdict.detail;

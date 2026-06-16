@@ -62,7 +62,7 @@
       </div>
 
       <div class="text-center py-2">
-        <div class="text-5xl mb-2">{{ result.emoji }}</div>
+        <div class="text-5xl mb-2 inline-block" :class="{ 'animate-heartbeat': result.beat }">{{ result.emoji }}</div>
         <div class="text-2xl font-bold" :class="result.textClass">{{ result.label }}</div>
         <p class="text-sm text-gray-300 mt-2">{{ result.detail }}</p>
         <p v-if="result.lastSeenDate" class="text-xs text-gray-500 mt-1">
@@ -92,6 +92,7 @@ const CATEGORY_DISPLAY = {
     label: 'Alive!',
     borderClass: 'border-zombie-green bg-green-900/10',
     textClass: 'text-zombie-green',
+    beat: true,
   },
   infected: {
     emoji: '💛',
@@ -283,3 +284,22 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* "lub-dub" heartbeat — two quick beats, then a rest */
+@keyframes heartbeat {
+  0%   { transform: scale(1); }
+  14%  { transform: scale(1.12); }
+  28%  { transform: scale(1); }
+  42%  { transform: scale(1.12); }
+  56%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+.animate-heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-heartbeat { animation: none; }
+}
+</style>
