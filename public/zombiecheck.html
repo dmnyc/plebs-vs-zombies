@@ -133,19 +133,25 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       </div>
 
       <div class="space-y-4">
-        <div>
+        <div class="relative">
           <label class="block text-sm font-medium text-gray-300 mb-2" for="npub-input">
-            Paste an npub, nprofile, or hex pubkey:
+            Search by username or paste an npub:
           </label>
           <input
             id="npub-input"
             type="text"
-            placeholder="npub1…"
-            class="input w-full px-3 py-2 text-sm font-mono"
+            placeholder="Search by username or paste npub/nprofile…"
+            class="input w-full px-3 py-2 text-sm"
             autocomplete="off"
             autocapitalize="off"
             spellcheck="false"
           />
+
+          <!-- Search results dropdown -->
+          <div
+            id="search-results"
+            class="hidden absolute z-20 mt-1 w-full max-h-72 overflow-y-auto card border border-gray-700 rounded-lg shadow-xl"
+          ></div>
         </div>
 
         <button id="check-btn" class="btn-primary w-full rounded-lg px-4 py-2 flex items-center justify-center gap-2">
@@ -258,6 +264,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
     const els = {
       input: document.getElementById('npub-input'),
+      results: document.getElementById('search-results'),
       btn: document.getElementById('check-btn'),
       spinner: document.getElementById('check-spinner'),
       label: document.getElementById('check-label'),
@@ -273,7 +280,125 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       lastseen: document.getElementById('r-lastseen'),
     };
 
-    async function check() {
+    function looksLikeIdentifier(value) {
+      const v = value.trim();
+      return v.startsWith('npub1') || v.startsWith('nprofile1') || /^[0-9a-f]{64}$/i.test(v);
+    }
+
+    // ----- Primal cache username search (mirrors primalCacheService.js) -----
+    const PRIMAL_ENDPOINTS = ['wss://cache2.primal.net/v1', 'wss://cache1.primal.net/v1'];
+
+    function searchUsers(query, limit = 8) {
+      return new Promise((resolve) => {
+        let settled = false;
+        let endpointIndex = 0;
+        const results = [];
+
+        function tryEndpoint() {
+          if (settled) return;
+          if (endpointIndex >= PRIMAL_ENDPOINTS.length) { resolve(results); return; }
+          const ws = new WebSocket(PRIMAL_ENDPOINTS[endpointIndex++]);
+          const reqId = `zc_${Date.now()}_${endpointIndex}`;
+          const timeout = setTimeout(() => { try { ws.close(); } catch (_) {} finish(false); }, 4000);
+
+          function finish(ok) {
+            clearTimeout(timeout);
+            if (settled) return;
+            if (ok || results.length) { settled = true; resolve(results); }
+            else { try { ws.close(); } catch (_) {} tryEndpoint(); }
+          }
+
+          ws.onopen = () => {
+            ws.send(JSON.stringify(['REQ', reqId, { cache: ['user_search', { query, limit }] }]));
+          };
+          ws.onmessage = (ev) => {
+            try {
+              const msg = JSON.parse(ev.data);
+              const [type, , payload] = msg;
+              if (type === 'EVENT' && payload && payload.kind === 0) results.push(payload);
+              if (type === 'EOSE') { try { ws.close(); } catch (_) {} settled = true; clearTimeout(timeout); resolve(results); }
+            } catch (_) {}
+          };
+          ws.onerror = () => finish(false);
+          ws.onclose = () => { if (!settled && !results.length) finish(false); };
+        }
+        tryEndpoint();
+      });
+    }
+
+    function parseProfile(event) {
+      try {
+        const c = JSON.parse(event.content) || {};
+        return {
+          pubkey: event.pubkey,
+          name: c.name || null,
+          display_name: c.display_name || null,
+          picture: c.picture || null,
+          nip05: c.nip05 || null,
+        };
+      } catch (_) { return null; }
+    }
+
+    let searchSeq = 0;
+    function renderSearchResults(profiles) {
+      els.results.innerHTML = '';
+      if (!profiles.length) { els.results.classList.add('hidden'); return; }
+      profiles.forEach((p) => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-700 transition-colors';
+        const label = p.display_name || p.name || 'Anonymous';
+        row.innerHTML = `
+          <img src="${p.picture || '/default-avatar.svg'}" onerror="this.src='/default-avatar.svg'"
+               class="w-8 h-8 rounded-full object-cover bg-gray-700 flex-shrink-0" alt="" />
+          <span class="min-w-0">
+            <span class="block text-sm text-white truncate">${escapeHtml(label)}</span>
+            ${p.nip05 ? `<span class="block text-xs text-gray-400 truncate">${escapeHtml(p.nip05)}</span>` : ''}
+          </span>`;
+        row.addEventListener('click', () => {
+          hideResults();
+          els.input.value = label;
+          check(p.pubkey);
+        });
+        els.results.appendChild(row);
+      });
+      els.results.classList.remove('hidden');
+    }
+
+    function hideResults() {
+      els.results.classList.add('hidden');
+      els.results.innerHTML = '';
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    let debounceId = null;
+    els.input.addEventListener('input', () => {
+      const value = els.input.value.trim();
+      if (debounceId) clearTimeout(debounceId);
+      if (value.length < 2 || looksLikeIdentifier(value)) { hideResults(); return; }
+      const seq = ++searchSeq;
+      debounceId = setTimeout(async () => {
+        try {
+          const events = await searchUsers(value, 8);
+          if (seq !== searchSeq) return; // a newer keystroke superseded this
+          const profiles = events
+            .map(parseProfile)
+            .filter((p) => p && !(p.nip05 && p.nip05.includes('mostr.pub')));
+          renderSearchResults(profiles);
+        } catch (_) { hideResults(); }
+      }, 400);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#search-results') && e.target !== els.input) hideResults();
+    });
+
+    async function check(presetHex = null) {
+      hideResults();
       els.error.textContent = '';
       els.result.classList.add('hidden');
       els.spinner.classList.remove('hidden');
@@ -283,7 +408,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
       const pool = new SimplePool();
       try {
-        const hex = resolveHex(els.input.value);
+        const hex = presetHex || resolveHex(els.input.value);
         els.progress.textContent = 'Scanning relays for activity…';
 
         const since = Math.floor(Date.now() / 1000) - 365 * 86400;
@@ -337,8 +462,17 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.result.classList.remove('hidden');
     }
 
-    els.btn.addEventListener('click', check);
-    els.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') check(); });
+    els.btn.addEventListener('click', () => check());
+    els.input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const value = els.input.value.trim();
+      // Identifier → check directly. Username → use the first search result if any.
+      if (looksLikeIdentifier(value)) { check(); return; }
+      const firstResult = els.results.querySelector('button');
+      if (firstResult) firstResult.click();
+      else check();
+    });
 
     // Allow deep-linking a target: /zombiecheck?npub=npub1...
     const params = new URLSearchParams(location.search);
