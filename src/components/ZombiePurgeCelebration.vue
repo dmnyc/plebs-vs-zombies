@@ -50,15 +50,15 @@
               <span class="font-bold text-lg">{{ purgeStats.burned }}</span>
             </div>
             <div v-if="purgeStats.ancient > 0" class="flex justify-between items-center">
-              <span class="text-red-500">💀 Ancient (365+ days):</span>
+              <span class="text-red-500">💀 Ancient ({{ thresholds.ancient }}+ days):</span>
               <span class="font-bold text-lg">{{ purgeStats.ancient }}</span>
             </div>
             <div v-if="purgeStats.rotting > 0" class="flex justify-between items-center">
-              <span class="text-orange-500">🧟‍♂️ Rotting (180+ days):</span>
+              <span class="text-orange-500">🧟‍♂️ Rotting ({{ thresholds.rotting }}+ days):</span>
               <span class="font-bold text-lg">{{ purgeStats.rotting }}</span>
             </div>
             <div v-if="purgeStats.fresh > 0" class="flex justify-between items-center">
-              <span class="text-yellow-400">🧟‍♀️ Fresh (90+ days):</span>
+              <span class="text-yellow-400">🧟‍♀️ Fresh ({{ thresholds.fresh }}+ days):</span>
               <span class="font-bold text-lg">{{ purgeStats.fresh }}</span>
             </div>
           </div>
@@ -249,6 +249,7 @@
 
 <script>
 import nostrService from '../services/nostrService';
+import zombieService from '../services/zombieService';
 import ConfirmModal from './ConfirmModal.vue';
 
 export default {
@@ -300,8 +301,24 @@ export default {
     };
   },
   computed: {
+    thresholds() {
+      return zombieService.zombieThresholds;
+    },
     totalPurged() {
       return this.purgeResult.removedCount || 0;
+    },
+    breakdownLines() {
+      const t = this.thresholds;
+      const lines = [];
+      if (this.purgeStats.burned > 0) lines.push(`⚫ 🔥 Burned (deleted): ${this.purgeStats.burned}`);
+      if (this.purgeStats.ancient > 0) lines.push(`🔴 💀 Ancient (${t.ancient}+ days): ${this.purgeStats.ancient}`);
+      if (this.purgeStats.rotting > 0) lines.push(`🟠 🧟‍♂️ Rotting (${t.rotting}+ days): ${this.purgeStats.rotting}`);
+      if (this.purgeStats.fresh > 0) lines.push(`🟡 🧟‍♀️ Fresh (${t.fresh}+ days): ${this.purgeStats.fresh}`);
+      return lines;
+    },
+    breakdownText() {
+      if (this.breakdownLines.length === 0) return '';
+      return `\n\nPurge Breakdown:\n${this.breakdownLines.join('\n')}`;
     },
     shareMessage() {
       // Simple total count description
@@ -314,7 +331,7 @@ export default {
         
         const message = `I just ${action} ${zombieDescription} from orbit using the NUCLEAR OPTION in #PlebsVsZombies! ☢️🧟‍♂️🧟‍♀️
 
-💀 MAXIMUM CARNAGE ACHIEVED! 💀
+💀 MAXIMUM CARNAGE ACHIEVED! 💀${this.breakdownText}
 
 My Zombie Score™ was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
@@ -354,7 +371,7 @@ https://plebsvszombies.cc`;
         ? `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${weapon}${zombie1}${zombie2}`
         : `I just ${action} ${zombieDescription} using #PlebsVsZombies! ${zombie1}${zombie2}${weapon}`;
 
-      return `${message}
+      return `${message}${this.breakdownText}
 
 My Zombie Score™ was ${this.zombieScore}%! What's yours?
 ${this.scoreBarEmojis.join('')}
