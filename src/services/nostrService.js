@@ -1,5 +1,5 @@
 import NDK, { NDKEvent, NDKNip07Signer } from "@nostr-dev-kit/ndk";
-import { nip19, finalizeEvent } from "nostr-tools";
+import { nip19, finalizeEvent, SimplePool } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 
@@ -1585,69 +1585,72 @@ class NostrService {
     }
   }
 
-  async publishEventToRelays(signedEvent) {
-    const relaysToUse = this.getPublishRelays();
-    const publishPromises = relaysToUse.map(async (relayUrl) => {
+  async publishEventToRelays(signedEvent, relays = null) {
+    const relaysToUse = relays || this.getPublishRelays();
+
+    if (!relaysToUse || relaysToUse.length === 0) {
+      console.warn("⚠️ No relays available to publish to");
+      return { successful: 0, failed: 0, total: 0, accepted: [], rejected: [] };
+    }
+
+    // Publish via SimplePool so we read each relay's OK reply. The previous
+    // hand-rolled WebSocket path sent EVENT and reported success on socket-open
+    // (and even on socket close) without ever reading the relay's OK response,
+    // so rejected/dropped events were silently counted as delivered. SimplePool
+    // resolves the per-relay promise only on OK:true and rejects on OK:false,
+    // relay error, or auth-required close.
+    const PUBLISH_TIMEOUT_MS = 10000;
+    const pool = new SimplePool();
+
+    let settled;
+    try {
+      settled = await Promise.allSettled(
+        pool.publish(relaysToUse, signedEvent).map((p) =>
+          Promise.race([
+            p,
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("publish timeout")),
+                PUBLISH_TIMEOUT_MS,
+              ),
+            ),
+          ]),
+        ),
+      );
+    } finally {
       try {
-        return new Promise((resolve, reject) => {
-          const ws = new WebSocket(relayUrl);
-          let resolved = false;
+        pool.close(relaysToUse);
+      } catch {
+        // Best-effort cleanup; SimplePool can throw on already-closed sockets.
+      }
+    }
 
-          const timeout = setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              ws.close();
-              reject(new Error(`Publish timeout to ${relayUrl}`));
-            }
-          }, 10000);
-
-          ws.onopen = () => {
-            if (!resolved) {
-              ws.send(JSON.stringify(["EVENT", signedEvent]));
-              setTimeout(() => {
-                if (!resolved) {
-                  resolved = true;
-                  clearTimeout(timeout);
-                  ws.close();
-                  resolve(relayUrl);
-                }
-              }, 3000);
-            }
-          };
-
-          ws.onerror = (error) => {
-            if (!resolved) {
-              resolved = true;
-              clearTimeout(timeout);
-              reject(
-                new Error(`Failed to connect to ${relayUrl}: ${error.message}`),
-              );
-            }
-          };
-
-          ws.onclose = () => {
-            if (!resolved) {
-              resolved = true;
-              clearTimeout(timeout);
-              resolve(relayUrl);
-            }
-          };
+    const accepted = [];
+    const rejected = [];
+    settled.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        accepted.push(relaysToUse[i]);
+      } else {
+        rejected.push({
+          relay: relaysToUse[i],
+          reason: String(r.reason?.message || r.reason || "unknown"),
         });
-      } catch (e) {
-        console.warn("Failed to publish to", relayUrl, e.message);
-        return null;
       }
     });
 
-    const results = await Promise.allSettled(publishPromises);
-    const successful = results.filter(
-      (r) => r.status === "fulfilled" && r.value,
-    ).length;
-    const failed = results.filter((r) => r.status === "rejected").length;
+    console.log(
+      `📡 Publish: accepted by ${accepted.length}/${relaysToUse.length} relay(s)`,
+    );
+    accepted.forEach((r) => console.log(`  ✓ ${r}`));
+    rejected.forEach((r) => console.log(`  ✗ ${r.relay} — ${r.reason}`));
 
-    console.log(`Publish results: ${successful} successful, ${failed} failed`);
-
-    return { successful, failed, total: relaysToUse.length };
+    return {
+      successful: accepted.length,
+      failed: rejected.length,
+      total: relaysToUse.length,
+      accepted,
+      rejected,
+    };
   }
 
   async backupFollowList() {
@@ -2868,19 +2871,40 @@ class NostrService {
    * Returns user's write relays + fallback to default relays
    */
   getPublishRelays() {
-    if (this.userRelayList) {
-      const writeRelays = this.getWriteRelays(this.userRelayList);
-      if (writeRelays.length > 0) {
-        console.log(
-          `📡 Using ${writeRelays.length} user write relays for publishing`,
-        );
-        return writeRelays;
-      }
-    }
+    const normalize = (url) => {
+      if (!url || typeof url !== "string") return null;
+      const trimmed = url.trim();
+      if (!/^wss?:\/\//i.test(trimmed)) return null;
+      return trimmed.replace(/\/+$/, "").toLowerCase();
+    };
 
-    // Fallback to default relays if no user relay list
-    console.log(`📡 Using ${this.relays.length} default relays for publishing`);
-    return this.relays;
+    const dedupe = (urls) => {
+      const seen = new Set();
+      const out = [];
+      for (const u of urls) {
+        const clean = normalize(u);
+        if (clean && !seen.has(clean)) {
+          seen.add(clean);
+          out.push(clean);
+        }
+      }
+      return out;
+    };
+
+    // Publish to the user's declared write relays PLUS the app's reliable
+    // defaults (deduped). Publishing to write-relays-only left poorly-connected
+    // profiles — whose write relays may be flaky or auth-gated — with a note
+    // that landed nowhere widely readable. Unioning the defaults gives every
+    // event a reliable home while still honoring the user's outbox.
+    const writeRelays = this.userRelayList
+      ? this.getWriteRelays(this.userRelayList)
+      : [];
+    const combined = dedupe([...writeRelays, ...this.relays]);
+
+    console.log(
+      `📡 Publishing to ${combined.length} relay(s): ${writeRelays.length} user write + ${this.relays.length} default (deduped)`,
+    );
+    return combined;
   }
 
   async restoreNip46Session() {
