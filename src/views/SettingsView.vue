@@ -822,6 +822,24 @@ export default {
       return getVersionSync();
     }
   },
+  watch: {
+    // When a relay sync completes, thresholds/batch size may have just been
+    // pulled from the relay into the underlying services. The form snapshots
+    // those values once at mount, so on a fresh device it can briefly show
+    // defaults until the async sync lands. Re-read just those display fields
+    // when a sync finishes — scoped narrowly so we never clobber an unsaved
+    // relay-list edit or other in-progress form input.
+    'syncStatus.isSyncing'(isSyncing, wasSyncing) {
+      if (wasSyncing && !isSyncing) {
+        this.thresholds = {
+          fresh: zombieService.zombieThresholds.fresh,
+          rotting: zombieService.zombieThresholds.rotting,
+          ancient: zombieService.zombieThresholds.ancient
+        };
+        this.batchSize = zombieService.batchSize;
+      }
+    }
+  },
   methods: {
     goToZombieHunting() {
       this.$router.push('/hunt');

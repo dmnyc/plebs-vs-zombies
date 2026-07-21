@@ -63,6 +63,9 @@ class BatchSettings {
 
       // Save to localStorage
       this.saveToLocalStorage();
+      // Mark this as the freshest known state so a later sync doesn't mistake
+      // stale relay data for newer and silently revert this change.
+      this.setLocalTimestamp(Math.floor(Date.now() / 1000));
 
       // Publish to relay if requested
       if (publish) {
