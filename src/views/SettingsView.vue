@@ -75,69 +75,103 @@
         <div class="border-t border-gray-700 pt-4">
           <h4 class="text-lg mb-3">Relay Configuration</h4>
           
-          <!-- User's NIP-65 Relay List -->
-          <div v-if="userRelayList" class="mb-6 p-3 bg-gray-800 rounded-lg">
-            <div class="text-green-400 mb-2 flex items-center">
-              <span class="mr-2">📡</span>
-              Your Announced Relays (NIP-65)
+          <!-- User's NIP-65 Relay List (editable) -->
+          <div v-if="isConnected" class="mb-6 p-3 bg-gray-800 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-green-400 flex items-center">
+                <span class="mr-2">📡</span>
+                Your Announced Relays (NIP-65)
+              </div>
+              <button
+                @click="refreshNip65"
+                :disabled="nip65Loading || nip65Busy"
+                class="btn-secondary text-xs py-1 px-2"
+                :class="{ 'opacity-50 cursor-not-allowed': nip65Loading || nip65Busy }"
+                title="Re-fetch your relay list from relays"
+              >
+                {{ nip65Loading ? 'Refreshing…' : '↻ Refresh' }}
+              </button>
             </div>
-            <div class="text-xs text-gray-400 mb-3">
+
+            <div v-if="userRelayList" class="text-xs text-gray-400 mb-3">
               Last updated: {{ new Date(userRelayList.lastUpdated * 1000).toLocaleString() }}
             </div>
-            
-            <div v-if="userRelayList.bothRelays.length > 0" class="mb-2">
-              <div class="text-sm text-gray-300 mb-1">Read & Write:</div>
-              <div class="space-y-1">
-                <div 
-                  v-for="relay in userRelayList.bothRelays" 
-                  :key="relay"
-                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
+
+            <p v-if="nip65Error" class="text-red-400 text-xs mb-2">{{ nip65Error }}</p>
+            <p v-if="nip65Notice" class="text-zombie-green text-xs mb-2">{{ nip65Notice }}</p>
+
+            <!-- Editable relay rows -->
+            <div v-if="nip65Relays.length > 0" class="space-y-2 mb-3">
+              <div
+                v-for="item in nip65Relays"
+                :key="item.url"
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded flex-grow truncate"
+                  :title="item.url"
+                >{{ item.url }}</span>
+                <select
+                  :value="item.role"
+                  @change="setNip65Role(item.url, $event.target.value)"
+                  :disabled="nip65Busy"
+                  class="input text-xs py-1 px-1 w-28"
                 >
-                  {{ relay }}
-                </div>
+                  <option value="both">Read & Write</option>
+                  <option value="write">Write only</option>
+                  <option value="read">Read only</option>
+                </select>
+                <button
+                  @click="removeNip65Relay(item.url)"
+                  :disabled="nip65Busy"
+                  class="text-red-500 hover:text-red-400 text-sm px-1"
+                  title="Remove from your NIP-65 list"
+                >
+                  ✕
+                </button>
               </div>
             </div>
-            
-            <div v-if="userRelayList.writeRelays.length > 0" class="mb-2">
-              <div class="text-sm text-gray-300 mb-1">Write Only:</div>
-              <div class="space-y-1">
-                <div 
-                  v-for="relay in userRelayList.writeRelays" 
-                  :key="relay"
-                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
-                >
-                  {{ relay }}
-                </div>
-              </div>
+
+            <div
+              v-else-if="!nip65Loading"
+              class="text-xs text-yellow-200 bg-yellow-900/40 border border-yellow-700 rounded px-2 py-2 mb-3"
+            >
+              ℹ️ No NIP-65 relay list found yet. Add a relay below to publish one.
             </div>
-            
-            <div v-if="userRelayList.readRelays.length > 0" class="mb-2">
-              <div class="text-sm text-gray-300 mb-1">Read Only:</div>
-              <div class="space-y-1">
-                <div 
-                  v-for="relay in userRelayList.readRelays" 
-                  :key="relay"
-                  class="text-xs font-mono text-gray-200 bg-gray-700 px-2 py-1 rounded"
-                >
-                  {{ relay }}
-                </div>
-              </div>
+
+            <!-- Add a relay to NIP-65 -->
+            <div class="flex items-center gap-2">
+              <input
+                v-model="newNip65Relay"
+                placeholder="wss://relay.example.com"
+                :disabled="nip65Busy"
+                class="input flex-grow text-xs"
+              />
+              <select v-model="newNip65Role" :disabled="nip65Busy" class="input text-xs py-1 px-1 w-28">
+                <option value="both">Read & Write</option>
+                <option value="write">Write only</option>
+                <option value="read">Read only</option>
+              </select>
+              <button
+                @click="addNip65Relay"
+                class="btn-secondary whitespace-nowrap text-xs"
+                :disabled="!isValidNip65Relay || nip65Busy"
+              >
+                {{ nip65Busy ? '…' : 'Add' }}
+              </button>
             </div>
-            
+
             <div class="text-xs text-gray-500 mt-2">
-              These are your announced relay preferences. The app will use these for publishing when available.
+              Your published relay list. Editing here signs and publishes an updated NIP-65 event to your relays.
             </div>
           </div>
           
-          <div v-else-if="isConnected" class="mb-6 p-3 bg-yellow-900 border border-yellow-600 rounded-lg">
-            <div class="text-yellow-200 text-sm">
-              ℹ️ No NIP-65 relay list found. You can publish your relay preferences using other Nostr clients to optimize your experience.
-            </div>
-          </div>
-          
-          <!-- Manual Relay Configuration -->
+          <!-- App connection relays (local to this device, not published) -->
           <div class="mb-4 p-3 bg-gray-800 rounded-lg">
-            <div class="text-gray-300 mb-3">Manual relay configuration:</div>
+            <div class="text-gray-300 mb-1">App connection relays</div>
+            <div class="text-xs text-gray-500 mb-3">
+              Relays this app connects to on this device. Separate from your published NIP-65 list above.
+            </div>
             <div class="space-y-1 max-h-60 overflow-y-auto pr-2">
               <div 
                 v-for="(relay, index) in relays" 
@@ -780,6 +814,12 @@ export default {
       npub: null,
       relays: [],
       newRelay: '',
+      newNip65Relay: '',
+      newNip65Role: 'both',
+      nip65Loading: false,
+      nip65Busy: false,
+      nip65Error: null,
+      nip65Notice: null,
       thresholds: {
         fresh: 180,
         rotting: 365,
@@ -810,13 +850,31 @@ export default {
   computed: {
     isValidRelay() {
       if (!this.newRelay) return false;
-      
+
       try {
         const url = new URL(this.newRelay);
         return url.protocol === 'wss:' || url.protocol === 'ws:';
       } catch (error) {
         return false;
       }
+    },
+    isValidNip65Relay() {
+      if (!this.newNip65Relay) return false;
+      try {
+        const url = new URL(this.newNip65Relay.trim());
+        return url.protocol === 'wss:' || url.protocol === 'ws:';
+      } catch (error) {
+        return false;
+      }
+    },
+    nip65Relays() {
+      const list = this.userRelayList;
+      if (!list) return [];
+      const rows = [];
+      (list.bothRelays || []).forEach((url) => rows.push({ url, role: 'both' }));
+      (list.writeRelays || []).forEach((url) => rows.push({ url, role: 'write' }));
+      (list.readRelays || []).forEach((url) => rows.push({ url, role: 'read' }));
+      return rows;
     },
     appVersion() {
       return getVersionSync();
@@ -923,6 +981,81 @@ export default {
     },
     removeRelay(index) {
       this.relays.splice(index, 1);
+    },
+    roleToFlags(role) {
+      if (role === 'read') return { read: true, write: false };
+      if (role === 'write') return { read: false, write: true };
+      return { read: true, write: true };
+    },
+    async refreshNip65() {
+      this.nip65Error = null;
+      this.nip65Notice = null;
+      this.nip65Loading = true;
+      try {
+        await nostrService.fetchUserRelayList();
+        this.userRelayList = nostrService.userRelayList;
+        this.nip65Notice = this.userRelayList
+          ? 'Relay list refreshed.'
+          : 'No relay list found on your relays.';
+      } catch (error) {
+        this.nip65Error = error?.message || 'Failed to refresh relay list.';
+      } finally {
+        this.nip65Loading = false;
+      }
+    },
+    async addNip65Relay() {
+      if (!this.isValidNip65Relay || this.nip65Busy) return;
+      this.nip65Error = null;
+      this.nip65Notice = null;
+      this.nip65Busy = true;
+      try {
+        const result = await nostrService.addRelayToNip65(
+          this.newNip65Relay.trim(),
+          this.roleToFlags(this.newNip65Role)
+        );
+        this.userRelayList = result.relayList || nostrService.userRelayList;
+        this.nip65Notice = `Published to ${result.publishedToRelays} relay(s).`;
+        this.newNip65Relay = '';
+      } catch (error) {
+        this.nip65Error = error?.message || 'Failed to add relay.';
+      } finally {
+        this.nip65Busy = false;
+      }
+    },
+    async removeNip65Relay(url) {
+      if (this.nip65Busy) return;
+      if (!confirm(`Remove ${url} from your published NIP-65 relay list?`)) return;
+      this.nip65Error = null;
+      this.nip65Notice = null;
+      this.nip65Busy = true;
+      try {
+        const result = await nostrService.removeRelayFromNip65(url);
+        this.userRelayList = result.relayList || nostrService.userRelayList;
+        this.nip65Notice = `Published to ${result.publishedToRelays} relay(s).`;
+      } catch (error) {
+        this.nip65Error = error?.message || 'Failed to remove relay.';
+      } finally {
+        this.nip65Busy = false;
+      }
+    },
+    async setNip65Role(url, role) {
+      if (this.nip65Busy) return;
+      this.nip65Error = null;
+      this.nip65Notice = null;
+      this.nip65Busy = true;
+      try {
+        const result = await nostrService.addRelayToNip65(url, this.roleToFlags(role));
+        this.userRelayList = result.relayList || nostrService.userRelayList;
+        this.nip65Notice = `Updated. Published to ${result.publishedToRelays} relay(s).`;
+      } catch (error) {
+        this.nip65Error = error?.message || 'Failed to update relay role.';
+        // Force the <select> back to the source-of-truth value after a failure.
+        this.userRelayList = nostrService.userRelayList
+          ? { ...nostrService.userRelayList }
+          : null;
+      } finally {
+        this.nip65Busy = false;
+      }
     },
     formatDate(timestamp) {
       if (!timestamp) return 'Unknown';

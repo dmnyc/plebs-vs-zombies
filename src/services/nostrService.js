@@ -1980,6 +1980,59 @@ class NostrService {
       lastUpdated: Math.floor(Date.now() / 1000),
     };
 
+    return await this._publishRelayListUpdate(updatedRelayList);
+  }
+
+  /**
+   * Remove a relay entirely from the user's NIP-65 list and republish the
+   * kind:10002 event.
+   */
+  async removeRelayFromNip65(relayUrl) {
+    if (!relayUrl) {
+      throw new Error("Relay URL is required.");
+    }
+    const normalizedRelay = this.normalizeRelayUrl(relayUrl);
+
+    await this.getPublicKey();
+
+    let relayList = this.userRelayList;
+    if (!relayList) {
+      relayList = await this.fetchUserRelayList();
+    }
+    if (!relayList) {
+      throw new Error("No relay list found to remove from.");
+    }
+
+    const normalizeList = (list) =>
+      list.map((relay) => this.normalizeRelayUrl(relay));
+    const readRelays = new Set(normalizeList(relayList.readRelays));
+    const writeRelays = new Set(normalizeList(relayList.writeRelays));
+    const bothRelays = new Set(normalizeList(relayList.bothRelays));
+
+    // Delete from all three sets (no short-circuit) so a relay that somehow
+    // appears in more than one bucket is fully removed.
+    const existedRead = readRelays.delete(normalizedRelay);
+    const existedWrite = writeRelays.delete(normalizedRelay);
+    const existedBoth = bothRelays.delete(normalizedRelay);
+    if (!existedRead && !existedWrite && !existedBoth) {
+      throw new Error("That relay is not in your relay list.");
+    }
+
+    const updatedRelayList = {
+      readRelays: Array.from(readRelays),
+      writeRelays: Array.from(writeRelays),
+      bothRelays: Array.from(bothRelays),
+      lastUpdated: Math.floor(Date.now() / 1000),
+    };
+
+    return await this._publishRelayListUpdate(updatedRelayList);
+  }
+
+  /**
+   * Sign and publish a kind:10002 relay list, mapping signer/publish errors to
+   * user-friendly messages. Shared by addRelayToNip65 and removeRelayFromNip65.
+   */
+  async _publishRelayListUpdate(updatedRelayList) {
     const event = {
       kind: 10002,
       created_at: updatedRelayList.lastUpdated,
