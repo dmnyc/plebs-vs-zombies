@@ -3,6 +3,7 @@
  * This is a read-only service that doesn't require authentication
  */
 import NDK, { NDKEvent, NDKUser } from "@nostr-dev-kit/ndk";
+import { SimplePool } from "nostr-tools";
 import immunityService from "./immunityService.js";
 import nostrService from "./nostrService.js";
 import zombieService from "./zombieService.js";
@@ -225,193 +226,97 @@ class ScoutService {
   }
 
   async fetchFollowList(pubkey, relays = null) {
+    const HEX_RE = /^[0-9a-f]{64}$/;
+    const PER_RELAY_TIMEOUT_MS = 7000;
+
     try {
       console.log(`🔍 Fetching follow list for ${pubkey.substring(0, 8)}...`);
 
-      // Check for cancellation
       if (this.cancelled) {
         console.log("🛑 Follow list fetch cancelled");
         return [];
       }
 
-      // Create temporary NDK instance with user's relays if available
-      let queryNdk = this.ndk;
-      if (relays && relays.length > 0) {
-        console.log(
-          `🔗 Using ${relays.length} user relays for follow list fetch`,
-        );
-        queryNdk = new NDK({
-          explicitRelayUrls: relays.slice(0, 15), // Use up to 15 relays for better coverage
-        });
+      // Combine user relays (already merged with defaults by fetchUserRelays)
+      // with a small set of reliable archival relays for extra coverage.
+      const archivalRelays = [
+        "wss://nostr.mom",
+        "wss://relay.nostr.net",
+        "wss://relay.noswhere.com",
+        "wss://relay.0xchat.com",
+        "wss://atlas.nostr.land",
+      ];
 
+      const baseRelays = relays && relays.length > 0 ? relays : this.defaultRelays;
+      const queryRelays = [...new Set([...baseRelays, ...archivalRelays])];
+
+      console.log(`📡 Querying ${queryRelays.length} relays in parallel...`);
+
+      // SimplePool queries each relay independently, so a slow or large event
+      // on one relay doesn't block results from faster relays. This avoids the
+      // NDK EOSE race condition that dropped large follow lists (~1,000+ follows).
+      const pool = new SimplePool();
+      const eventsById = new Map();
+
+      try {
+        await Promise.all(
+          queryRelays.map(async (relay) => {
+            if (this.cancelled) return;
+            try {
+              const events = await Promise.race([
+                pool.querySync([relay], {
+                  kinds: [3],
+                  authors: [pubkey],
+                  limit: 5,
+                }),
+                new Promise((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error(`Timeout: ${relay}`)),
+                    PER_RELAY_TIMEOUT_MS,
+                  ),
+                ),
+              ]);
+              for (const event of events) {
+                if (!eventsById.has(event.id)) {
+                  eventsById.set(event.id, event);
+                }
+              }
+            } catch (err) {
+              console.warn(`⚠️ ${relay}: ${err.message}`);
+            }
+          }),
+        );
+      } finally {
         try {
-          // Add timeout for user relay connection
-          await Promise.race([
-            queryNdk.connect(),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("User relay connection timeout")),
-                8000,
-              ),
-            ),
-          ]);
-          console.log("✅ Connected to user relays");
-        } catch (error) {
-          console.warn(
-            "⚠️ Failed to connect to user relays, falling back to default:",
-            error,
-          );
-          queryNdk = this.ndk; // Fall back to default relays
+          pool.close(queryRelays);
+        } catch {
+          // best-effort cleanup
         }
       }
 
-      // Fetch multiple kind 3 (follow list) events to improve coverage
-      console.log("📡 Fetching follow list events...");
-      const followEvents = await Promise.race([
-        queryNdk.fetchEvents({
-          kinds: [3],
-          authors: [pubkey],
-          limit: 25, // Fetch up to 25 recent events to merge follows
-        }),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Follow list fetch timeout")),
-            30000,
-          ),
-        ),
-      ]);
+      if (this.cancelled) return [];
 
-      if (followEvents.size === 0) {
-        console.log("❌ No follow list found");
+      if (eventsById.size === 0) {
+        console.log("❌ No follow list found on any relay");
         return [];
       }
 
-      // Check for cancellation before processing events
-      if (this.cancelled) {
-        console.log("🛑 Follow list processing cancelled");
-        return [];
-      }
-
-      console.log(`📡 Found ${followEvents.size} follow list events`);
-      const allFollows = new Set(); // Use Set to avoid duplicates
-
-      // Merge follows from all events, prioritizing newer ones
-      const eventArray = Array.from(followEvents).sort(
+      // Use the most recent kind:3 event. Only count valid hex pubkeys so a
+      // malformed historical version doesn't appear larger than the real one.
+      const mostRecent = Array.from(eventsById.values()).sort(
         (a, b) => b.created_at - a.created_at,
-      );
-
-      for (const [index, event] of eventArray.entries()) {
-        // Check for cancellation during event processing
-        if (this.cancelled) {
-          console.log("🛑 Follow list processing cancelled during event loop");
-          return Array.from(allFollows);
-        }
-        console.log(
-          `📡 Processing event ${index + 1}/${eventArray.length} (timestamp: ${event.created_at}, tags: ${event.tags?.length || 0})`,
-        );
-
-        // Extract pubkeys from p tags
-        for (const tag of event.tags || []) {
-          if (tag[0] === "p" && tag[1]) {
-            allFollows.add(tag[1]);
-          }
-        }
-
-        console.log(
-          `📡 Total unique follows after event ${index + 1}: ${allFollows.size}`,
-        );
-      }
-
-      const followList = Array.from(allFollows);
+      )[0];
 
       console.log(
-        `✅ Found ${followList.length} follows from ${followEvents.size} events`,
+        `📡 Using follow list from ${new Date(mostRecent.created_at * 1000).toISOString()} (${eventsById.size} version(s) found)`,
       );
 
-      // Always try additional popular relays for maximum coverage
-      if (!this.cancelled) {
-        console.log(
-          `🔍 Current count: ${followList.length}, trying additional popular relays for maximum coverage...`,
-        );
+      const follows = mostRecent.tags
+        .filter((tag) => tag[0] === "p" && HEX_RE.test(tag[1]))
+        .map((tag) => tag[1]);
 
-        const additionalRelays = [
-          "wss://nostr-pub.wellorder.net",
-          "wss://atlas.nostr.land",
-          "wss://brb.io",
-          "wss://nostr.fmt.wiz.biz",
-          "wss://relay.orangepill.dev",
-          "wss://nostr.oxtr.dev",
-          "wss://nostr.mom",
-          "wss://relay.nostr.wirednet.jp",
-          "wss://nostr.bitcoiner.social",
-          "wss://relay.westernbtc.com",
-        ];
-
-        try {
-          const fallbackNdk = new NDK({
-            explicitRelayUrls: additionalRelays,
-          });
-
-          await Promise.race([
-            fallbackNdk.connect(),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Fallback relay timeout")),
-                10000,
-              ),
-            ),
-          ]);
-
-          const fallbackEvents = await Promise.race([
-            fallbackNdk.fetchEvents({
-              kinds: [3],
-              authors: [pubkey],
-              limit: 15,
-            }),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Fallback fetch timeout")),
-                15000,
-              ),
-            ),
-          ]);
-
-          console.log(
-            `📡 Fallback found ${fallbackEvents.size} additional events`,
-          );
-
-          // Check for cancellation before processing fallback events
-          if (this.cancelled) {
-            console.log("🛑 Fallback processing cancelled");
-            return Array.from(allFollows);
-          }
-
-          // Merge any new follows from fallback
-          for (const event of fallbackEvents) {
-            if (this.cancelled) {
-              console.log(
-                "🛑 Fallback processing cancelled during event merge",
-              );
-              break;
-            }
-            for (const tag of event.tags || []) {
-              if (tag[0] === "p" && tag[1]) {
-                allFollows.add(tag[1]);
-              }
-            }
-          }
-
-          const finalFollowList = Array.from(allFollows);
-          console.log(
-            `✅ Final count after fallback: ${finalFollowList.length} follows (+${finalFollowList.length - followList.length})`,
-          );
-          return finalFollowList;
-        } catch (fallbackError) {
-          console.warn("⚠️ Fallback relay strategy failed:", fallbackError);
-        }
-      }
-
-      return followList;
+      console.log(`✅ Found ${follows.length} follows`);
+      return follows;
     } catch (error) {
       console.error("❌ Failed to fetch follow list:", error);
       return [];
