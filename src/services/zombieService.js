@@ -1,6 +1,8 @@
 import { differenceInDays } from "date-fns";
 import nostrService from "./nostrService";
 import immunityService from "./immunityService";
+import zombieClassificationSettings from "./settings/zombieClassificationSettings";
+import batchSettings from "./settings/batchSettings";
 import localforage from "localforage";
 
 // Configure localforage
@@ -10,22 +12,23 @@ localforage.config({
 });
 
 class ZombieService {
-  constructor() {
-    this.zombieThresholds = {
-      fresh: 90, // 3 months minimum before considering zombie
-      rotting: 180, // 6 months for "rotting" zombie
-      ancient: 365, // 1 year for "ancient" zombie (more conservative)
-    };
-    this.batchSize = 30; // Default batch size for unfollows
+  // Thresholds and batch size are delegated to zombieClassificationSettings /
+  // batchSettings (NIP-78-backed) so a value loaded from localStorage or
+  // synced from a relay on login actually drives classification, instead of
+  // this service holding its own disconnected in-memory copy.
+  get zombieThresholds() {
+    return zombieClassificationSettings.getSettings();
+  }
+
+  get batchSize() {
+    return batchSettings.getSettings().batchSize;
   }
 
   /**
    * Set custom thresholds for zombie classification
    */
   setThresholds(fresh, rotting, ancient) {
-    this.zombieThresholds.fresh = fresh || this.zombieThresholds.fresh;
-    this.zombieThresholds.rotting = rotting || this.zombieThresholds.rotting;
-    this.zombieThresholds.ancient = ancient || this.zombieThresholds.ancient;
+    return zombieClassificationSettings.updateSettings({ fresh, rotting, ancient });
   }
 
   /**
@@ -33,7 +36,7 @@ class ZombieService {
    */
   setBatchSize(size) {
     if (size > 0 && size <= 100) {
-      this.batchSize = size;
+      return batchSettings.updateSettings({ batchSize: size });
     }
   }
 

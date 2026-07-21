@@ -7,7 +7,6 @@
  * NIP-78: https://github.com/nostr-protocol/nips/blob/master/78.md
  */
 
-import { NDKEvent } from '@nostr-dev-kit/ndk';
 import nostrService from './nostrService';
 
 class RelayStorage {
@@ -28,9 +27,8 @@ class RelayStorage {
     try {
       await nostrService.initialize();
 
-      const signer = nostrService.getSigner();
-      if (!signer) {
-        throw new Error('No signer available. Please connect with a browser extension.');
+      if (!nostrService.isSigningReady()) {
+        throw new Error('No signer available. Please connect your Nostr account.');
       }
 
       // Add timestamp to data
@@ -39,14 +37,12 @@ class RelayStorage {
         timestamp: Math.floor(Date.now() / 1000)
       };
 
-      // Create the event
-      const event = new NDKEvent(nostrService.ndk);
-      event.kind = this.KIND;
-      event.tags = [['d', `${this.APP_PREFIX}:${dTag}`]];
+      const tags = [['d', `${this.APP_PREFIX}:${dTag}`]];
+      let content;
 
       // Encrypt if requested
       if (encrypted) {
-        const content = JSON.stringify(dataWithTimestamp);
+        const plaintext = JSON.stringify(dataWithTimestamp);
         const pubkey = nostrService.pubkey;
 
         if (!pubkey) {
@@ -54,18 +50,21 @@ class RelayStorage {
         }
 
         // Encrypt to self, preferring NIP-44 with NIP-04 fallback
-        const { ciphertext, algorithm } = await nostrService.encryptData(content, pubkey);
-        event.content = ciphertext;
-        event.tags.push(['enc', algorithm]);
+        const { ciphertext, algorithm } = await nostrService.encryptData(plaintext, pubkey);
+        content = ciphertext;
+        tags.push(['enc', algorithm]);
       } else {
-        event.content = JSON.stringify(dataWithTimestamp);
+        content = JSON.stringify(dataWithTimestamp);
       }
 
-      // Sign the event
-      await event.sign(signer);
-
-      // Convert NDKEvent to plain object for publishing
-      const signedEvent = event.rawEvent();
+      // Sign with whichever method the user is connected with (nsec/NIP-46/NIP-07).
+      // NIP-46 has its own transport-size fallback to NIP-07 built into nip46Service.
+      const signedEvent = await nostrService.signEventWithCurrentMethod({
+        kind: this.KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags,
+        content,
+      });
 
       // Publish using nostrService's publishEventToRelays method
       const targetRelays = relays || this._getPublishRelays();
@@ -80,7 +79,7 @@ class RelayStorage {
       nostrService.relays = originalRelays;
 
       console.log(`[RelayStorage] Published ${dTag} to ${publishResults.successful}/${publishResults.total} relay(s)`, {
-        eventId: event.id,
+        eventId: signedEvent.id,
         encrypted
       });
 
@@ -88,7 +87,7 @@ class RelayStorage {
         throw new Error('Failed to publish to any relays');
       }
 
-      return event.id;
+      return signedEvent.id;
     } catch (error) {
       console.error(`[RelayStorage] Failed to publish ${dTag}:`, error);
       throw error;
@@ -167,8 +166,7 @@ class RelayStorage {
     try {
       await nostrService.initialize();
 
-      const signer = nostrService.getSigner();
-      if (!signer) {
+      if (!nostrService.isSigningReady()) {
         throw new Error('No signer available');
       }
 
@@ -187,16 +185,13 @@ class RelayStorage {
         return null;
       }
 
-      // Create deletion event (kind 5)
-      const deletionEvent = new NDKEvent(nostrService.ndk);
-      deletionEvent.kind = 5;
-      deletionEvent.content = `Deleting ${this.APP_PREFIX}:${dTag}`;
-      deletionEvent.tags = Array.from(events).map(event => ['e', event.id]);
-
-      await deletionEvent.sign(signer);
-
-      // Convert NDKEvent to plain object for publishing
-      const signedEvent = deletionEvent.rawEvent();
+      // Create deletion event (kind 5), signed with whichever method the user is connected with
+      const signedEvent = await nostrService.signEventWithCurrentMethod({
+        kind: 5,
+        created_at: Math.floor(Date.now() / 1000),
+        content: `Deleting ${this.APP_PREFIX}:${dTag}`,
+        tags: Array.from(events).map(event => ['e', event.id]),
+      });
 
       // Publish using nostrService's publishEventToRelays method
       const targetRelays = relays || this._getPublishRelays();
@@ -211,12 +206,12 @@ class RelayStorage {
       nostrService.relays = originalRelays;
 
       console.log(`[RelayStorage] Deleted ${dTag}`, {
-        deletionEventId: deletionEvent.id,
-        deletedEvents: deletionEvent.tags.length,
+        deletionEventId: signedEvent.id,
+        deletedEvents: signedEvent.tags.length,
         publishedTo: `${publishResults.successful}/${publishResults.total} relays`
       });
 
-      return deletionEvent.id;
+      return signedEvent.id;
     } catch (error) {
       console.error(`[RelayStorage] Failed to delete ${dTag}:`, error);
       throw error;
