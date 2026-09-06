@@ -42,7 +42,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      // `import.meta.dirname` rather than `__dirname`: Vite 8's native config
+      // loader can't evaluate CJS globals, and it becomes the default loader in
+      // a future major.
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
