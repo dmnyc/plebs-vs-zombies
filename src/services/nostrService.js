@@ -3,6 +3,39 @@ import { nip19, finalizeEvent, SimplePool } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 
+// Liveness detection: any event a user signs proves their key is still in use.
+// A lurker who only reacts, zaps, or edits their mute list is alive, not a
+// zombie — so activity queries deliberately omit `kinds` and match everything.
+// Narrowing to a handful of "social" kinds was the main source of false
+// positives: article-only writers, NIP-22 commenters and quiet reactors all
+// looked dead.
+//
+// LIVENESS_KINDS is only a fallback for relays that mishandle kind-less
+// filters. Note kind 9735 (zap receipt) is absent on purpose — receipts are
+// signed by the recipient's zapper service, not by the user, so they never
+// match an `authors` filter and prove nothing. Kind 9734 (the zap request the
+// user actually signs) is what counts.
+const LIVENESS_KINDS = [
+  0, 1, 3, 4, 5, 6, 7, 8, 16, 20, 40, 41, 42, 1063, 1068, 1111, 1311, 1617,
+  1621, 1984, 1985, 9734, 9802, 10000, 10001, 10002, 10003, 10015, 10030,
+  30000, 30001, 30002, 30003, 30008, 30009, 30017, 30018, 30023, 30024, 30078,
+  30311, 30315, 30402, 30617, 30618, 31922, 31923, 31924, 31925, 31989, 31990,
+  34235, 34550,
+];
+
+// NDKRelayStatus.CONNECTED is 5 in NDK 2.x (1 is DISCONNECTED). Older code in
+// this file compared against 1, which counted *disconnected* relays as ready
+// and made the connection-wait loops meaningless. Accept both so a version
+// bump can't silently reintroduce that.
+// Below this many days the Zombie Check verdict is "Alive" and no additional
+// relay or kind list can change it — used to stop scanning early.
+const ZOMBIE_CHECK_ALIVE_DAYS = 60;
+
+function isRelayConnected(relay) {
+  const status = relay?.connectivity?.status;
+  return status === 5 || status === 8; // CONNECTED | AUTHENTICATED
+}
+
 class NostrService {
   constructor() {
     this.ndk = null;
@@ -72,7 +105,7 @@ class NostrService {
       while (Date.now() - startTime < maxWaitTime) {
         const connectedRelays = Array.from(
           this.ndk?.pool?.relays?.values() || [],
-        ).filter((r) => r.connectivity.status === 1);
+        ).filter((r) => isRelayConnected(r));
 
         if (connectedRelays.length > 0) {
           console.log(
@@ -86,7 +119,7 @@ class NostrService {
 
       const finalConnected = Array.from(
         this.ndk?.pool?.relays?.values() || [],
-      ).filter((r) => r.connectivity.status === 1).length;
+      ).filter((r) => isRelayConnected(r)).length;
 
       if (finalConnected === 0) {
         console.warn("⚠️ No relays connected after 5s, but continuing anyway");
@@ -985,6 +1018,179 @@ class NostrService {
     return validFollowList;
   }
 
+  /**
+   * Fetch a single user's most recent events for liveness classification.
+   *
+   * Deliberately unconstrained: no `kinds` (any signed event proves the key is
+   * in use) and no `since` (so a long-dormant account reports a real last-seen
+   * date instead of "nothing in the past year"). If the kind-less query comes
+   * back empty we retry with an explicit kind list, since a few relays handle
+   * kind-less filters poorly and an empty result is what produces a false
+   * zombie.
+   *
+   * @returns {Promise<Array>} events sorted newest-first, capped at `limit`
+   */
+  async fetchLivenessEvents(pubkey, limit = 10, options = {}) {
+    const { ndk = this.ndk, timeoutMs = 10000 } = options;
+
+    const toPlain = (events) =>
+      Array.from(events)
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, limit)
+        .map((e) => ({
+          id: e.id,
+          created_at: e.created_at,
+          content: e.content,
+          kind: e.kind,
+        }));
+
+    const run = async (filter) => {
+      const events = await Promise.race([
+        ndk.fetchEvents(filter, { closeOnEose: true }),
+        new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+      ]);
+      return events && events.size > 0 ? toPlain(events) : [];
+    };
+
+    const base = { authors: [pubkey], limit: Math.max(limit, 10) };
+
+    const anyKind = await run(base);
+    if (anyKind.length > 0) return anyKind;
+
+    // Fallback: explicit kinds for relays that mishandle kind-less filters.
+    return run({ ...base, kinds: LIVENESS_KINDS });
+  }
+
+  /**
+   * Deep single-user activity lookup, used by the Zombie Check.
+   *
+   * Unlike a bulk scan we can afford to be thorough for one pubkey: we resolve
+   * the subject's own NIP-65 relay list and query it alongside the defaults, so
+   * someone who only publishes to their own or a niche relay isn't reported as
+   * a zombie just because our six default relays never saw them.
+   *
+   * @returns {Promise<{events: Array, relaysQueried: string[], reachable: boolean}>}
+   *   `reachable: false` means no relay answered — the caller must surface an
+   *   error rather than treat the silence as proof of death.
+   */
+  async getProfileActivityDeep(pubkey, limit = 10, onProgress = null) {
+    await this.initialize();
+
+    const report = (stage) => {
+      if (typeof onProgress === "function") onProgress(stage);
+    };
+
+    const results = [];
+    let reachable = false;
+    const newestDays = () => {
+      if (results.length === 0) return null;
+      const newest = Math.max(...results.map((e) => e.created_at));
+      return Math.floor((Date.now() / 1000 - newest) / 86400);
+    };
+
+    // Pass 1: default relays. The subject's relay list rides along in parallel
+    // so we never wait on it serially.
+    report(`Searching ${this.relays.length} default relays…`);
+    const [defaultEvents, relayList] = await Promise.all([
+      this.fetchLivenessEvents(pubkey, limit).catch((error) => {
+        console.warn("⚠️ Default-relay activity lookup failed:", error.message);
+        return [];
+      }),
+      this.fetchRelayList(pubkey).catch((error) => {
+        console.warn("⚠️ Could not resolve NIP-65 relays:", error.message);
+        return null;
+      }),
+    ]);
+
+    results.push(...defaultEvents);
+    reachable = this.getConnectedRelayCount() > 0;
+
+    let extraRelays = [];
+    if (relayList) {
+      const advertised = [
+        ...new Set([
+          ...this.getWriteRelays(relayList),
+          ...this.getReadRelays(relayList),
+        ]),
+      ];
+      extraRelays = advertised.filter((url) => !this.relays.includes(url));
+    }
+
+    // Escalate to their own relays only when the verdict could still change.
+    // Activity already inside the "alive" band can't be improved on, so don't
+    // spend another several seconds connecting to more relays.
+    const days = newestDays();
+    const verdictSettled = days !== null && days < ZOMBIE_CHECK_ALIVE_DAYS;
+
+    if (verdictSettled) {
+      report(`Active ${days} days ago — no further relays needed.`);
+    } else if (extraRelays.length > 0) {
+      report(
+        `Checking ${extraRelays.length} relay(s) ${pubkey.substring(0, 8)}… advertises…`,
+      );
+      console.log(
+        `📡 Also scanning ${extraRelays.length} relay(s) advertised by ${pubkey.substring(0, 8)}...`,
+      );
+      let userNdk = null;
+      try {
+        // No signer: this is a read-only lookup that must work for logged-out
+        // visitors on the homepage without ever prompting to sign.
+        userNdk = new NDK({ explicitRelayUrls: extraRelays });
+        await userNdk.connect(3000);
+        const events = await this.fetchLivenessEvents(pubkey, limit, {
+          ndk: userNdk,
+          timeoutMs: 6000,
+        });
+        if (events.length > 0) {
+          results.push(...events);
+          reachable = true;
+        }
+      } catch (error) {
+        console.warn(`⚠️ User-relay activity lookup failed: ${error.message}`);
+      } finally {
+        try {
+          userNdk?.pool?.close();
+        } catch (_) {}
+      }
+    }
+
+    // Merge both passes, de-duplicated, newest first.
+    const byId = new Map();
+    for (const event of results) {
+      if (!byId.has(event.id)) byId.set(event.id, event);
+    }
+    const merged = Array.from(byId.values())
+      .sort((a, b) => b.created_at - a.created_at)
+      .slice(0, limit);
+
+    return {
+      events: merged,
+      relaysQueried: [...this.relays, ...extraRelays],
+      reachable: reachable || merged.length > 0,
+    };
+  }
+
+  /**
+   * Count relays in the main pool that are currently connected.
+   */
+  getConnectedRelayCount() {
+    try {
+      const pool = this.ndk?.pool;
+      if (typeof pool?.connectedRelays === "function") {
+        return pool.connectedRelays().length;
+      }
+      const stats = pool?.stats?.();
+      if (stats && typeof stats.connected === "number") {
+        return stats.connected;
+      }
+      return Array.from(pool?.relays?.values() || []).filter((relay) =>
+        isRelayConnected(relay),
+      ).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   async getProfilesActivity(pubkeys, limit = 10, progressCallback = null) {
     if (!pubkeys || pubkeys.length === 0) {
       return new Map();
@@ -1011,11 +1217,10 @@ class NostrService {
       const batchNum = Math.floor(i / batchSize) + 1;
 
       try {
-        // Comprehensive filter - multiple event types, full year lookback
-        // Must cover the full zombie threshold range (up to 365 days)
+        // No `kinds` — any signed event counts as liveness (see LIVENESS_KINDS).
+        // Full year lookback to cover the whole zombie threshold range.
         // Higher per-user limit to avoid prolific posters crowding out quiet users
         const filter = {
-          kinds: [0, 1, 3, 6, 7, 9735], // Profiles, posts, contacts, reposts, reactions, zaps
           authors: batch,
           limit: 20 * batch.length, // 20 events per user to ensure coverage
           since: Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60, // 365 days - matches zombie thresholds
@@ -1098,21 +1303,8 @@ class NostrService {
           );
           const recheckPromises = usersToRecheck.map(async (pk) => {
             try {
-              const individualEvents = await this.ndk.fetchEvents({
-                kinds: [0, 1, 3, 6, 7, 9735],
-                authors: [pk],
-                limit: 10,
-              });
-              if (individualEvents && individualEvents.size > 0) {
-                const evts = Array.from(individualEvents)
-                  .sort((a, b) => b.created_at - a.created_at)
-                  .slice(0, limit)
-                  .map((e) => ({
-                    id: e.id,
-                    created_at: e.created_at,
-                    content: e.content,
-                    kind: e.kind,
-                  }));
+              const evts = await this.fetchLivenessEvents(pk, limit);
+              if (evts.length > 0) {
                 // Only overwrite if the recheck found something newer than what
                 // we already had — protects against the recheck returning only
                 // older events than the batch already cached.
@@ -1219,12 +1411,7 @@ class NostrService {
 
       try {
         const individualFilter = {
-          kinds: [
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063,
-            1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001,
-            30008, 30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923,
-            31924, 31925, 31989, 31990, 34550,
-          ],
+          kinds: LIVENESS_KINDS,
           authors: [pubkey],
           limit: 500, // Very high limit for individual search
           // No time limit - search all time
@@ -2197,7 +2384,7 @@ class NostrService {
       // Fallback to subscription method only if fetchEvents fails
       const connectedRelays = Array.from(
         this.ndk?.pool?.relays?.values() || [],
-      ).filter((r) => r.connectivity.status === 1);
+      ).filter((r) => isRelayConnected(r));
 
       console.log("🔧 NDK state for fallback:", {
         exists: !!this.ndk,
@@ -2221,7 +2408,7 @@ class NostrService {
 
           const nowConnectedRelays = Array.from(
             this.ndk?.pool?.relays?.values() || [],
-          ).filter((r) => r.connectivity.status === 1);
+          ).filter((r) => isRelayConnected(r));
 
           if (nowConnectedRelays.length > 0) {
             console.log(
@@ -2249,7 +2436,7 @@ class NostrService {
               statusText:
                 r.connectivity.status === 0
                   ? "connecting"
-                  : r.connectivity.status === 1
+                  : isRelayConnected(r)
                     ? "connected"
                     : "disconnected",
             }));
@@ -2266,7 +2453,7 @@ class NostrService {
 
         const finalConnectedRelays = Array.from(
           this.ndk?.pool?.relays?.values() || [],
-        ).filter((r) => r.connectivity.status === 1);
+        ).filter((r) => isRelayConnected(r));
 
         if (finalConnectedRelays.length === 0) {
           console.warn(
@@ -2591,15 +2778,9 @@ class NostrService {
    */
   async fetchUserActivitySingle(pubkey, relays, limit = 5) {
     const filter = {
-      kinds: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063,
-        1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001,
-        30008, 30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923, 31924,
-        31925, 31989, 31990, 34550,
-      ],
+      kinds: LIVENESS_KINDS,
       authors: [pubkey],
       limit: limit,
-      since: Math.floor((Date.now() - 365 * 24 * 60 * 60 * 1000) / 1000), // 1 year lookback
     };
 
     const events = [];
@@ -2652,15 +2833,9 @@ class NostrService {
    */
   async fetchUserActivity(pubkey, relays, limit = 10) {
     const filter = {
-      kinds: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063,
-        1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001, 30008,
-        30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923, 31924, 31925,
-        31989, 31990, 34550,
-      ],
+      kinds: LIVENESS_KINDS,
       authors: [pubkey],
       limit: limit * 2, // Get a few extra to account for filtering
-      since: Math.floor((Date.now() - 365 * 24 * 60 * 60 * 1000) / 1000), // Look back 1 year
     };
 
     const events = [];
@@ -2828,14 +3003,8 @@ class NostrService {
     );
 
     const filter = {
-      kinds: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 40, 41, 42, 43, 44, 1063,
-        1311, 1984, 1985, 9734, 9735, 10000, 10001, 10002, 30000, 30001, 30008,
-        30009, 30017, 30018, 30023, 30024, 31890, 31922, 31923, 31924, 31925,
-        31989, 31990, 34550,
-      ],
+      kinds: LIVENESS_KINDS,
       authors: [pubkey],
-      since: Math.floor(Date.now() / 1000 - 365 * 24 * 60 * 60), // Look back 1 year
       limit: 100,
     };
 

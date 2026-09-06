@@ -207,7 +207,8 @@ Classification bands mirror the in-app ZombieCheck.vue component:
   </main>
 
   <script type="module">
-    import { SimplePool, nip19 } from 'https://esm.sh/nostr-tools@2.17.0';
+    // Keep in step with the nostr-tools version in package.json.
+    import { SimplePool, nip19 } from 'https://esm.sh/nostr-tools@2.25.2';
 
     const RELAYS = [
       'wss://relay.damus.io',
@@ -221,7 +222,84 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       'wss://relay.noswhere.com',
       'wss://relay.0xchat.com',
     ];
-    const KINDS = [0, 1, 3, 6, 7, 9735];
+    // Liveness detection: any event a user signs proves their key is still in
+    // use, so the activity query below omits `kinds` entirely. A lurker who
+    // only reacts, zaps, or edits a mute list is alive, not a zombie — and
+    // narrowing to a few "social" kinds was the main source of false positives
+    // (article-only writers, NIP-22 commenters and quiet reactors looked dead).
+    //
+    // LIVENESS_KINDS is only a fallback for relays that mishandle kind-less
+    // filters. Kind 9735 (zap receipt) is absent on purpose — receipts are
+    // signed by the recipient's zapper service, not by the user, so they never
+    // match an `authors` filter. Kind 9734 is the one the user actually signs.
+    // Mirrors LIVENESS_KINDS in src/services/nostrService.js.
+    const LIVENESS_KINDS = [
+      0, 1, 3, 4, 5, 6, 7, 8, 16, 20, 40, 41, 42, 1063, 1068, 1111, 1311, 1617,
+      1621, 1984, 1985, 9734, 9802, 10000, 10001, 10002, 10003, 10015, 10030,
+      30000, 30001, 30002, 30003, 30008, 30009, 30017, 30018, 30023, 30024,
+      30078, 30311, 30315, 30402, 30617, 30618, 31922, 31923, 31924, 31925,
+      31989, 31990, 34235, 34550,
+    ];
+
+    const RELAY_TIMEOUT = 4000;   // per relay — one slow relay must not stall the check
+    const PROFILE_TIMEOUT = 2500; // profile/relay-list lookups aren't verdict-critical
+    const ALIVE_DAYS = 60;        // inside this band the verdict can't change, so stop early
+
+    function newestDays(events) {
+      if (!events.length) return null;
+      const newest = Math.max(...events.map((e) => e.created_at));
+      return Math.floor((Date.now() / 1000 - newest) / 86400);
+    }
+
+    function relayName(url) {
+      return url.replace(/^wss?:\/\//, '').replace(/\/$/, '');
+    }
+
+    // Query relays one at a time rather than as a single pool call, so the user
+    // sees which relay is being searched and a slow or dead one can't hold the
+    // whole check hostage.
+    async function scanRelays(pool, relays, filter, groupLabel, stopWhen = null) {
+      const found = [];
+      let answered = 0;
+      let resolveEarly;
+      const early = new Promise((resolve) => { resolveEarly = resolve; });
+
+      const tick = (url) => {
+        answered++;
+        const newest = newestDays(found);
+        const seen = newest === null
+          ? 'nothing yet'
+          : `newest ${formatGone(newest)} ago`;
+        els.progress.textContent =
+          `Searching ${groupLabel} — ${answered}/${relays.length} answered ` +
+          `(${relayName(url)}) · ${found.length} events, ${seen}`;
+        // Once the answer can't change, don't keep the user waiting on the
+        // slowest relay in the set.
+        if (stopWhen && stopWhen(found)) resolveEarly();
+      };
+
+      const all = Promise.all(relays.map(async (url) => {
+        try {
+          const evs = await pool.querySync([url], filter, { maxWait: RELAY_TIMEOUT });
+          found.push(...evs);
+        } catch (_) {
+          // Unreachable relay — silence from one relay is not evidence of death.
+        } finally {
+          tick(url);
+        }
+      }));
+
+      // Whichever comes first: every relay answered, or the verdict is settled.
+      // Stragglers keep running harmlessly and are dropped when the pool closes.
+      await Promise.race([all, early]);
+      return found;
+    }
+
+    // The verdict is settled once we've seen activity inside the "Alive" band.
+    const settledAlive = (evs) => {
+      const days = newestDays(evs);
+      return days !== null && days < ALIVE_DAYS;
+    };
 
     // Display bands — mirrors src/components/ZombieCheck.vue
     function classify(days, deleted) {
@@ -231,7 +309,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
       if (days == null) {
         return { emoji: '💀', label: 'Ancient Zombie', color: '#f87171', border: '#b91c1c',
-          detail: 'No activity found in the past year.' };
+          detail: 'No activity found on any relay we checked.' };
       }
       if (days < 60) {
         return { emoji: '🫀', label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
@@ -425,19 +503,59 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.progress.textContent = 'Resolving identifier…';
 
       const pool = new SimplePool();
+      const extraQueried = []; // user's own relays, so we can close them too
       try {
         const hex = presetHex || resolveHex(els.input.value);
-        els.progress.textContent = 'Scanning relays for activity…';
 
-        const since = Math.floor(Date.now() / 1000) - 365 * 86400;
-        const [activity, profileEvents] = await Promise.all([
-          pool.querySync(RELAYS, { kinds: KINDS, authors: [hex], since, limit: 50 }),
-          pool.querySync(RELAYS, { kinds: [0], authors: [hex], limit: 5 }),
+        // Pass 1: default relays, no `kinds` and no `since` — any signed event
+        // counts, and a dormant account should report a real last-seen date
+        // rather than "nothing in the past year". Profile and relay list ride
+        // along in parallel so nothing waits on them.
+        const [events, profileEvents, relayListEvents] = await Promise.all([
+          scanRelays(pool, RELAYS, { authors: [hex], limit: 20 }, 'default relays', settledAlive),
+          pool.querySync(RELAYS, { kinds: [0], authors: [hex], limit: 5 }, { maxWait: PROFILE_TIMEOUT }),
+          pool.querySync(RELAYS, { kinds: [10002], authors: [hex], limit: 1 }, { maxWait: PROFILE_TIMEOUT }),
         ]);
 
-        const sorted = activity.slice().sort((a, b) => b.created_at - a.created_at);
+        // Escalate only when the verdict could still change. If we already
+        // found activity inside the "Alive" band, no additional relay or kind
+        // list can make them more alive — so stop here instead of spending
+        // another 10 seconds on it.
+        if (newestDays(events) === null || newestDays(events) >= ALIVE_DAYS) {
+          // A few relays mishandle kind-less filters, and an empty result is
+          // exactly what produces a false zombie — so retry with explicit kinds.
+          if (!events.length) {
+            const byKind = await scanRelays(
+              pool, RELAYS, { kinds: LIVENESS_KINDS, authors: [hex], limit: 20 },
+              'default relays (explicit kinds)',
+            );
+            events.push(...byKind);
+          }
+
+          // Also check the relays this user advertises (NIP-65): someone who
+          // only publishes to their own or a niche relay isn't a zombie just
+          // because our defaults never saw them.
+          const extraRelays = relayListEvents.length
+            ? [...new Set(
+                relayListEvents[0].tags
+                  .filter((t) => t[0] === 'r' && t[1])
+                  .map((t) => t[1]),
+              )].filter((url) => !RELAYS.includes(url)).slice(0, 8)
+            : [];
+
+          if (extraRelays.length) {
+            extraQueried.push(...extraRelays);
+            const own = await scanRelays(
+              pool, extraRelays, { authors: [hex], limit: 20 },
+              'their own relays',
+            );
+            events.push(...own);
+          }
+        }
+
+        const sorted = events.slice().sort((a, b) => b.created_at - a.created_at);
         const newest = sorted[0] || null;
-        const days = newest ? Math.floor((Date.now() / 1000 - newest.created_at) / 86400) : null;
+        const days = newestDays(events);
 
         let profile = {};
         let deleted = false;
@@ -452,7 +570,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         console.error('Zombie Check failed:', e);
         els.error.textContent = e?.message || 'Failed to check this user. Try again.';
       } finally {
-        try { pool.close(RELAYS); } catch (_) {}
+        try { pool.close([...RELAYS, ...extraQueried]); } catch (_) {}
         els.spinner.classList.add('hidden');
         els.label.textContent = '🧟 Check for Zombie';
         els.btn.disabled = false;

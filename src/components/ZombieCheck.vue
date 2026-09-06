@@ -170,11 +170,22 @@ export default {
         const hex = profile.pubkey;
         this.progress = 'Scanning relays for activity…';
 
-        const [activityMap, profileMap] = await Promise.all([
-          nostrService.getProfilesActivity([hex]),
+        const [activity, profileMap] = await Promise.all([
+          nostrService.getProfileActivityDeep(hex, 10, (stage) => {
+            this.progress = stage;
+          }),
           nostrService.getProfileMetadata([hex]),
         ]);
 
+        // No relay answered — that's a network failure, not a dead account.
+        // Reporting a zombie here would be a false positive.
+        if (!activity.reachable) {
+          this.error =
+            "Could not reach any relay to check this user. Check your connection and try again.";
+          return;
+        }
+
+        const activityMap = new Map([[hex, activity.events]]);
         const zombies = zombieService.classifyZombies(activityMap, profileMap);
 
         // Find which bucket this pubkey landed in.
@@ -237,7 +248,9 @@ export default {
           ? `Active — last seen ${this.formatGone(days)} ago.`
           : 'Active recently.';
       } else if (days == null) {
-        detail = 'No activity found in the past year.';
+        // The lookup is no longer capped at a year, so this really does mean
+        // nothing turned up anywhere we looked.
+        detail = 'No activity found on any relay we checked.';
       } else {
         detail = `Gone for ${this.formatGone(days)}.`;
       }
