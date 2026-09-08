@@ -531,26 +531,50 @@
           </div>
 
           <div class="mt-10 pt-6 border-t border-gray-700/50 text-center">
-            <a
-              href="https://mutable.top"
-              target="_blank"
-              rel="noreferrer"
-              class="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
-            >
+            <div class="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-gray-400">
               <span class="text-white font-medium">From the creator of</span>
-              <img
-                src="https://www.mutable.top/mutable_logo.svg"
-                alt=""
-                class="h-8 w-auto"
-                loading="lazy"
-              />
-              <img
-                src="https://www.mutable.top/mutable_text.svg"
-                alt="Mutable"
-                class="h-4 w-auto"
-                loading="lazy"
-              />
-            </a>
+              <a
+                href="https://mutable.top"
+                target="_blank"
+                rel="noreferrer"
+                class="inline-flex items-center gap-2 hover:text-gray-200 transition-colors"
+              >
+                <img
+                  src="https://www.mutable.top/mutable_logo.svg"
+                  alt=""
+                  class="h-8 w-auto"
+                  loading="lazy"
+                />
+                <img
+                  src="https://www.mutable.top/mutable_text.svg"
+                  alt="Mutable"
+                  class="h-4 w-auto"
+                  loading="lazy"
+                />
+              </a>
+              <span class="text-white font-medium">and</span>
+              <a
+                href="https://sidecar.top"
+                target="_blank"
+                rel="noreferrer"
+                class="inline-flex items-center hover:opacity-80 transition-opacity"
+              >
+                <!--
+                  Self-hosted so the footer doesn't depend on sidecar.top.
+                  h-7 sizes the script to match the "mutable" wordmark beside
+                  it. The lockup's script sits in the lower third of its
+                  viewBox (the glass fills the full height), so plain
+                  box-centering reads low — the small upward nudge lines the
+                  word up with the surrounding text.
+                -->
+                <img
+                  src="/sidecar_logo_white.svg"
+                  alt="Sidecar"
+                  class="h-7 w-auto -translate-y-[3px]"
+                  loading="lazy"
+                />
+              </a>
+            </div>
           </div>
         </div>
       </div>
