@@ -301,6 +301,34 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       return days !== null && days < ALIVE_DAYS;
     };
 
+    // U+1FAC0 (anatomical heart) arrived in Emoji 13.0 (2020). Every other
+    // emoji here predates 2017, so on a platform whose emoji font stopped
+    // before 13.0 — notably Windows 10, which never got it — the "Alive!"
+    // verdict renders as a blank box while everything around it is fine.
+    // Since that's the most common verdict, detect the gap once and swap in
+    // an SVG only for those users; anyone whose system has the glyph keeps
+    // their own native artwork. Mirrors ZombieCheck.vue.
+    const HEART_FALLBACK_SRC = '/heart-anatomical.svg';
+    let heartGlyphSupported = null;
+
+    function supportsAnatomicalHeart() {
+      if (heartGlyphSupported !== null) return heartGlyphSupported;
+      try {
+        const ctx = document.createElement('canvas').getContext('2d');
+        if (!ctx) return (heartGlyphSupported = false);
+        ctx.font = '32px sans-serif';
+        const heart = ctx.measureText('\u{1FAC0}').width;
+        const missing = ctx.measureText('\uFFFF').width;      // unassigned
+        const present = ctx.measureText('\u{1F480}').width;   // skull, Emoji 1.0
+        // A glyph the font lacks collapses to the same notdef box as U+FFFF;
+        // a real emoji matches the advance width of other emoji.
+        heartGlyphSupported = heart !== missing && heart === present;
+      } catch (_) {
+        heartGlyphSupported = false; // fall back to the SVG, which always renders
+      }
+      return heartGlyphSupported;
+    }
+
     // Display bands — mirrors src/components/ZombieCheck.vue
     function classify(days, deleted) {
       if (deleted) {
@@ -312,7 +340,8 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           detail: 'No activity found on any relay we checked.' };
       }
       if (days < 60) {
-        return { emoji: '🫀', label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
+        return { emoji: '🫀', iconFallback: HEART_FALLBACK_SRC,
+          label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
           detail: `Active — last seen ${formatGone(days)} ago.`, beat: true };
       }
       if (days < 120) {
@@ -586,7 +615,16 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.npub.textContent = `${npub.slice(0, 12)}…${npub.slice(-6)}`;
       els.npub.href = `https://njump.me/${npub}`;
 
-      els.emoji.textContent = verdict.emoji;
+      if (verdict.iconFallback && !supportsAnatomicalHeart()) {
+        els.emoji.textContent = '';
+        const img = document.createElement('img');
+        img.src = verdict.iconFallback;
+        img.alt = verdict.label;
+        img.className = 'inline-block align-middle h-12 w-12';
+        els.emoji.appendChild(img);
+      } else {
+        els.emoji.textContent = verdict.emoji;
+      }
       els.emoji.classList.toggle('animate-heartbeat', !!verdict.beat);
       els.rlabel.textContent = verdict.label;
       els.rlabel.style.color = verdict.color;

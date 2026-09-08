@@ -62,7 +62,15 @@
       </div>
 
       <div class="text-center py-2">
-        <div class="text-5xl mb-2 inline-block" :class="{ 'animate-heartbeat': result.beat }">{{ result.emoji }}</div>
+        <div class="text-5xl mb-2 inline-block" :class="{ 'animate-heartbeat': result.beat }">
+          <img
+            v-if="result.iconSrc"
+            :src="result.iconSrc"
+            :alt="result.label"
+            class="h-12 w-12 inline-block align-middle"
+          />
+          <template v-else>{{ result.emoji }}</template>
+        </div>
         <div class="text-2xl font-bold" :class="result.textClass">{{ result.label }}</div>
         <p class="text-sm text-gray-300 mt-2">{{ result.detail }}</p>
         <p v-if="result.lastSeenDate" class="text-xs text-gray-500 mt-1">
@@ -86,9 +94,36 @@ import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import ProfileSearchInput from './ProfileSearchInput.vue';
 
+// U+1FAC0 (anatomical heart) arrived in Emoji 13.0 (2020). Every other emoji
+// here predates 2017, so on a platform whose emoji font stopped before 13.0 —
+// notably Windows 10, which never got it — the "Alive!" verdict renders as a
+// blank box while everything around it is fine. Since that's the most common
+// verdict, detect the gap once and swap in an SVG only for those users; anyone
+// whose system has the glyph keeps their own native artwork.
+let heartGlyphSupported = null;
+
+function supportsAnatomicalHeart() {
+  if (heartGlyphSupported !== null) return heartGlyphSupported;
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return (heartGlyphSupported = false);
+    ctx.font = '32px sans-serif';
+    const heart = ctx.measureText('\u{1FAC0}').width;
+    const missing = ctx.measureText('￿').width; // permanently unassigned
+    const present = ctx.measureText('\u{1F480}').width; // skull, Emoji 1.0
+    // A glyph the font lacks collapses to the same notdef box as U+FFFF;
+    // a real emoji matches the advance width of other emoji.
+    heartGlyphSupported = heart !== missing && heart === present;
+  } catch (_) {
+    heartGlyphSupported = false; // fall back to the SVG, which always renders
+  }
+  return heartGlyphSupported;
+}
+
 const CATEGORY_DISPLAY = {
   active: {
     emoji: '🫀',
+    iconFallback: '/heart-anatomical.svg',
     label: 'Alive!',
     borderClass: 'border-zombie-green bg-green-900/10',
     textClass: 'text-zombie-green',
@@ -257,6 +292,11 @@ export default {
 
       return {
         ...display,
+        // Only set when this platform can't render the emoji itself.
+        iconSrc:
+          display.iconFallback && !supportsAnatomicalHeart()
+            ? display.iconFallback
+            : null,
         detail,
         profile,
         displayName: profile.display_name || profile.name || 'Anonymous',
