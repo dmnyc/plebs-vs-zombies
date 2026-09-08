@@ -1,6 +1,6 @@
 {
   "name": "plebs-vs-zombies",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "A Nostr utility for managing dormant follows",
   "main": "index.js",
   "type": "module",
@@ -29,23 +29,23 @@
   },
   "homepage": "https://github.com/dmnyc/plebs-vs-zombies#readme",
   "dependencies": {
-    "@nostr-dev-kit/ndk": "^2.5.1",
+    "@nostr-dev-kit/ndk": "^2.18.1",
     "@vercel/analytics": "^1.6.1",
-    "chart.js": "^4.4.2",
-    "date-fns": "^3.3.1",
+    "chart.js": "^4.5.1",
+    "date-fns": "^3.6.0",
     "localforage": "^1.10.0",
-    "nostr-tools": "^2.17.0",
+    "nostr-tools": "^2.25.2",
     "qrcode-generator": "^2.0.4",
-    "vue": "^3.4.21",
-    "vue-router": "^4.6.3"
+    "vue": "^3.5.42",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
-    "autoprefixer": "^10.4.18",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "vite": "^5.1.4",
-    "vitest": "^1.2.2",
-    "ws": "^8.18.3"
+    "@vitejs/plugin-vue": "^5.2.4",
+    "autoprefixer": "^10.5.5",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "vite": "^5.4.21",
+    "vitest": "^1.6.1",
+    "ws": "^8.21.3"
   }
 }
