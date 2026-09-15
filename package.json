@@ -9,8 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "update-profiles": "node scripts/fetch-well-known-profiles.js",
-    "validate-leaderboard": "node scripts/validate-protected-entries.js"
+    "update-profiles": "node scripts/fetch-well-known-profiles.js"
   },
   "repository": {
     "type": "git",
