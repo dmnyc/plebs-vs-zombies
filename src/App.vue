@@ -738,7 +738,15 @@
     @click="closeScoutModal"
   >
     <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
-      <h3 class="text-lg font-medium text-yellow-400 mb-4">👁️🔍 Start Scout Mode</h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-yellow-400">👁️🔍 Start Scout Mode</h3>
+        <button
+          @click="closeScoutModal"
+          class="text-gray-400 hover:text-gray-200 text-2xl leading-none"
+        >
+          ×
+        </button>
+      </div>
 
       <div class="space-y-4">
         <div>
@@ -754,20 +762,21 @@
           />
         </div>
 
-        <div class="flex gap-2">
-          <button
-            @click="closeScoutModal"
-            class="btn-secondary flex-1"
-          >
-            Cancel
-          </button>
+        <div class="space-y-2">
           <button
             @click="startScoutFromModal"
             :disabled="!scoutInputValue"
-            class="btn-scout flex-1"
+            class="btn-scout w-full"
             :class="{'opacity-50 cursor-not-allowed': !scoutInputValue}"
           >
             Start Scouting
+          </button>
+          <button
+            v-if="isConnected"
+            @click="scoutMyself"
+            class="btn-tertiary btn-sm w-full"
+          >
+            Scout Myself
           </button>
         </div>
         <div v-if="scoutInputError" class="text-red-400 text-xs mt-2">
@@ -984,6 +993,32 @@ export default {
 
       // Clear the input
       this.$refs.modalScoutInput?.clear();
+    },
+    async scoutMyself() {
+      const pubkey = nostrService.pubkey || this.userProfile?.pubkey;
+      if (!pubkey) return;
+
+      this.selectedScoutProfile = {
+        npub: nip19.npubEncode(pubkey),
+        pubkey,
+        name: this.userProfile?.name,
+        display_name: this.userProfile?.display_name,
+        picture: this.userProfile?.picture
+      };
+      this.showScoutModal = false;
+      this.scoutInputError = '';
+
+      // Mirror startScoutFromModal: force a remount when already in Scout Mode
+      if (this.isScoutMode) {
+        await scoutService.forceShutdown();
+        await scoutService.reset();
+        this.isScoutMode = false;
+        this.scoutTarget = null;
+        await this.$nextTick();
+        await this.startScoutMode();
+      } else {
+        await this.startScoutMode();
+      }
     },
     async startScoutFromModal() {
       console.log('🔍 Start Scout From Modal clicked!');

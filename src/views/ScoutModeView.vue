@@ -713,6 +713,14 @@ export default {
       const targetNpub = this.scoutTarget.npub;
       const zombieCount = this.scoutResults.totalZombies;
       const zombieScore = this.scoutResults.zombieScore;
+      const breakdown = this.scoutResults.breakdown;
+      const breakdownLines = [
+        breakdown.fresh > 0 ? `🧟‍♀️ Fresh: ${breakdown.fresh}` : '',
+        breakdown.rotting > 0 ? `🧟‍♂️ Rotting: ${breakdown.rotting}` : '',
+        breakdown.ancient > 0 ? `💀 Ancient: ${breakdown.ancient}` : '',
+        breakdown.burned > 0 ? `🔥 Burned: ${breakdown.burned}` : ''
+      ].filter(Boolean).join('\n');
+      const breakdownSection = breakdownLines ? `\nZombie Breakdown:\n${breakdownLines}\n\n` : '\n';
       
       if (this.isMyReport) {
         return `I just scouted my follows with #PlebsVsZombies! 👁️🔍🧟‍♀🧟‍♀
@@ -721,8 +729,7 @@ My Zombie Count is: ${zombieCount}
 
 My Zombie Score™ is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
-
-Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
+${breakdownSection}Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
 https://plebsvszombies.cc`;
       } else {
         return `Hey nostr:${targetNpub} — I just scouted your follows with #PlebsVsZombies! 👁️🔍🧟‍♀🧟‍♀
@@ -731,8 +738,7 @@ Your Zombie Count is: ${zombieCount}
 
 Your Zombie Score™ is ${zombieScore}%!
 ${this.scoreBarEmojis.join('')}
-
-Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
+${breakdownSection}Follow nostr:npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h and join the hunt at: 🏹
 https://plebsvszombies.cc`;
       }
     },
