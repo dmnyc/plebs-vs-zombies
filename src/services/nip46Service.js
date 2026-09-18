@@ -18,6 +18,13 @@ const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://nos.lol',
+  // Clave's relay proxy keeps a persistent subscription on this relay and
+  // wakes Clave via APNs on any kind:24133 event addressed to a paired
+  // signer, even while backgrounded. Including it in our nostrconnect URI
+  // makes the client -> Clave direction reliable regardless of which of
+  // the relays above Clave's own subscription pool has warmed up.
+  // https://github.com/DocNR/clave/blob/main/docs/nip46-compatibility.md
+  'wss://relay.powr.build',
 ];
 
 class Nip46Service {
@@ -28,6 +35,26 @@ class Nip46Service {
     this.connected = false;
     this.connecting = false;
     this.appName = 'Plebs vs Zombies';
+  }
+
+
+  /**
+   * Some signers (notably Amber) accept the handshake but return an empty or
+   * invalid pubkey on the first getPublicKey request. Retry before giving up.
+   */
+  async getPublicKeyWithRetry(attempts = 3, delayMs = 1500) {
+    let lastError = null;
+    for (let i = 0; i < attempts; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, delayMs));
+      try {
+        const pubkey = await this.bunkerSigner.getPublicKey();
+        if (pubkey && /^[0-9a-f]{64}$/i.test(pubkey)) return pubkey;
+        lastError = new Error('Signer returned an invalid public key');
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('Signer did not return a public key');
   }
 
   /**
@@ -60,7 +87,7 @@ class Nip46Service {
       this.connected = true;
       this.connecting = false;
 
-      const pubkey = await this.bunkerSigner.getPublicKey();
+      const pubkey = await this.getPublicKeyWithRetry();
       console.log('[NIP-46] Connected via bunker URL, pubkey:', pubkey.substring(0, 8) + '...');
 
       this.saveConnectionDetails({
@@ -98,7 +125,7 @@ class Nip46Service {
 
     const uri = createNostrConnectURI({
       clientPubkey,
-      relays: DEFAULT_RELAYS.slice(0, 3),
+      relays: DEFAULT_RELAYS,
       secret,
       name: this.appName,
       url: window.location.origin,
@@ -112,7 +139,7 @@ class Nip46Service {
       secretKey,
       secret,
       localPubkey: clientPubkey,
-      relayUrls: DEFAULT_RELAYS.slice(0, 3),
+      relayUrls: DEFAULT_RELAYS,
     };
   }
 
@@ -149,7 +176,7 @@ class Nip46Service {
       this.connected = true;
       this.connecting = false;
 
-      const pubkey = await this.bunkerSigner.getPublicKey();
+      const pubkey = await this.getPublicKeyWithRetry();
       console.log('[NIP-46] Connected via nostrconnect, pubkey:', pubkey.substring(0, 8) + '...');
 
       this.saveConnectionDetails({

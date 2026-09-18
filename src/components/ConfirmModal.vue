@@ -1,6 +1,7 @@
 <template>
+  <Transition name="modal">
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click="handleBackdropClick">
-    <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+    <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
       <div class="flex items-center mb-4">
         <div 
           v-if="!hideIcon"
@@ -59,6 +60,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script>

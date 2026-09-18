@@ -3,70 +3,361 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-gray-900 text-gray-100 font-main;
+  :root {
+    --zombie-green: #5cdb5c;
+    --zombie-green-bright: #7dff7d;
+    --zombie-dark: #141b17;
+    --abyss: #0a0f0c;
+    --pleb-purple: #8e30eb;
+    --pleb-gold: #ffd700;
+
+    /* Decay texture — shared grunge layers for flat surfaces (cards, modals) */
+    --decay-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.16'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    --decay-mold: radial-gradient(ellipse 85% 68% at 0% -4%, rgba(114, 138, 66, 0.48), transparent 64%);
+    --decay-rust: radial-gradient(ellipse 80% 72% at 100% 102%, rgba(132, 84, 40, 0.46), transparent 60%);
+    --decay-grime: radial-gradient(ellipse 140% 65% at 50% 104%, rgba(5, 10, 6, 0.6), transparent 68%);
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-gray-100 font-main antialiased;
+    background-color: var(--abyss);
+  }
+
   h1, h2, h3 {
     @apply font-horror text-zombie-green;
+    /* Glow uses currentColor, so overridden heading colors (yellow, red...)
+       glow in their own hue */
+    text-shadow: 0 0 28px rgb(92 219 92 / 0.28), 0 2px 12px rgb(0 0 0 / 0.6);
+    letter-spacing: 0.01em;
+    /* No single-word headline lines */
+    text-wrap: balance;
+  }
+
+  /* Typography hygiene: no orphans (single word on the last line) and no
+     widows. Progressive enhancement — unsupported browsers just ignore it. */
+  p, li {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: rgba(92, 219, 92, 0.35);
+    color: #fff;
+  }
+
+  /* Themed scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2b352f transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #2b352f;
+    border-radius: 8px;
+    border: 2px solid #0a0f0c;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #3d4a44;
+  }
+
+  /* The fixed header changes height when it compacts on scroll; opt it
+     out of scroll anchoring so that height change can't nudge scrollY
+     back across the compaction threshold and oscillate */
+  header {
+    overflow-anchor: none;
+    position: relative;
+    /* iOS Safari has a known history of mispainting `position: sticky`
+       elements during fast/momentum scroll — the element lags a frame or
+       renders without its background, letting page content show through
+       underneath. Promoting it to its own compositing layer avoids that
+       repaint path. */
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  /* Extends the header's own (dynamic — transparent on the unscrolled
+     landing page, glass once scrolled) background upward. Overscroll
+     rubber-banding and iOS Safari's floating URL bar both momentarily
+     reveal space above the header's normal top edge; without this, that
+     space shows the ambient page background instead of the header's own
+     look. `inherit` tracks headerGlass's classes automatically instead of
+     duplicating its colors here. */
+  header::before {
+    content: '';
+    position: absolute;
+    top: -150px;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: inherit;
+    -webkit-backdrop-filter: inherit;
+    backdrop-filter: inherit;
+    pointer-events: none;
+  }
+  /* Same fixes as header, mirrored for the footer: its own compositing
+     layer against iOS Safari's sticky/fixed repaint bug, and a downward
+     background extension so bottom-of-page overscroll can't reveal the
+     ambient page background below it. */
+  footer {
+    position: relative;
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  footer::after {
+    content: '';
+    position: absolute;
+    bottom: -150px;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: inherit;
+    -webkit-backdrop-filter: inherit;
+    backdrop-filter: inherit;
+    pointer-events: none;
+  }
+
+  /* Visible keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--zombie-green);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
 @layer components {
+  /* ---------- Buttons ---------- */
   .btn {
-    @apply font-main px-4 py-2 rounded font-semibold transition-colors;
+    @apply font-main px-4 py-2 rounded-xl font-semibold;
+    @apply transition-all duration-200 ease-out select-none;
+    @apply active:scale-[0.97];
+    will-change: transform;
   }
+
   .btn-primary {
-    @apply btn bg-zombie-green text-zombie-dark hover:bg-green-400;
+    @apply btn text-zombie-dark;
+    background-image: linear-gradient(180deg, #6fe66f 0%, #4ec94e 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 2px 8px rgba(92, 219, 92, 0.25);
   }
+  .btn-primary:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #7dff7d 0%, #5cdb5c 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 4px 16px rgba(92, 219, 92, 0.45);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
+  }
+
   .btn-secondary {
-    @apply btn bg-pleb-blue hover:bg-blue-500;
+    @apply btn text-white;
+    background-image: linear-gradient(180deg, #3ba2ff 0%, #1e7fe0 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 2px 8px rgba(30, 144, 255, 0.25);
   }
+  .btn-secondary:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #52b0ff 0%, #2e90f5 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 4px 16px rgba(30, 144, 255, 0.45);
+    transform: translateY(-1px);
+  }
+
   .btn-danger {
-    @apply btn bg-red-600 hover:bg-red-500;
+    @apply btn text-white;
+    background-image: linear-gradient(180deg, #ef5350 0%, #d32f2f 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 2px 8px rgba(211, 47, 47, 0.3);
   }
+  .btn-danger:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #ff6b67 0%, #e53935 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 4px 16px rgba(229, 57, 53, 0.5);
+    transform: translateY(-1px);
+  }
+
+  .btn-success {
+    @apply btn text-zombie-dark;
+    background-image: linear-gradient(180deg, #6fe66f 0%, #4ec94e 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
   .btn-scout {
-    @apply btn bg-yellow-400 text-gray-900 hover:bg-yellow-300;
+    @apply btn text-gray-900;
+    background-image: linear-gradient(180deg, #ffe45c 0%, #f5c518 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 2px 8px rgba(245, 197, 24, 0.25);
   }
+  .btn-scout:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #ffef85 0%, #ffd42e 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 4px 16px rgba(245, 197, 24, 0.45);
+    transform: translateY(-1px);
+  }
+
   .btn-hunt {
-    @apply btn bg-zombie-green text-zombie-dark hover:bg-green-400 font-bold text-lg px-6 py-3 shadow-lg;
+    @apply btn text-zombie-dark font-bold text-lg px-6 py-3;
+    background-image: linear-gradient(180deg, #6fe66f 0%, #4ec94e 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 0 20px rgba(92, 219, 92, 0.35);
     animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .btn-hunt:hover:not(:disabled) {
+    filter: brightness(1.1);
   }
   .btn-hunt-large {
     @apply btn-hunt text-xl px-8 py-4;
   }
-  .card {
-    @apply bg-zombie-dark p-6 rounded-lg shadow-lg border border-gray-700;
-  }
+
   .btn-tertiary {
-    @apply btn bg-gray-700 text-gray-300 hover:bg-gray-600;
+    @apply btn bg-gray-700 text-gray-300 shadow-sm hover:bg-gray-600 hover:text-white hover:-translate-y-px;
   }
   .btn-warn {
-    @apply btn bg-amber-600 text-white hover:bg-amber-500;
+    @apply btn text-white;
+    background-image: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+  }
+  .btn-warn:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+    transform: translateY(-1px);
   }
   .btn-nostr {
-    @apply btn bg-pleb-purple text-white hover:bg-purple-700;
+    @apply btn text-white;
+    background-image: linear-gradient(180deg, #9b4df2 0%, #7c22d9 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 2px 8px rgba(142, 48, 235, 0.3);
   }
+  .btn-nostr:hover:not(:disabled) {
+    background-image: linear-gradient(180deg, #ab66f7 0%, #8e30eb 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 4px 16px rgba(142, 48, 235, 0.5);
+    transform: translateY(-1px);
+  }
+
   .btn-sm {
     @apply text-sm px-3 py-1.5;
   }
   .btn-lg {
     @apply text-lg px-6 py-3;
   }
+
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    transform: none !important;
+    box-shadow: none;
+  }
+
+  /* ---------- Header nav pills ---------- */
+  .nav-pill {
+    @apply px-3.5 py-1.5 rounded-full text-[15px] transition-all duration-200;
+  }
+
+  /* ---------- Modal panels ---------- */
+  /* Placed before .card so the combined "modal-panel card" dialogs resolve
+     to .card's fuller background-image (grunge + sheen) on the cascade tie. */
+  .modal-panel {
+    background-image: var(--decay-grain), var(--decay-mold), var(--decay-rust), var(--decay-grime);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 140px 140px, auto, auto, auto;
+    background-blend-mode: overlay, normal, normal, normal;
+  }
+
+  /* ---------- Cards ---------- */
+  .card {
+    position: relative;
+    @apply p-6 shadow-lg;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Grunge layers (grain + mold + rust + grime) sit behind the sheen and
+       base color — pure background, so text contrast is never affected. */
+    background:
+      var(--decay-grain),
+      var(--decay-mold),
+      var(--decay-rust),
+      var(--decay-grime),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%),
+      rgba(20, 27, 23, 0.72);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 140px 140px, auto, auto, auto, auto;
+    background-blend-mode: overlay, normal, normal, normal, normal;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow:
+      0 24px 48px -12px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  /* Gradient top edge — the "charged" seam */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(92, 219, 92, 0.55), transparent);
+    pointer-events: none;
+  }
+  .card-hover:hover {
+    border-color: rgba(92, 219, 92, 0.4);
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(92, 219, 92, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .card-info {
+    @apply card bg-transparent border-yellow-500/30;
+    background-color: rgba(250, 204, 21, 0.04);
+  }
+  .card-success {
+    @apply card bg-transparent border-green-500/50;
+    background-color: rgba(92, 219, 92, 0.05);
+  }
+  .card-danger {
+    @apply card bg-transparent border-red-500/50;
+    background-color: rgba(239, 68, 68, 0.05);
+  }
+
+  /* ---------- Typography ---------- */
   .page-title {
     @apply text-2xl mb-6;
   }
   .section-title {
     @apply text-xl mb-4;
   }
-  .card-info {
-    @apply card bg-gray-800/50 border-yellow-500/30;
+  /* Gradient display text — apply explicitly where the brand voice should sing */
+  .text-gradient {
+    background: linear-gradient(94deg, #4ec94e 0%, #7dff7d 30%, #d9ff9e 50%, #7dff7d 70%, #4ec94e 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient-pan 6s linear infinite;
+    filter: drop-shadow(0 0 22px rgba(92, 219, 92, 0.3));
   }
-  .card-success {
-    @apply card border-green-500/50;
+  @keyframes gradient-pan {
+    to { background-position: 200% center; }
   }
-  .card-danger {
-    @apply card border-red-500/50;
-  }
+
+  /* ---------- Spinners ---------- */
   .spinner {
     @apply inline-block animate-spin rounded-full border-b-2 border-zombie-green;
   }
@@ -79,11 +370,79 @@
   .spinner-lg {
     @apply spinner h-12 w-12;
   }
+
+  /* ---------- Inputs ---------- */
   .input {
-    @apply bg-gray-800 border border-gray-700 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-zombie-green;
+    @apply border rounded-xl px-4 py-2 text-gray-100;
+    @apply transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zombie-green/70;
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.1);
   }
-  
-  /* Line clamp utilities */
+  .input:focus {
+    border-color: rgba(92, 219, 92, 0.7);
+  }
+
+  /* ---------- Ambient background layers (mounted in App.vue) ---------- */
+  .app-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+      radial-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1.6px) 0 0 / 34px 34px,
+      radial-gradient(1100px 750px at 12% -12%, rgba(92, 219, 92, 0.09), transparent 60%),
+      radial-gradient(1000px 720px at 106% 8%, rgba(142, 48, 235, 0.10), transparent 60%),
+      radial-gradient(900px 700px at 50% 118%, rgba(16, 185, 129, 0.07), transparent 62%),
+      linear-gradient(180deg, #0c130f 0%, #0a0f0c 55%, #0a100c 100%);
+  }
+  .app-bg-fog {
+    position: absolute;
+    width: 62vmax;
+    height: 62vmax;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.55;
+    will-change: transform;
+  }
+  .app-bg-fog-a {
+    background: radial-gradient(circle, rgba(92, 219, 92, 0.13), transparent 62%);
+    top: -22vmax;
+    left: -12vmax;
+    animation: fog-drift-a 28s ease-in-out infinite alternate;
+  }
+  .app-bg-fog-b {
+    background: radial-gradient(circle, rgba(142, 48, 235, 0.12), transparent 62%);
+    bottom: -26vmax;
+    right: -16vmax;
+    animation: fog-drift-b 34s ease-in-out infinite alternate;
+  }
+  @keyframes fog-drift-a {
+    to { transform: translate(14vmax, 9vmax) scale(1.18); }
+  }
+  @keyframes fog-drift-b {
+    to { transform: translate(-12vmax, -10vmax) scale(1.12); }
+  }
+  /* Traced grunge texture. Multiply-only so it can never add white/light —
+     it can only darken, adding faint stains without ever brightening. */
+  .app-bg-distressed {
+    position: absolute;
+    inset: 0;
+    background-image: url("/distressed_bg.svg");
+    background-size: cover;
+    background-position: center;
+    mix-blend-mode: multiply;
+    opacity: 0.4;
+  }
+  .app-bg-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------- Line clamp utilities ---------- */
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -96,8 +455,8 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
-  /* Word breaking utilities for long strings like npubs */
+
+  /* ---------- Word breaking utilities for long strings like npubs ---------- */
   .break-long-strings {
     word-break: break-all;
     overflow-wrap: anywhere;
@@ -107,14 +466,88 @@
   }
 }
 
+/* ==========================================================================
+   Entrance animation utilities — pair with .stagger-* for cascades
+   ========================================================================== */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+.animate-scale-in {
+  animation: scale-in 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger delays for entrance cascades */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* ==========================================================================
+   Fun / thematic animations
+   ========================================================================== */
+
 /* Hunt Button Animations */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5), 0 0 10px rgba(16, 185, 129, 0.3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 0 8px rgba(92, 219, 92, 0.4),
+      0 0 16px rgba(92, 219, 92, 0.25);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.8), 0 0 20px rgba(16, 185, 129, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 0 14px rgba(92, 219, 92, 0.7),
+      0 0 28px rgba(92, 219, 92, 0.45);
     transform: scale(1.02);
   }
 }
@@ -123,16 +556,207 @@
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Respect reduced motion preferences */
+/* Gentle idle float (logos, mascots) */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+/* Spooky title flicker */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.6; }
+  94% { opacity: 1; }
+  96% { opacity: 0.7; }
+  97% { opacity: 1; }
+}
+.animate-flicker {
+  animation: flicker 6s linear infinite;
+}
+
+/* Zombie lurch — for emoji and icons */
+@keyframes lurch {
+  0%, 100% { transform: rotate(-4deg) translateY(0); }
+  25% { transform: rotate(0deg) translateY(-3px); }
+  50% { transform: rotate(4deg) translateY(0); }
+  75% { transform: rotate(0deg) translateY(-3px); }
+}
+.animate-lurch {
+  animation: lurch 2.4s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Shake — errors, earthquakes, purges */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Wobble — playful hover for emoji icons */
+@keyframes wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+.animate-wobble-hover:hover {
+  animation: wobble 0.4s ease-in-out;
+  display: inline-block;
+}
+
+/* Falling zombie (easter-egg rain) */
+@keyframes zombie-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(360deg);
+    opacity: 0.9;
+  }
+}
+
+/* Horde sweep — screen-wide tint when zombie mode is on */
+@keyframes horde-pulse {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.12; }
+}
+
+/* Animated stripes for in-progress bars */
+@keyframes progress-stripes {
+  from { background-position: 1rem 0; }
+  to { background-position: 0 0; }
+}
+.progress-animated {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.18) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.18) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+
+/* ==========================================================================
+   Vue <Transition> classes
+   ========================================================================== */
+
+/* Page swaps (router-view) */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Modals & overlays */
+.modal-enter-active {
+  transition: opacity 0.25s ease;
+}
+.modal-leave-active {
+  transition: opacity 0.18s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-active .modal-panel,
+.modal-leave-active .modal-panel {
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.25s ease;
+}
+.modal-enter-from .modal-panel {
+  transform: scale(0.92) translateY(12px);
+  opacity: 0;
+}
+.modal-leave-to .modal-panel {
+  transform: scale(0.96) translateY(6px);
+  opacity: 0;
+}
+
+/* Dropdown menus */
+.drop-enter-active {
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.drop-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.drop-enter-from,
+.drop-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-4px);
+}
+
+/* Generic collapse (mobile menu) */
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.collapse-enter-from,
+.collapse-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ==========================================================================
+   Easter egg: ZOMBIE MODE (Konami code)
+   The tilt is applied to header/main/footer — NOT the root container —
+   because a transform on the root would re-anchor position:fixed modals.
+   ========================================================================== */
+.zombie-mode header,
+.zombie-mode main,
+.zombie-mode footer {
+  animation: zombie-crawl-tilt 8s ease-in-out infinite;
+}
+@keyframes zombie-crawl-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-0.4deg); }
+  70% { transform: rotate(0.4deg); }
+}
+.zombie-mode::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(46, 82, 46, 0.5) 100%);
+  mix-blend-mode: multiply;
+  animation: horde-pulse 4s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Reduced motion — kill all non-essential animation globally
+   ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .btn-hunt,
   .animate-pulse-glow {
-    animation: none;
-  }
-  @keyframes pulse-glow {
-    0%, 100% {
-      box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
-      transform: scale(1);
-    }
+    animation: none !important;
   }
 }

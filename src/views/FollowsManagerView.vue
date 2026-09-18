@@ -269,11 +269,12 @@
     </div>
     
     <!-- Success Dialog -->
-    <div 
-      v-if="successMessage" 
+    <Transition name="modal">
+    <div
+      v-if="successMessage"
       class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-75"
     >
-      <div class="card max-w-md mx-auto p-6">
+      <div class="modal-panel card max-w-md mx-auto p-6">
         <h3 class="text-xl mb-4 text-zombie-green">Success!</h3>
         <p class="text-gray-300 mb-6">{{ successMessage }}</p>
         <button @click="successMessage = ''" class="btn-primary w-full">
@@ -281,14 +282,16 @@
         </button>
       </div>
     </div>
+    </Transition>
     
     <!-- Custom Alert Modal -->
-    <div 
-      v-if="alertModal.show" 
+    <Transition name="modal">
+    <div
+      v-if="alertModal.show"
       class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-75"
       @click.self="closeAlert"
     >
-      <div class="card max-w-md mx-auto p-6">
+      <div class="modal-panel card max-w-md mx-auto p-6">
         <div class="flex items-center mb-4">
           <div 
             class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
@@ -322,6 +325,7 @@
         </button>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 

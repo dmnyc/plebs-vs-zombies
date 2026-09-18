@@ -24,25 +24,11 @@
     </div>
 
     <!-- Tab Navigation -->
-    <nav class="flex border-b border-gray-700 mb-6 overflow-x-auto" role="tablist" aria-label="Backup sections">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        :id="`tab-${tab.id}`"
-        role="tab"
-        :aria-selected="activeTab === tab.id"
-        :aria-controls="`panel-${tab.id}`"
-        :tabindex="activeTab === tab.id ? 0 : -1"
-        @click="activeTab = tab.id"
-        @keydown="handleTabKeydown($event, tab.id)"
-        class="px-4 py-3 text-sm md:text-base font-medium whitespace-nowrap transition-colors border-b-2 -mb-px focus:outline-none focus:ring-2 focus:ring-zombie-green focus:ring-offset-2 focus:ring-offset-zombie-dark"
-        :class="activeTab === tab.id
-          ? 'border-zombie-green text-zombie-green'
-          : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'"
-      >
-        <span class="mr-2">{{ tab.icon }}</span>{{ tab.label }}
-      </button>
-    </nav>
+    <GlideTabs
+      v-model="activeTab"
+      :tabs="tabs"
+      label="Backup sections"
+    />
 
     <!-- Backups Tab -->
     <section
@@ -256,6 +242,7 @@
 import BackupControls from '../components/BackupControls.vue';
 import BackupHistory from '../components/BackupHistory.vue';
 import FollowRecovery from '../components/FollowRecovery.vue';
+import GlideTabs from '../components/GlideTabs.vue';
 import nostrService from '../services/nostrService';
 
 export default {
@@ -263,7 +250,8 @@ export default {
   components: {
     BackupControls,
     BackupHistory,
-    FollowRecovery
+    FollowRecovery,
+    GlideTabs
   },
   data() {
     return {
@@ -295,21 +283,6 @@ export default {
     }
   },
   methods: {
-    handleTabKeydown(event, tabId) {
-      const idx = this.tabs.findIndex((t) => t.id === tabId);
-      if (idx === -1) return;
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        const next = this.tabs[(idx + 1) % this.tabs.length];
-        this.activeTab = next.id;
-        this.$nextTick(() => document.getElementById(`tab-${next.id}`)?.focus());
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        const prev = this.tabs[(idx - 1 + this.tabs.length) % this.tabs.length];
-        this.activeTab = prev.id;
-        this.$nextTick(() => document.getElementById(`tab-${prev.id}`)?.focus());
-      }
-    },
     normalizeRelayUrl(relayUrl) {
       return relayUrl.trim().replace(/\/$/, '');
     },

@@ -26,6 +26,14 @@ This tool works by:
   <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Inline fallback so the page is never white while the Tailwind CDN
+       <script> below (which blocks parsing) is still loading over the
+       network — the full gradient further down repaints over this once
+       it's ready. -->
+  <style>
+    html, body { background: #0a0f0c; }
+  </style>
+
   <title>The Resurrector | Undelete Your Nostr Profile</title>
   <meta name="description" content="Bring your deleted Nostr profile back to life! Works with browser extensions or nsec." />
 
@@ -46,7 +54,7 @@ This tool works by:
   <!-- Google Fonts - matching main app -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN for quick styling -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -57,14 +65,15 @@ This tool works by:
         extend: {
           colors: {
             'zombie-green': '#5cdb5c',
-            'zombie-dark': '#2c3531',
+            'zombie-dark': '#141b17',
+            'abyss': '#0a0f0c',
             'pleb-gold': '#ffd700',
             'pleb-blue': '#1e90ff',
             'pleb-purple': '#8e30eb',
           },
           fontFamily: {
             'horror': ['"Creepster"', 'cursive'],
-            'main': ['"Inter"', 'sans-serif'],
+            'main': ['"Geist"', 'sans-serif'],
           }
         }
       }
@@ -73,14 +82,39 @@ This tool works by:
 
   <style>
     body {
-      background: #111827;
+      background:
+        radial-gradient(1100px 750px at 12% 0%, rgba(92, 219, 92, 0.09), transparent 60%),
+        radial-gradient(1000px 720px at 100% 8%, rgba(142, 48, 235, 0.10), transparent 60%),
+        linear-gradient(180deg, #0c130f 0%, #0a0f0c 30%, #0a100c 100%);
+      background-repeat: no-repeat;
+      min-height: 100vh;
       color: #e5e7eb;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Geist', sans-serif;
     }
+
+    ::selection {
+      background: rgba(92, 219, 92, 0.35);
+      color: #fff;
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #2b352f transparent;
+    }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      background: #2b352f;
+      border-radius: 8px;
+      border: 2px solid #0a0f0c;
+    }
+    *::-webkit-scrollbar-thumb:hover { background: #3d4a44; }
 
     h1, h2, h3 {
       font-family: 'Creepster', cursive;
       color: #5cdb5c;
+      text-shadow: 0 0 28px rgba(92, 219, 92, 0.28), 0 2px 12px rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.01em;
     }
 
     .zombie-green {
@@ -88,70 +122,101 @@ This tool works by:
     }
 
     .btn-primary {
-      background: #5cdb5c;
-      color: #2c3531;
+      font-family: inherit;
+      background-image: linear-gradient(180deg, #6fe66f 0%, #4ec94e 100%);
+      color: #141b17;
       font-weight: 600;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      transition: all 0.2s;
+      padding: 0.5rem 1rem;
+      border-radius: 0.75rem;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 2px 8px rgba(92, 219, 92, 0.25);
+      transition: all 0.2s ease-out;
       cursor: pointer;
       border: none;
     }
 
     .btn-primary:hover:not(:disabled) {
-      background: #4ade80;
+      background-image: linear-gradient(180deg, #7dff7d 0%, #5cdb5c 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 4px 16px rgba(92, 219, 92, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(0) scale(0.97);
     }
 
     .btn-primary:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
 
     .btn-secondary {
+      font-family: inherit;
       background: #374151;
-      color: #e5e7eb;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
+      color: #d1d5db;
+      padding: 0.5rem 1rem;
+      border-radius: 0.75rem;
       font-weight: 600;
-      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease-out;
       cursor: pointer;
       border: none;
     }
 
     .btn-secondary:hover:not(:disabled) {
       background: #4b5563;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary:active:not(:disabled) {
+      transform: translateY(0) scale(0.97);
     }
 
     .btn-secondary:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
 
     .card {
-      background: #2c3531;
-      border: 1px solid #374151;
-      border-radius: 0.75rem;
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%),
+        rgba(20, 27, 23, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
       padding: 1.5rem;
       margin-bottom: 1.5rem;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 24px 48px -12px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
 
     input[type="password"],
     input[type="text"],
     textarea {
       width: 100%;
-      padding: 0.75rem;
-      background: #111827;
-      border: 1px solid #374151;
-      border-radius: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
       color: #e5e7eb;
       font-size: 0.875rem;
+      transition: border-color 0.2s ease-out;
     }
 
     input:focus,
     textarea:focus {
       outline: none;
-      border-color: #10b981;
+      border-color: rgba(92, 219, 92, 0.7);
+      box-shadow: 0 0 0 2px rgba(92, 219, 92, 0.35);
     }
 
     .log-info { color: #9ca3af; }
@@ -380,7 +445,7 @@ This tool works by:
       </div>
 
       <div class="flex gap-3 flex-wrap">
-        <button onclick="forceResurrection()" class="btn-primary text-lg px-8 py-4" id="force-btn" style="background: #5cdb5c;">
+        <button onclick="forceResurrection()" class="btn-primary text-lg px-8 py-4" id="force-btn">
           🔍 Check Profile
         </button>
 

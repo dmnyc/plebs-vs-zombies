@@ -14,7 +14,7 @@
               Your browser extension will be used automatically to sign large events.
             </template>
             <template v-else>
-              Install a browser extension (Alby, nos2x, or Nostr Connect) to sign follow list updates,
+              Install a browser extension (Sidecar, Alby, nos2x, or Nostr Connect) to sign follow list updates,
               or reduce your follows below ~900 first.
             </template>
           </p>
@@ -23,11 +23,11 @@
     </div>
 
     <!-- Prominent Hunt Zombies CTA -->
-    <div class="mb-8 bg-gradient-to-r from-zombie-dark via-gray-800 to-zombie-dark p-6 rounded-lg border-2 border-zombie-green/50 shadow-2xl">
+    <div class="mb-8 bg-gradient-to-r from-zombie-dark via-gray-800 to-zombie-dark p-6 rounded-lg border-2 border-zombie-green/50 shadow-2xl animate-fade-up">
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="text-center md:text-left">
           <h3 class="text-2xl md:text-3xl font-bold text-zombie-green mb-2 flex items-center justify-center md:justify-start gap-2">
-            <span class="text-4xl">🧟</span>
+            <span class="text-4xl animate-lurch">🧟</span>
             <span>Ready to Hunt Zombies?</span>
           </h3>
           <p class="text-gray-300 text-sm md:text-base">
@@ -44,7 +44,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div class="card">
+      <div class="card card-hover animate-fade-up stagger-1">
         <h3 class="section-title">Follow List Overview</h3>
         <div v-if="loading" class="text-center py-4">
           <div class="spinner-md"></div>
@@ -54,11 +54,11 @@
           <div class="space-y-4">
             <div class="flex justify-between items-center">
               <span class="text-gray-300">Total follows:</span>
-              <span class="font-bold">{{ followStats.total || 0 }}</span>
+              <span class="font-bold"><AnimatedNumber :value="followStats.total || 0" /></span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-gray-300">Immune users:</span>
-              <span class="font-bold text-green-400">🛡️ {{ followStats.immune || 0 }}</span>
+              <span class="font-bold text-green-400">🛡️ <AnimatedNumber :value="followStats.immune || 0" /></span>
             </div>
             <div class="flex justify-between items-center">
               <span class="text-gray-300">Last scan:</span>
@@ -67,7 +67,7 @@
             </div>
             <div class="flex justify-between items-center">
               <span class="text-gray-300">Zombie Score™:</span>
-              <span 
+              <span
                 class="font-bold"
                 :class="{
                   'text-green-500': zombieScore < 20,
@@ -76,7 +76,7 @@
                   'text-red-500': zombieScore >= 80
                 }"
               >
-                {{ zombieScore }}%
+                <AnimatedNumber :value="zombieScore" format />{{ '%' }}
               </span>
             </div>
           </div>
@@ -96,8 +96,8 @@
                 
                 <!-- Progress Bar -->
                 <div class="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    class="bg-zombie-green h-2 rounded-full transition-all duration-300"
+                  <div
+                    class="bg-zombie-green h-2 rounded-full transition-all duration-300 progress-animated"
                     :style="{ width: scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total * 100) + '%' : '0%' }"
                   ></div>
                 </div>
@@ -146,6 +146,7 @@
         v-if="zombieStatsReady"
         title="Zombie Statistics"
         :stats="zombieStats"
+        class="animate-fade-up stagger-2"
       >
         <div class="mt-6">
           <button @click="goToZombieHunting" class="btn-danger w-full">
@@ -153,17 +154,17 @@
           </button>
         </div>
       </ZombieStats>
-      
-      <div class="card">
+
+      <div class="card card-hover animate-fade-up stagger-3">
         <h3 class="section-title">Hunt Status</h3>
         <div class="space-y-4">
           <div class="flex justify-between items-center">
             <span class="text-gray-300">Zombies purged:</span>
-            <span class="font-bold text-zombie-green">{{ huntStats.totalPurged || 0 }}</span>
+            <span class="font-bold text-zombie-green"><AnimatedNumber :value="huntStats.totalPurged || 0" /></span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-gray-300">Purge events:</span>
-            <span class="font-bold">{{ huntStats.purgeEvents || 0 }}</span>
+            <span class="font-bold"><AnimatedNumber :value="huntStats.purgeEvents || 0" /></span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-gray-300">Bandwidth saved:</span>
@@ -193,10 +194,11 @@
         </div>
         <div v-else>
           <ul class="space-y-2">
-            <li 
-              v-for="(activity, index) in recentActivity" 
+            <li
+              v-for="(activity, index) in recentActivity"
               :key="index"
-              class="p-3 border border-gray-700 rounded-lg"
+              class="p-3 border border-gray-700 rounded-lg animate-fade-up hover:border-zombie-green/40 transition-colors"
+              :class="`stagger-${Math.min(index + 1, 8)}`"
             >
               <div class="flex items-center">
                 <div 
@@ -226,12 +228,14 @@
     </div>
 
     <!-- Welcome Modal -->
+    <Transition name="modal">
     <WelcomeModal
       v-if="showWelcomeModal"
       @close="closeWelcomeModal"
       @go-to-backups="handleGoToBackups"
       @skip-backup="handleSkipBackup"
     />
+    </Transition>
 
     <!-- Alert Modal -->
     <ConfirmModal
@@ -252,6 +256,7 @@ import { format } from 'date-fns';
 import ZombieStats from '../components/ZombieStats.vue';
 import WelcomeModal from '../components/WelcomeModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
+import AnimatedNumber from '../components/AnimatedNumber.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
@@ -263,7 +268,8 @@ export default {
   components: {
     ZombieStats,
     WelcomeModal,
-    ConfirmModal
+    ConfirmModal,
+    AnimatedNumber
   },
   data() {
     return {

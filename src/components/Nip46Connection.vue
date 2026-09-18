@@ -1,44 +1,39 @@
 <template>
   <div class="card">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-xl font-semibold text-gray-100">Remote Signer (NIP-46)</h3>
-      <div v-if="connectionStatus.connected" class="flex items-center gap-2">
-        <span class="w-2 h-2 bg-zombie-green rounded-full"></span>
-        <span class="text-sm text-zombie-green">Connected</span>
-      </div>
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-xl font-semibold text-gray-100">
+        Remote Signer <span class="text-gray-500 font-normal">· NIP-46</span>
+      </h3>
+      <span
+        v-if="connectionStatus.connected"
+        class="inline-flex items-center gap-1.5 text-[11px] font-medium text-green-300 bg-green-900/40 border border-green-500/30 px-2.5 py-1 rounded-full"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-zombie-green animate-pulse"></span>
+        Connected
+      </span>
     </div>
 
     <!-- Connection Status -->
-    <div v-if="connectionStatus.connected" class="mb-6">
-      <div class="bg-gray-900 rounded-lg p-4 space-y-2">
-        <div class="flex justify-between items-center">
-          <span class="text-gray-300">Status:</span>
-          <span class="text-zombie-green font-medium">✅ Connected to bunker</span>
+    <div v-if="connectionStatus.connected" class="mb-2">
+      <div class="rounded-xl border border-white/10 bg-black/20 divide-y divide-white/5">
+        <div class="flex justify-between items-center px-4 py-3 gap-3">
+          <span class="text-gray-400 text-sm shrink-0">Bunker</span>
+          <span class="text-gray-100 font-mono text-sm truncate">{{ connectionStatus.bunkerPubkey?.substring(0, 12) }}…</span>
         </div>
-        <div class="flex justify-between items-center">
-          <span class="text-gray-300">Bunker:</span>
-          <span class="text-gray-100 font-mono text-sm">
-            {{ connectionStatus.bunkerPubkey?.substring(0, 8) }}...
-          </span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-gray-300">Relay:</span>
-          <span class="text-gray-100 text-sm">
-            {{ connectionStatus.bunkerRelays?.[0] }}
-          </span>
+        <div class="flex justify-between items-center px-4 py-3 gap-3">
+          <span class="text-gray-400 text-sm shrink-0">Relay</span>
+          <span class="text-gray-100 text-sm truncate">{{ connectionStatus.bunkerRelays?.[0] }}</span>
         </div>
       </div>
-      
-      <div class="mt-4 flex justify-between items-center">
-        <p class="text-gray-400 text-sm">
-          Your bunker will handle all signing requests
-        </p>
-        <button 
+
+      <div class="mt-4 flex items-center justify-between gap-3">
+        <p class="text-gray-500 text-sm">Your bunker handles all signing requests</p>
+        <button
           @click="disconnect"
           :disabled="disconnecting"
-          class="btn-secondary text-sm"
+          class="btn-danger btn-sm shrink-0"
         >
-          {{ disconnecting ? 'Disconnecting...' : 'Disconnect' }}
+          {{ disconnecting ? 'Disconnecting…' : 'Disconnect' }}
         </button>
       </div>
     </div>
@@ -46,77 +41,60 @@
     <!-- Connection Form -->
     <div v-else class="space-y-4">
       <!-- Reconnect Saved Connection -->
-      <div v-if="hasSavedConnection" class="bg-green-900 border border-green-700 rounded-lg p-4">
-        <div class="flex items-center justify-between">
+      <div v-if="hasSavedConnection" class="rounded-xl border border-zombie-green/30 bg-zombie-green/10 p-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h4 class="text-green-400 font-medium mb-1">Saved Connection Available</h4>
-            <p class="text-sm text-green-300">You have a previously authorized bunker connection</p>
+            <h4 class="text-zombie-green font-medium mb-0.5">Saved connection available</h4>
+            <p class="text-sm text-gray-400">Reconnect your previously authorized bunker</p>
           </div>
-          <div class="flex gap-2">
-            <button 
+          <div class="flex gap-2 shrink-0">
+            <button
               @click="deleteSavedConnection"
               :disabled="reconnecting || deleting"
-              class="btn-secondary text-sm"
+              class="btn-tertiary btn-sm inline-flex items-center justify-center gap-1.5"
             >
-              {{ deleting ? 'Deleting...' : '🗑️ Delete' }}
+              <span>🗑️</span>
+              <span>{{ deleting ? 'Deleting…' : 'Delete' }}</span>
             </button>
-            <button 
+            <button
               @click="reconnectSavedConnection"
               :disabled="reconnecting || deleting"
-              class="btn-primary"
+              class="btn-primary btn-sm inline-flex items-center justify-center gap-1.5"
             >
-              {{ reconnecting ? 'Reconnecting...' : '🔄 Reconnect' }}
+              <span>🔄</span>
+              <span>{{ reconnecting ? 'Reconnecting…' : 'Reconnect' }}</span>
             </button>
           </div>
         </div>
       </div>
 
       <!-- Separator -->
-      <div v-if="hasSavedConnection" class="flex items-center justify-center text-gray-500 text-sm">
-        <div class="border-t border-gray-600 flex-grow"></div>
-        <span class="px-3 bg-zombie-dark">or connect manually</span>
-        <div class="border-t border-gray-600 flex-grow"></div>
+      <div v-if="hasSavedConnection" class="flex items-center justify-center text-gray-600 text-xs uppercase tracking-wide">
+        <div class="border-t border-white/10 flex-grow"></div>
+        <span class="px-3">or connect manually</span>
+        <div class="border-t border-white/10 flex-grow"></div>
       </div>
 
-      <div v-if="connecting" class="bg-blue-900 rounded-lg p-4 text-center">
-        <div class="flex items-center justify-center gap-2">
-          <div class="animate-spin w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"></div>
-          <span class="text-blue-400">Connecting to bunker...</span>
+      <div v-if="connecting" class="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
+        <div class="flex items-center justify-center gap-2.5">
+          <span class="spinner-sm"></span>
+          <span class="text-gray-200 text-sm font-medium">Connecting to bunker…</span>
         </div>
-        <p class="text-sm text-gray-300 mt-2">This may take a few seconds</p>
+        <p class="text-xs text-gray-500 mt-1.5">This may take a few seconds</p>
       </div>
 
       <!-- Connection Method Selector -->
-      <div class="flex border border-gray-600 rounded-lg p-1 mb-4">
-        <button
-          @click="connectionMethod = 'bunker-url'"
-          :class="connectionMethod === 'bunker-url' 
-            ? 'bg-gray-700 text-gray-100' 
-            : 'text-gray-400 hover:text-gray-200'"
-          class="flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
-          Use Bunker URL
-        </button>
-        <button
-          @click="connectionMethod = 'generate-string'"
-          :class="connectionMethod === 'generate-string' 
-            ? 'bg-gray-700 text-gray-100' 
-            : 'text-gray-400 hover:text-gray-200'"
-          class="flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        >
-          Generate Connection String
-        </button>
-      </div>
+      <GlideTabs v-model="connectionMethod" :tabs="connectionTabs" label="Signer connection method" />
 
-      <!-- Bunker URL Method (existing) -->
+      <!-- Bunker URL Method -->
       <div v-if="connectionMethod === 'bunker-url'" class="space-y-3">
         <div class="space-y-2">
           <label class="block text-sm font-medium text-gray-300">
             Bunker URL
           </label>
           <div class="relative">
-            <input 
-              v-model="bunkerUrl" 
+            <input
+              v-model="bunkerUrl"
               type="text"
               placeholder="bunker://..."
               class="input w-full pr-10"
@@ -126,7 +104,7 @@
             <button
               v-if="bunkerUrl"
               @click="bunkerUrl = ''"
-              class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200"
+              class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
             >
               ✕
             </button>
@@ -136,90 +114,88 @@
           </p>
         </div>
 
-        <button 
+        <button
           @click="connect"
           :disabled="connecting || !bunkerUrl.trim()"
           class="btn-primary w-full"
         >
-          {{ connecting ? 'Connecting...' : 'Connect to Bunker' }}
+          {{ connecting ? 'Connecting…' : 'Connect to Bunker' }}
         </button>
       </div>
 
       <!-- Generate Connection String Method -->
       <div v-if="connectionMethod === 'generate-string'" class="space-y-3">
         <div class="text-center">
-          <p class="text-sm text-gray-300 mb-3">
-            Generate a connection string to use with your signer app
+          <p class="text-xs text-gray-500 mb-3">
+            Best for pairing with a different device. On this device?
+            Use the <em>Bunker URL</em> tab instead.
           </p>
-          
-          <button 
+
+          <button
             v-if="!generatedConnectionString"
             @click="generateConnectionString"
             :disabled="generatingString"
             class="btn-primary"
           >
-            {{ generatingString ? 'Generating...' : 'Generate Connection String' }}
+            {{ generatingString ? 'Generating…' : 'Generate Connection String' }}
           </button>
-          
+
           <!-- Generated Connection String Display -->
           <div v-if="generatedConnectionString" class="space-y-4">
             <!-- QR Code Display -->
             <div class="flex justify-center">
-              <div class="bg-white p-4 rounded-lg shadow-lg">
-                <div 
-                  ref="qrCode" 
-                  class="w-64 h-64 flex items-center justify-center"
+              <div class="bg-white p-4 rounded-xl shadow-[0_0_0_1px_rgba(92,219,92,0.3),0_0_32px_rgba(92,219,92,0.15)]">
+                <div
+                  ref="qrCode"
+                  class="w-56 h-56 flex items-center justify-center"
                 >
                   <!-- QR code will be inserted here -->
                 </div>
               </div>
             </div>
-            
+
             <!-- Connection String -->
-            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
-              <div class="flex items-center justify-between mb-2">
-                <p class="text-sm text-gray-300">Or copy connection string:</p>
-                <div class="flex items-center gap-2">
-                  <button 
+            <div class="bg-black/20 rounded-xl p-4 border border-white/10">
+              <div class="flex items-center justify-between mb-2 gap-2">
+                <p class="text-sm text-gray-400">Or copy connection string</p>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
                     @click="copyConnectionString"
-                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                    :class="connectionStringCopied 
-                      ? 'bg-green-600 hover:bg-green-500 text-white' 
-                      : 'bg-zombie-green hover:bg-green-400 text-zombie-dark'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    :class="connectionStringCopied
+                      ? 'bg-green-600 hover:bg-green-500 text-white'
+                      : 'bg-zombie-green hover:brightness-110 text-zombie-dark'"
                   >
-                    {{ connectionStringCopied ? '✅ Copied!' : '📋 Copy' }}
+                    {{ connectionStringCopied ? '✅ Copied' : '📋 Copy' }}
                   </button>
-                  <button 
+                  <button
                     @click="showFullConnectionString = !showFullConnectionString"
-                    class="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+                    class="text-xs text-gray-500 hover:text-gray-300 px-1"
                   >
-                    {{ showFullConnectionString ? '▼ Hide' : '▶ Show' }}
+                    {{ showFullConnectionString ? 'Hide' : 'Show' }}
                   </button>
                 </div>
               </div>
-              
-              <div v-if="showFullConnectionString" class="transition-all duration-200">
-                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-green-400 block font-mono break-all">
-                  {{ generatedConnectionString }}
-                </code>
-              </div>
-              
-              <div v-else class="text-center">
-                <code class="bg-gray-900 px-2 py-1 rounded text-xs text-gray-500 font-mono">
-                  nostrconnect://••••••••••••••••••
-                </code>
-              </div>
+
+              <code v-if="showFullConnectionString" class="bg-black/30 px-2 py-1.5 rounded text-xs text-zombie-green block font-mono break-all">
+                {{ generatedConnectionString }}
+              </code>
+              <code v-else class="text-xs text-gray-600 font-mono">
+                nostrconnect://••••••••••••••••••
+              </code>
             </div>
-            
-            <div class="text-xs text-gray-400 text-center">
-              <p>📱 Scan the QR code or paste the string into your signer app</p>
-              <p>🔄 Your signer will connect back to complete the setup</p>
-              <p class="text-blue-400 mt-2">👂 App is now listening for your signer to connect...</p>
+
+            <div class="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <span class="w-1.5 h-1.5 rounded-full bg-zombie-green animate-pulse"></span>
+              Listening for your signer to connect…
             </div>
-            
-            <button 
+            <p class="text-xs text-gray-600 text-center">
+              Scan the QR or paste the string into your signer app. Using Clave? Make sure notifications are allowed.
+            </p>
+
+            <button
               @click="resetConnectionString"
-              class="btn-secondary text-sm w-full"
+              class="btn-tertiary btn-sm w-full"
             >
               Generate New String
             </button>
@@ -228,16 +204,16 @@
       </div>
 
       <!-- Error Display -->
-      <div v-if="error" class="bg-red-900 border border-red-700 rounded-lg p-3">
-        <div class="flex items-start gap-2">
+      <div v-if="error" class="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+        <div class="flex items-start gap-2.5">
           <span class="text-red-400 mt-0.5">⚠️</span>
-          <div class="flex-1">
-            <p class="text-red-400 text-sm font-medium">Connection Failed</p>
-            <p class="text-red-300 text-xs mt-1">{{ error }}</p>
+          <div class="flex-1 min-w-0">
+            <p class="text-red-300 text-sm font-medium">Connection failed</p>
+            <p class="text-red-300/80 text-xs mt-1">{{ error }}</p>
           </div>
-          <button 
+          <button
             @click="error = null"
-            class="text-red-400 hover:text-red-300"
+            class="text-red-400 hover:text-red-300 shrink-0"
           >
             ✕
           </button>
@@ -245,39 +221,48 @@
       </div>
 
       <!-- Help Section -->
-      <div class="bg-gray-900 rounded-lg p-4">
-        <h4 class="text-sm font-medium text-gray-200 mb-2">
-          🔗 Get a Bunker URL
+      <div class="rounded-xl border border-white/10 bg-black/20 p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-1">
+          Get a Bunker URL
         </h4>
-        <p class="text-xs text-gray-400 mb-3">
-          You need a remote signer (bunker) to provide the connection URL. Popular options:
+        <p class="text-xs text-gray-500 mb-3">
+          You need a remote signer (bunker) to provide the connection URL.
         </p>
         <div class="space-y-2">
           <a
-            href="https://www.getamber.app"
+            href="https://zapstore.dev/apps/naddr1qvzqqqr7pvpzqateqake4lc2fn77lflzq30jfpk8uhvtccalc66989er8cdmljceqqdkxmmd9enhyet9deshyaphvvejumn0wd68yumfvahx2usx8zmj2"
             target="_blank"
-            class="flex items-center gap-2 text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            class="flex items-center gap-2.5 text-sm px-3 py-2.5 rounded-lg border border-white/10 bg-white/[0.02] hover:border-orange-400/50 hover:bg-orange-400/5 transition-all duration-200"
           >
-            <span class="w-2 h-2 bg-orange-400 rounded-full"></span>
-            Amber - Android signer app (bunker)
-            <span class="ml-auto">↗</span>
+            <span class="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
+            <span class="text-gray-300">Amber</span>
+            <span class="text-gray-600 text-xs">Android</span>
+            <span class="ml-auto text-gray-600">↗</span>
+          </a>
+          <a
+            href="https://clave.casa/"
+            target="_blank"
+            class="flex items-center gap-2.5 text-sm px-3 py-2.5 rounded-lg border border-white/10 bg-white/[0.02] hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-all duration-200"
+          >
+            <span class="w-2 h-2 bg-cyan-400 rounded-full shrink-0"></span>
+            <span class="text-gray-300">Clave</span>
+            <span class="text-gray-600 text-xs">iOS</span>
+            <span class="ml-auto text-gray-600">↗</span>
           </a>
           <a
             href="https://primal.net"
             target="_blank"
-            class="flex items-center gap-2 text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            class="flex items-center gap-2.5 text-sm px-3 py-2.5 rounded-lg border border-white/10 bg-white/[0.02] hover:border-pleb-purple/50 hover:bg-pleb-purple/5 transition-all duration-200"
           >
-            <span class="w-2 h-2 bg-purple-400 rounded-full"></span>
-            Primal - Mobile &amp; desktop with nostrconnect
-            <span class="ml-auto">↗</span>
+            <span class="w-2 h-2 bg-pleb-purple rounded-full shrink-0"></span>
+            <span class="text-gray-300">Primal</span>
+            <span class="text-gray-600 text-xs">Mobile &amp; desktop</span>
+            <span class="ml-auto text-gray-600">↗</span>
           </a>
         </div>
-        <div class="mt-3 p-2 bg-gray-800 rounded text-xs">
-          <p class="text-gray-400">
-            <strong class="text-gray-300">How it works:</strong> Your private keys stay in the bunker app. 
-            When Plebs vs Zombies needs to sign events, it sends requests to your bunker for approval.
-          </p>
-        </div>
+        <p class="text-xs text-gray-600 mt-3">
+          Your private keys stay in the bunker app — Plebs vs Zombies only sends signing requests for approval.
+        </p>
       </div>
     </div>
   </div>
@@ -286,9 +271,13 @@
 <script>
 import nostrService from '../services/nostrService';
 import qr from 'qrcode-generator';
+import GlideTabs from './GlideTabs.vue';
 
 export default {
   name: 'Nip46Connection',
+  components: {
+    GlideTabs
+  },
   data() {
     return {
       bunkerUrl: '',
@@ -296,6 +285,10 @@ export default {
       disconnecting: false,
       error: null,
       connectionMethod: 'bunker-url',
+      connectionTabs: [
+        { id: 'bunker-url', label: 'Bunker URL' },
+        { id: 'generate-string', label: 'Connection String' }
+      ],
       generatedConnectionString: '',
       generatingString: false,
       connectionStringCopied: false,
@@ -337,24 +330,29 @@ export default {
       try {
         console.log('🔌 Attempting to connect to bunker...');
         const result = await nostrService.nip46Service.connectWithBunkerUrl(this.bunkerUrl.trim());
-        
+
         console.log('✅ Bunker connection successful:', result);
-        
+
+        if (!result?.pubkey) {
+          this.error = 'The signer accepted the connection but did not return your public key. Press Disconnect and try again.';
+          return;
+        }
+
         // Switch nostrService to NIP-46 mode
         nostrService.setSigningMethod('nip46');
-        
+
         // Set the pubkey in nostrService
         nostrService.pubkey = result.pubkey;
         console.log('✅ Set nostrService.pubkey:', result.pubkey.substring(0, 8) + '...');
-        
+
         // Update connection status
         this.updateConnectionStatus();
-        
+
         // Clear the URL input
         this.bunkerUrl = '';
-        
+
         this.$emit('connected', result);
-        
+
       } catch (error) {
         console.error('❌ Bunker connection failed:', error);
         this.error = error.message;
@@ -365,19 +363,19 @@ export default {
 
     async disconnect() {
       this.disconnecting = true;
-      
+
       try {
         // When user explicitly disconnects in settings, clear the saved connection
         await nostrService.nip46Service.disconnect(true);
-        
+
         // Switch back to NIP-07 mode
         nostrService.setSigningMethod('nip07');
-        
+
         // Update connection status
         this.updateConnectionStatus();
-        
+
         this.$emit('disconnected');
-        
+
       } catch (error) {
         console.error('❌ Disconnect failed:', error);
         this.error = 'Failed to disconnect: ' + error.message;
@@ -412,6 +410,15 @@ export default {
       try {
         const result = await nostrService.nip46Service.connectFromURI(connectionData, 120000);
 
+        if (!result?.pubkey) {
+          // Keep the user in the modal with a visible error — emitting now
+          // would close it and swallow the failure
+          this.error = 'The signer accepted the connection but did not return your public key. Press Disconnect and try again, or use the bunker URL flow.';
+          this.generatedConnectionString = '';
+          this.pendingConnectionData = null;
+          return;
+        }
+
         // Switch nostrService to NIP-46 mode
         nostrService.setSigningMethod('nip46');
         nostrService.pubkey = result.pubkey;
@@ -427,10 +434,12 @@ export default {
           detail: { success: true, pubkey: result.pubkey, bunkerPubkey: result.bunkerPubkey, relay: result.relay }
         }));
       } catch (error) {
-        if (!error.message?.includes('timed out')) {
-          this.error = 'Connection failed: ' + error.message;
+        if (error.message?.includes('timed out')) {
+          this.error = 'No signer responded within 2 minutes. If you scanned with Amber, its nostrconnect flow often fails silently — try the bunker flow instead: create the connection inside Amber, copy the bunker:// URL it generates, and paste it in the Use Bunker URL tab.';
+        } else if (error.message?.includes('subscription closed')) {
+          this.error = 'The connection to the relay dropped before your signer responded. If you switched apps on the same device to approve (e.g. Clave on iPhone), the browser tab gets suspended mid-handshake — paste a bunker:// URL instead for same-device pairing.';
         } else {
-          this.error = 'Connection timed out. Please try again.';
+          this.error = 'Connection failed: ' + error.message;
         }
         this.generatedConnectionString = '';
         this.pendingConnectionData = null;
@@ -447,22 +456,22 @@ export default {
 
           // Clear existing content
           this.$refs.qrCode.innerHTML = '';
-          
+
           // Create QR code
           const qrCode = qr(0, 'M');
           qrCode.addData(text);
           qrCode.make();
-          
+
           // Generate SVG
           const svg = qrCode.createSvgTag({
             cellSize: 4,
             margin: 0,
             scalable: true
           });
-          
+
           // Insert into DOM
           this.$refs.qrCode.innerHTML = svg;
-          
+
           console.log('✅ QR code generated successfully');
         });
       } catch (error) {
@@ -497,24 +506,24 @@ export default {
       try {
         console.log('🔄 Attempting to reconnect with saved connection...');
         const result = await nostrService.nip46Service.restoreConnection();
-        
+
         if (result) {
           console.log('✅ Reconnected successfully');
-          
+
           // Switch nostrService to NIP-46 mode
           nostrService.setSigningMethod('nip46');
-          
+
           // Set the pubkey in nostrService
           nostrService.pubkey = await nostrService.nip46Service.getPublicKey();
-          
+
           // Update connection status
           this.updateConnectionStatus();
-          
+
           this.$emit('connected', { pubkey: nostrService.pubkey });
         } else {
           throw new Error('Failed to restore saved connection');
         }
-        
+
       } catch (error) {
         console.error('❌ Reconnect failed:', error);
         this.error = error.message;
@@ -531,7 +540,7 @@ export default {
         console.log('🗑️ Deleting saved connection...');
         nostrService.nip46Service.clearSavedConnection();
         console.log('✅ Saved connection deleted');
-        
+
         // Update the connection status to reflect the change
         this.updateConnectionStatus();
       } catch (error) {
@@ -555,18 +564,3 @@ export default {
   }
 };
 </script>
-
-<style scoped>
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

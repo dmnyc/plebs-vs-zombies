@@ -1,189 +1,127 @@
 <template>
-  <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click.self="$emit('close')">
-    <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-3xl w-full mx-4 max-h-[95vh] overflow-y-auto">
+  <Transition name="modal">
+  <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" @click.self="$emit('close')">
+    <div class="modal-panel card max-w-lg w-full">
       <!-- Header -->
-      <div class="p-6 border-b border-gray-700">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="text-4xl">🧟‍♂️</div>
-            <div>
-              <h2 class="text-3xl font-bold text-zombie-green">Welcome to Plebs vs. Zombies!</h2>
-              <p class="text-gray-400 mt-1">The ultimate Nostr follow list cleanup tool</p>
-            </div>
-          </div>
-          <button 
-            @click="$emit('close')"
-            class="text-gray-400 hover:text-gray-200 text-2xl"
-          >
-            ×
-          </button>
+      <div class="flex items-center justify-between mb-5">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🧟‍♂️</span>
+          <h2 class="text-2xl">Welcome to Plebs vs. Zombies!</h2>
         </div>
+        <button
+          @click="$emit('close')"
+          class="text-gray-500 hover:text-gray-300 text-2xl leading-none shrink-0"
+        >
+          ×
+        </button>
       </div>
 
-      <!-- Content -->
-      <div class="p-6 space-y-6">
-        <!-- What is this? -->
-        <div class="bg-gradient-to-r from-purple-900/50 to-blue-900/50 rounded-lg p-6">
-          <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+      <!-- Step content -->
+      <div :key="step" class="animate-fade-in">
+        <div v-if="step === 1">
+          <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
             🎯 What are "Zombies"?
           </h3>
-          <p class="text-gray-300 mb-3">
-            Zombies are Nostr accounts you follow that have been inactive for a long time or have been deleted. 
-            Over time, your follow list can become cluttered with these dormant accounts.
+          <p class="text-gray-300 text-sm mb-4">
+            Nostr accounts you follow that have gone inactive — or been deleted.
           </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div class="flex items-center gap-2">
-              <span class="text-yellow-400">🧟‍♀️</span>
-              <span><strong>Fresh:</strong> 90+ days inactive</span>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div class="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2.5">
+              <span>🧟‍♀️</span>
+              <span><strong class="text-gray-100">Fresh</strong> <span class="text-gray-500">90+ days</span></span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-orange-500">🧟‍♂️</span>
-              <span><strong>Rotting:</strong> 180+ days inactive</span>
+            <div class="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2.5">
+              <span>🧟‍♂️</span>
+              <span><strong class="text-gray-100">Rotting</strong> <span class="text-gray-500">180+ days</span></span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-red-500">💀</span>
-              <span><strong>Ancient:</strong> 365+ days inactive</span>
+            <div class="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2.5">
+              <span>💀</span>
+              <span><strong class="text-gray-100">Ancient</strong> <span class="text-gray-500">365+ days</span></span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-red-700">🔥</span>
-              <span><strong>Burned:</strong> Deleted accounts</span>
+            <div class="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2.5">
+              <span>🔥</span>
+              <span><strong class="text-gray-100">Burned</strong> <span class="text-gray-500">deleted</span></span>
             </div>
           </div>
         </div>
 
-        <!-- How it works -->
-        <div class="bg-gradient-to-r from-green-900/50 to-teal-900/50 rounded-lg p-6">
-          <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+        <div v-else-if="step === 2">
+          <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
             ⚔️ How Zombie Hunting Works
           </h3>
-          <div class="space-y-3 text-gray-300">
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">1️⃣</span>
-              <div>
-                <strong class="text-white">Scan Your Follows:</strong> We analyze your follow list across multiple Nostr relays to find inactive accounts.
-              </div>
+          <div class="space-y-2.5 text-sm text-gray-300">
+            <div class="flex items-center gap-3">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-zombie-green text-zombie-dark font-bold text-xs flex items-center justify-center">1</span>
+              <span>Scan your follows across relays</span>
             </div>
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">2️⃣</span>
-              <div>
-                <strong class="text-white">Review Zombies:</strong> Browse your zombies by category and decide which ones to keep or remove.
-              </div>
+            <div class="flex items-center gap-3">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-zombie-green text-zombie-dark font-bold text-xs flex items-center justify-center">2</span>
+              <span>Review zombies by category</span>
             </div>
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">3️⃣</span>
-              <div>
-                <strong class="text-white">Grant Immunity:</strong> Protect important accounts from being marked as zombies.
-              </div>
+            <div class="flex items-center gap-3">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-zombie-green text-zombie-dark font-bold text-xs flex items-center justify-center">3</span>
+              <span>Grant immunity to protect VIPs</span>
             </div>
-            <div class="flex items-start gap-3">
-              <span class="text-2xl">4️⃣</span>
-              <div>
-                <strong class="text-white">Purge Safely:</strong> Remove unwanted zombies in small, manageable batches.
-              </div>
+            <div class="flex items-center gap-3">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-zombie-green text-zombie-dark font-bold text-xs flex items-center justify-center">4</span>
+              <span>Purge safely in small batches</span>
             </div>
           </div>
         </div>
 
-        <!-- Backup Warning -->
-        <div class="bg-gradient-to-r from-amber-900/50 to-red-900/50 rounded-lg p-6 border border-amber-700/50">
-          <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
-            ⚠️ Important: Create a Backup First!
+        <div v-else-if="step === 3">
+          <h3 class="text-lg font-semibold mb-2 flex items-center gap-2 text-amber-300">
+            ⚠️ Create a Backup First
           </h3>
-          <p class="text-gray-300 mb-4">
-            Before hunting zombies, we <strong class="text-amber-300">strongly recommend</strong> creating a backup of your follow list. 
-            This ensures you can restore your follows if something goes wrong.
+          <p class="text-gray-300 text-sm mb-5">
+            Strongly recommended before purging — lets you restore your follows if anything goes wrong.
           </p>
-          <div class="bg-amber-900/30 rounded-lg p-4 mb-4">
-            <div class="flex items-start gap-3">
-              <span class="text-xl">💾</span>
-              <div>
-                <strong class="text-amber-200">Backups Include:</strong>
-                <ul class="list-disc list-inside text-gray-300 text-sm mt-1 ml-2 space-y-1">
-                  <li>Your complete follow list</li>
-                  <li>Timestamps and metadata</li>
-                  <li>Easy export and import</li>
-                  <li>Local browser storage</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
           <div class="flex flex-col sm:flex-row gap-3">
-            <button 
+            <button
               @click="goToBackups"
-              class="btn-primary flex-1 flex items-center justify-center gap-2"
+              class="btn-primary flex-1 inline-flex items-center justify-center gap-2"
             >
-              <span>💾</span>
-              Create My First Backup
+              <span>💾</span> Create My First Backup
             </button>
-            <button 
+            <button
               @click="skipBackup"
-              class="btn-secondary flex-1 flex items-center justify-center gap-2"
+              class="btn-tertiary flex-1 inline-flex items-center justify-center gap-2"
             >
-              <span>⏭️</span>
-              Skip for Now
+              <span>⏭️</span> Skip for Now
             </button>
-          </div>
-        </div>
-
-        <!-- Features -->
-        <div class="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 rounded-lg p-6">
-          <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
-            ✨ Key Features
-          </h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div class="flex items-center gap-2">
-              <span class="text-green-400">🛡️</span>
-              <span>Immunity system for VIPs</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-blue-400">📊</span>
-              <span>Detailed zombie statistics</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-purple-400">🔄</span>
-              <span>Safe batch processing</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-yellow-400">💾</span>
-              <span>Backup & restore tools</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-pink-400">🎉</span>
-              <span>Social sharing of victories</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-cyan-400">🌐</span>
-              <span>Multi-relay support</span>
-            </div>
           </div>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="p-6 border-t border-gray-700">
-        <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div class="text-sm text-gray-400">
-            Happy hunting! Remember to backup first for maximum safety. 🏹
-          </div>
-          <div class="flex gap-3">
-            <button 
-              @click="$emit('close')"
-              class="btn-secondary px-6"
-            >
-              Got it!
-            </button>
-          </div>
+      <!-- Step nav -->
+      <div class="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+        <div class="flex gap-1.5" aria-hidden="true">
+          <span
+            v-for="n in 3"
+            :key="n"
+            class="w-1.5 h-1.5 rounded-full transition-colors"
+            :class="n === step ? 'bg-zombie-green' : 'bg-gray-600'"
+          ></span>
+        </div>
+        <div class="flex gap-2">
+          <button v-if="step > 1" @click="step--" class="btn-tertiary btn-sm">Back</button>
+          <button v-if="step < 3" @click="step++" class="btn-primary btn-sm">Next</button>
         </div>
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script>
 export default {
   name: 'WelcomeModal',
   emits: ['close', 'go-to-backups', 'skip-backup'],
+  data() {
+    return {
+      step: 1
+    };
+  },
   methods: {
     goToBackups() {
       this.$emit('go-to-backups');

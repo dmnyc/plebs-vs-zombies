@@ -68,10 +68,11 @@
         
         <!-- Zombie List -->
         <div class="space-y-2">
-          <div 
-            v-for="zombie in paginatedZombies" 
-            :key="zombie.pubkey" 
-            class="p-3 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors"
+          <div
+            v-for="(zombie, index) in paginatedZombies"
+            :key="zombie.pubkey"
+            class="p-3 border border-gray-700 rounded-lg hover:bg-gray-800 hover:border-zombie-green/40 transition-all duration-200 animate-fade-up"
+            :class="`stagger-${Math.min((index % 10) + 1, 8)}`"
           >
             <!-- Top Row: Profile Picture + Info + Badge -->
             <div class="flex items-center justify-between">
@@ -355,12 +356,13 @@
     </div>
 
     <!-- Alert Modal -->
-    <div 
-      v-if="alertModal.show" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <Transition name="modal">
+    <div
+      v-if="alertModal.show"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="closeAlert"
     >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
         <div class="flex items-center mb-4">
           <div 
             class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
@@ -407,6 +409,7 @@
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 

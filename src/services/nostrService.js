@@ -254,7 +254,7 @@ class NostrService {
     if (typeof window.nostr === "undefined") {
       this.extensionConnected = false;
       throw new Error(
-        "No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension.",
+        "No Nostr extension found. Please install Sidecar, Alby, nos2x, or another NIP-07 compatible extension.",
       );
     }
 

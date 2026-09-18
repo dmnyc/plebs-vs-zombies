@@ -1,4 +1,5 @@
 <template>
+  <Transition name="modal">
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click="handleBackdropClick">
     <div class="bg-gray-800 border border-gray-600 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" @click.stop>
       <!-- Header -->
@@ -60,6 +61,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script>

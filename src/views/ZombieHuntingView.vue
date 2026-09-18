@@ -103,19 +103,19 @@
               <div class="space-y-3">
                 <div class="flex justify-between items-center">
                   <span class="text-gray-300">Total follows:</span>
-                  <span class="font-bold">{{ stats.totalFollows }}</span>
+                  <span class="font-bold"><AnimatedNumber :value="stats.totalFollows" /></span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-gray-300">Immune users:</span>
-                  <span class="font-bold text-green-400">🛡️ {{ stats.immuneUsers }}</span>
+                  <span class="font-bold text-green-400">🛡️ <AnimatedNumber :value="stats.immuneUsers" /></span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-gray-300">Zombies found:</span>
-                  <span class="font-bold text-red-500">{{ stats.totalZombies }}</span>
+                  <span class="font-bold text-red-500"><AnimatedNumber :value="stats.totalZombies" /></span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-gray-300">Zombies purged:</span>
-                  <span class="font-bold text-zombie-green">{{ stats.zombiesPurged }}</span>
+                  <span class="font-bold text-zombie-green"><AnimatedNumber :value="stats.zombiesPurged" /></span>
                 </div>
               </div>
             </div>
@@ -153,10 +153,13 @@
       
       <div class="xl:col-span-2 lg:col-span-1">
         <!-- Scanning Progress Display -->
-        <div v-if="scanning" class="card mb-6 p-6">
+        <div v-if="scanning" class="card mb-6 p-6 animate-fade-up">
           <div class="flex flex-col">
-            <h3 class="text-xl mb-4 text-center">Scanning for Zombies...</h3>
-            
+            <h3 class="text-xl mb-4 text-center flex items-center justify-center gap-2">
+              <span class="animate-lurch text-2xl">🧟</span>
+              <span>Scanning for Zombies...</span>
+            </h3>
+
             <!-- Progress Bar -->
             <div class="mb-6">
               <div class="flex justify-between text-sm text-gray-400 mb-2">
@@ -164,8 +167,8 @@
                 <span class="flex-shrink-0 ml-2">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
               </div>
               <div class="w-full bg-gray-700 rounded-full h-3">
-                <div 
-                  class="bg-zombie-green h-3 rounded-full transition-all duration-300"
+                <div
+                  class="bg-zombie-green h-3 rounded-full transition-all duration-300 progress-animated"
                   :style="{ width: scanProgress.total > 0 ? (scanProgress.processed / scanProgress.total * 100) + '%' : '0%' }"
                 ></div>
               </div>
@@ -183,11 +186,11 @@
               
               <div class="flex justify-center gap-4 sm:gap-8 text-lg">
                 <div class="text-center">
-                  <div class="text-xl sm:text-2xl font-bold text-blue-400 h-8 flex items-center justify-center">{{ scanProgress.processed || 0 }}</div>
+                  <div class="text-xl sm:text-2xl font-bold text-blue-400 h-8 flex items-center justify-center"><AnimatedNumber :value="scanProgress.processed || 0" :duration="300" /></div>
                   <div class="text-xs text-gray-400">{{ getScanProgressLabel() }}</div>
                 </div>
                 <div class="text-center">
-                  <div class="text-xl sm:text-2xl font-bold text-gray-400 h-8 flex items-center justify-center">{{ scanProgress.total || 0 }}</div>
+                  <div class="text-xl sm:text-2xl font-bold text-gray-400 h-8 flex items-center justify-center"><AnimatedNumber :value="scanProgress.total || 0" :duration="300" /></div>
                   <div class="text-xs text-gray-400">{{ getScanTotalLabel() }}</div>
                 </div>
               </div>
@@ -221,13 +224,13 @@
           <p class="text-gray-300">Please wait while we purge the selected zombies.</p>
           <p class="text-gray-400 mt-2">This process requires signing an event with your Nostr extension.</p>
         </div>
-        
-        <div v-else-if="purgeSuccess" class="card mb-6 p-8 text-center">
+
+        <div v-else-if="purgeSuccess" class="card mb-6 p-8 text-center animate-scale-in">
           <h3 v-if="isNuclearPurge" class="text-xl mb-4 text-yellow-400">☢️ NUCLEAR STRIKE COMPLETE! ☢️</h3>
           <h3 v-else class="text-xl mb-4 text-zombie-green">Zombies Successfully Purged!</h3>
-          
-          <div v-if="isNuclearPurge" class="text-6xl mb-4">☢️</div>
-          <div v-else class="text-6xl mb-4">🎯</div>
+
+          <div v-if="isNuclearPurge" class="text-6xl mb-4 animate-lurch">☢️</div>
+          <div v-else class="text-6xl mb-4 animate-float">🎯</div>
           
           <p v-if="isNuclearPurge" class="text-gray-300">
             <strong>💀 MAXIMUM CARNAGE ACHIEVED! 💀</strong><br>
@@ -270,9 +273,9 @@
           />
         </div>
         
-        <div v-else class="card p-8 text-center">
+        <div v-else class="card p-8 text-center animate-fade-up">
           <h3 class="section-title">Ready to Hunt?</h3>
-          <div class="text-6xl mb-4">🧟</div>
+          <div class="text-6xl mb-4 animate-lurch inline-block">🧟</div>
           <p class="text-gray-300">
             Use the controls on the left to scan for dormant follows.
           </p>
@@ -291,6 +294,7 @@
     </div>
 
     <!-- Zombie Purge Celebration Modal -->
+    <Transition name="modal">
     <ZombiePurgeCelebration
       v-if="showCelebration && lastPurgeResult && prePurgeStats"
       :purgeResult="lastPurgeResult"
@@ -299,6 +303,7 @@
       :isNuclearPurge="isNuclearPurge"
       @close="closeCelebration"
     />
+    </Transition>
 
     <!-- Confirmation Modal -->
     <ConfirmModal
@@ -329,6 +334,7 @@
 
 <script>
 import ZombieStats from '../components/ZombieStats.vue';
+import AnimatedNumber from '../components/AnimatedNumber.vue';
 import ZombieBatchSelector from '../components/ZombieBatchSelector.vue';
 import ZombiePurgeCelebration from '../components/ZombiePurgeCelebration.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
@@ -345,7 +351,8 @@ export default {
     ZombieStats,
     ZombieBatchSelector,
     ZombiePurgeCelebration,
-    ConfirmModal
+    ConfirmModal,
+    AnimatedNumber
   },
   data() {
     return {
