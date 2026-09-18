@@ -760,13 +760,13 @@ https://plebsvszombies.cc`;
 
       const developerNpub = 'npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h';
       let formatted = this.shareMessage
-        .replace(new RegExp(`nostr:${developerNpub}`, 'g'), '<span style="color: #8e30eb; font-weight: 500;">@plebsvszombies</span>');
+        .replace(new RegExp(`nostr:${developerNpub}`, 'g'), '<span style="color: #c084fc; font-weight: 500;">@plebsvszombies</span>');
 
       // Also replace the target npub with their @username if this is not "my report"
       if (!this.isMyReport && this.scoutTarget?.npub && this.targetUsername) {
         formatted = formatted.replace(
           new RegExp(`nostr:${this.scoutTarget.npub}`, 'g'),
-          `<span style="color: #8e30eb; font-weight: 500;">@${this.targetUsername}</span>`
+          `<span style="color: #c084fc; font-weight: 500;">@${this.targetUsername}</span>`
         );
       }
 

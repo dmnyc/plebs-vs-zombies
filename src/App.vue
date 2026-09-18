@@ -381,7 +381,7 @@
               :disabled="isConnecting"
               class="w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all duration-200 bg-black/20 hover:-translate-y-px disabled:opacity-60"
               :class="hasNip07
-                ? 'border-pleb-purple/50 hover:border-pleb-purple hover:shadow-[0_0_24px_rgba(142,48,235,0.25)]'
+                ? 'border-pleb-purple/50 hover:border-pleb-purple hover:shadow-[0_0_24px_rgba(192,132,252,0.25)]'
                 : 'border-white/10 hover:border-white/25'"
             >
               <div class="w-11 h-11 rounded-xl grid place-items-center text-2xl flex-shrink-0"
@@ -676,26 +676,26 @@
             <span class="hidden sm:inline"> | </span>
             <span class="block sm:inline">Made with 🧠 for the Nostr community</span>
           </p>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto max-w-full">
             <a
               href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h"
               target="_blank"
-              class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
+              class="text-xs px-2 sm:px-2.5 py-1 bg-black/40 hover:bg-black/60 text-pleb-purple border border-pleb-purple/30 rounded-full transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              Follow on Nostr ➕
+              Nostr 🤙
             </a>
             <button
               @click="showZapModal"
-              class="text-xs px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-black rounded-full transition-colors inline-flex items-center gap-1"
+              class="text-xs px-2 sm:px-2.5 py-1 bg-black/40 hover:bg-black/60 text-pleb-gold border border-pleb-gold/30 rounded-full transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              ⚡ Zap Creator
+              ⚡ Zap
             </button>
             <a
               href="https://github.com/dmnyc/plebs-vs-zombies"
               target="_blank"
-              class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded-full transition-colors inline-flex items-center gap-1"
+              class="text-xs px-2 sm:px-2.5 py-1 bg-black/40 hover:bg-black/60 text-gray-300 border border-white/15 rounded-full transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              View on GitHub 🤓
+              GitHub 🤓
             </a>
           </div>
         </div>

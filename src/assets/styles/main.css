@@ -8,7 +8,7 @@
     --zombie-green-bright: #7dff7d;
     --zombie-dark: #141b17;
     --abyss: #0a0f0c;
-    --pleb-purple: #8e30eb;
+    --pleb-purple: #c084fc;
     --pleb-gold: #ffd700;
 
     /* Decay texture — shared grunge layers for flat surfaces (cards, modals) */
@@ -328,8 +328,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: gradient-pan 6s linear infinite;
-    filter: drop-shadow(0 0 22px rgba(92, 219, 92, 0.3));
+    animation: gradient-pan 1.8s ease-out 1;
   }
   @keyframes gradient-pan {
     to { background-position: 200% center; }

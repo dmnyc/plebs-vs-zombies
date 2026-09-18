@@ -171,7 +171,7 @@
               target="_blank"
               class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
             >
-              Follow on Nostr ➕
+              Follow on Nostr 🤙
             </a>
             <button 
               @click="showZapModal"
@@ -428,7 +428,7 @@ https://plebsvszombies.cc`;
       // Format the share message for display with styled mentions
       // Replace the full npub with a styled @username for better UX
       return this.shareMessage
-        .replace(new RegExp(`nostr:${this.developerNpub}`, 'g'), '<span style="color: #8e30eb; font-weight: 500;">@plebsvszombies</span>')
+        .replace(new RegExp(`nostr:${this.developerNpub}`, 'g'), '<span style="color: #c084fc; font-weight: 500;">@plebsvszombies</span>')
         .replace(/\n/g, '<br>');
     },
     scoreBarSquares() {
