@@ -95,19 +95,19 @@
                     >
                     <a
                       href="#"
-                      @click.prevent="showScoutModeMenu(); moreDropdownOpen = false"
-                      class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                      :class="isScoutMode ? 'text-zombie-green' : ''"
-                    >
-                      Scout Mode
-                    </a>
-                    <a
-                      href="#"
                       @click.prevent="setActiveView('zombieCheck'); moreDropdownOpen = false"
                       class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
                       :class="activeView === 'zombieCheck' && !isScoutMode ? 'text-zombie-green' : ''"
                     >
                       Zombie Check
+                    </a>
+                    <a
+                      href="#"
+                      @click.prevent="showScoutModeMenu(); moreDropdownOpen = false"
+                      class="block px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                      :class="isScoutMode ? 'text-zombie-green' : ''"
+                    >
+                      Scout Mode
                     </a>
                     <a
                       href="#"
@@ -295,21 +295,21 @@
             <li>
               <a
                 href="#"
-                @click.prevent="showScoutModeMenu(); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': isScoutMode}"
-                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
-              >
-                Scout Mode
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
                 @click.prevent="setActiveView('zombieCheck'); mobileMenuOpen = false"
                 :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'zombieCheck' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Zombie Check
+              </a>
+            </li>
+            <li>
+              <a
+                href="#"
+                @click.prevent="showScoutModeMenu(); mobileMenuOpen = false"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': isScoutMode}"
+                class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
+              >
+                Scout Mode
               </a>
             </li>
             <li>
@@ -369,6 +369,7 @@
               <div class="absolute inset-0 -m-10 rounded-full bg-zombie-green/15 blur-3xl" aria-hidden="true"></div>
               <div class="relative text-7xl drop-shadow-[0_0_24px_rgba(92,219,92,0.5)]">🧟‍♂️</div>
             </div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-zombie-green mb-2">Nostr Follow List Manager</p>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
             <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
             <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
@@ -444,10 +445,10 @@
           </div>
 
           <!-- nsec login -->
-          <div class="pt-2">
+          <div class="pt-2 text-center">
             <button
               @click="showNsecLogin = !showNsecLogin"
-              class="text-sm text-gray-400 hover:text-gray-200 transition-colors w-full text-center mb-3"
+              class="text-xs text-gray-500 hover:text-gray-400 transition-colors mb-3"
             >
               {{ showNsecLogin ? 'Hide private key sign-in' : 'Or sign in with your private key' }}
             </button>
@@ -479,6 +480,11 @@
             </Transition>
           </div>
 
+
+          <!-- Zombie Check Section -->
+          <div class="mt-10 pt-6 border-t border-gray-700/50">
+            <ZombieCheck />
+          </div>
 
           <!-- Scout Mode Section -->
           <div class="mt-10 pt-6 border-t border-gray-700/50">
@@ -530,11 +536,6 @@
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Zombie Check Section -->
-          <div class="mt-10 pt-6 border-t border-gray-700/50">
-            <ZombieCheck />
           </div>
 
           <!-- The Resurrector Section -->

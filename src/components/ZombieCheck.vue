@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="text-center mb-6">
-      <div class="text-4xl mb-3">🧟‍♀️🔍</div>
+      <div class="text-4xl mb-3">🧟‍♀️☑️</div>
       <h3 class="text-xl mb-2 text-zombie-green">Zombie Check</h3>
       <p class="text-gray-400 text-sm">
         Check whether any Nostr user is a zombie and see how long they've been gone.
@@ -191,7 +191,7 @@ const CATEGORY_DISPLAY = {
 const DELETION_STATUS_STYLE = {
   current: { icon: '⚠️', textClass: 'text-red-400 font-medium' },
   past: { icon: '🩹', textClass: 'text-yellow-400 font-medium' },
-  none: { icon: '✅', textClass: 'text-gray-200 font-medium' },
+  none: { icon: '☑️', textClass: 'text-gray-200 font-medium' },
 };
 
 export default {
