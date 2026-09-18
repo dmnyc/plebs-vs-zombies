@@ -613,7 +613,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.avatar.onerror = () => { els.avatar.src = '/default-avatar.svg'; };
       els.name.textContent = profile.display_name || profile.name || 'Anonymous';
       els.npub.textContent = `${npub.slice(0, 12)}…${npub.slice(-6)}`;
-      els.npub.href = `https://njump.me/${npub}`;
+      els.npub.href = `https://jumble.social/users/${npub}`;
 
       if (verdict.iconFallback && !supportsAnatomicalHeart()) {
         els.emoji.textContent = '';
