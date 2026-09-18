@@ -497,7 +497,7 @@
                 </label>
                 <ProfileSearchInput
                   ref="loginScoutInput"
-                  placeholder="Search by username or paste npub/nprofile..."
+                  placeholder="Search by username or paste npub/nprofile/hex..."
                   @profile-selected="handleLoginScoutProfileSelected"
                   @input-changed="handleScoutInputChanged"
                 />
@@ -809,7 +809,7 @@
           </label>
           <ProfileSearchInput
             ref="modalScoutInput"
-            placeholder="Search by username or paste npub/nprofile..."
+            placeholder="Search by username or paste npub/nprofile/hex..."
             :auto-focus="true"
             @profile-selected="handleModalScoutProfileSelected"
             @input-changed="handleScoutInputChanged"

@@ -95,7 +95,7 @@ export default {
   props: {
     placeholder: {
       type: String,
-      default: 'Search by username or paste npub/nprofile...'
+      default: 'Search by username or paste npub/nprofile/hex...'
     },
     disabled: {
       type: Boolean,
@@ -143,6 +143,16 @@ export default {
     }
   },
   methods: {
+    // npub/nprofile are unambiguous by prefix; a raw hex pubkey is exactly
+    // 64 hex characters, which is long enough that it'll never collide with
+    // a real username search.
+    looksLikeIdentifier(value) {
+      return (
+        value.startsWith('npub1') ||
+        value.startsWith('nprofile1') ||
+        /^[0-9a-fA-F]{64}$/.test(value)
+      );
+    },
     async handleInput() {
       const value = this.inputValue.trim();
 
@@ -158,8 +168,8 @@ export default {
         return;
       }
 
-      // Check if it's an npub or nprofile (instant validation)
-      if (value.startsWith('npub1') || value.startsWith('nprofile1')) {
+      // Check if it's an npub, nprofile, or raw hex pubkey (instant validation)
+      if (this.looksLikeIdentifier(value)) {
         const parsed = profileSearchService.parseIdentifier(value);
 
         if (parsed) {
@@ -187,12 +197,12 @@ export default {
                 about: null
               };
               this.suggestions = [minimalProfile];
-              this.validationMessage = '✅ Valid npub (profile metadata not found, but you can still proceed)';
+              this.validationMessage = '✅ Valid identifier (profile metadata not found, but you can still proceed)';
               this.validationState = 'valid';
             }
           } catch (error) {
             console.error('Failed to fetch profile:', error);
-            // Even on error, if we have a valid npub format, allow proceeding
+            // Even on error, if we have a valid identifier, allow proceeding
             const { nip19 } = await import('nostr-tools');
             const minimalProfile = {
               pubkey: parsed.pubkey,
@@ -204,14 +214,14 @@ export default {
               about: null
             };
             this.suggestions = [minimalProfile];
-            this.validationMessage = '✅ Valid npub format (could not fetch metadata, but you can still proceed)';
+            this.validationMessage = '✅ Valid identifier (could not fetch metadata, but you can still proceed)';
             this.validationState = 'valid';
           } finally {
             this.searching = false;
           }
         } else if (value.length >= 63) {
-          // Looks like an npub but invalid format
-          this.validationMessage = '❌ Invalid npub/nprofile format';
+          // Looks like an npub/nprofile/hex key but invalid format
+          this.validationMessage = '❌ Invalid npub/nprofile/hex format';
           this.validationState = 'error';
           this.suggestions = [];
           this.showDropdown = false;
@@ -324,15 +334,15 @@ export default {
       const value = this.inputValue.trim();
 
       if (!value) {
-        return { valid: false, error: 'Please enter a username or npub' };
+        return { valid: false, error: 'Please enter a username, npub, or hex pubkey' };
       }
 
-      // Check if it's an npub or nprofile
-      if (value.startsWith('npub1') || value.startsWith('nprofile1')) {
+      // Check if it's an npub, nprofile, or raw hex pubkey
+      if (this.looksLikeIdentifier(value)) {
         const parsed = profileSearchService.parseIdentifier(value);
 
         if (!parsed) {
-          return { valid: false, error: 'Invalid npub/nprofile format' };
+          return { valid: false, error: 'Invalid npub/nprofile/hex format' };
         }
 
         // Valid format, try to fetch profile
@@ -372,8 +382,8 @@ export default {
         }
       }
 
-      // Not an npub, must be a username - user should select from dropdown
-      return { valid: false, error: 'Please select a profile from the search results or enter a valid npub/nprofile' };
+      // Not an identifier, must be a username - user should select from dropdown
+      return { valid: false, error: 'Please select a profile from the search results or enter a valid npub/nprofile/hex pubkey' };
     }
   },
   mounted() {

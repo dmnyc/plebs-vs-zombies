@@ -70,7 +70,7 @@
             </label>
             <ProfileSearchInput
               ref="scoutInput"
-              placeholder="Search by username or paste npub/nprofile..."
+              placeholder="Search by username or paste npub/nprofile/hex..."
               :auto-focus="true"
               @profile-selected="handleProfileSelected"
             />

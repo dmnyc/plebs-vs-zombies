@@ -11,11 +11,11 @@
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">
-          Search for a user or paste an npub:
+          Search for a user or paste an npub/hex pubkey:
         </label>
         <ProfileSearchInput
           ref="searchInput"
-          placeholder="Search by username or paste npub/nprofile..."
+          placeholder="Search by username or paste npub/nprofile/hex..."
           @profile-selected="onProfileSelected"
           @input-changed="onInputChanged"
         />
@@ -36,46 +36,62 @@
     </div>
 
     <!-- Result -->
-    <div
-      v-if="result"
-      class="mt-6 rounded-lg border-2 p-5"
-      :class="result.borderClass"
-    >
-      <div class="flex items-center gap-4 mb-4">
-        <img
-          :src="result.profile.picture || '/default-avatar.svg'"
-          :alt="result.displayName"
-          class="w-14 h-14 rounded-full object-cover bg-gray-700 flex-shrink-0"
-          @error="onAvatarError"
-        />
-        <div class="min-w-0 flex-1">
-          <div class="font-bold text-white truncate">{{ result.displayName }}</div>
-          <a
-            :href="`https://njump.me/${result.profile.npub}`"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-xs text-gray-400 hover:text-gray-200 font-mono truncate block"
-          >
-            {{ shortNpub(result.profile.npub) }}
-          </a>
-        </div>
-      </div>
-
-      <div class="text-center py-2">
-        <div class="text-5xl mb-2 inline-block" :class="{ 'animate-heartbeat': result.beat }">
+    <div v-if="result" class="mt-6">
+      <!-- Self-contained frame: designed to be screenshotted and shared as-is,
+           so it carries its own opaque background and a small brand mark
+           rather than relying on whatever's behind it on the page. The
+           "Check another user" button below is deliberately outside this
+           frame, so a screenshot of just this card doesn't include it. -->
+      <div
+        class="rounded-2xl border-2 p-6"
+        :class="result.borderClass"
+      >
+        <div class="flex items-center gap-4 mb-4">
           <img
-            v-if="result.iconSrc"
-            :src="result.iconSrc"
-            :alt="result.label"
-            class="h-12 w-12 inline-block align-middle"
+            :src="result.profile.picture || '/default-avatar.svg'"
+            :alt="result.displayName"
+            class="w-14 h-14 rounded-full object-cover bg-gray-700 flex-shrink-0"
+            @error="onAvatarError"
           />
-          <template v-else>{{ result.emoji }}</template>
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-white truncate">{{ result.displayName }}</div>
+            <a
+              :href="`https://jumble.social/users/${result.profile.npub}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs text-gray-400 hover:text-gray-200 font-mono truncate block"
+            >
+              {{ shortNpub(result.profile.npub) }}
+            </a>
+          </div>
         </div>
-        <div class="text-2xl font-bold" :class="result.textClass">{{ result.label }}</div>
-        <p class="text-sm text-gray-300 mt-2">{{ result.detail }}</p>
-        <p v-if="result.lastSeenDate" class="text-xs text-gray-500 mt-1">
-          Last activity: {{ result.lastSeenDate }}
-        </p>
+
+        <div class="text-center py-2">
+          <div class="text-5xl mb-2 inline-block" :class="{ 'animate-heartbeat': result.beat }">
+            <img
+              v-if="result.iconSrc"
+              :src="result.iconSrc"
+              :alt="result.label"
+              class="h-12 w-12 inline-block align-middle"
+            />
+            <template v-else>{{ result.emoji }}</template>
+          </div>
+          <div class="text-2xl font-bold" :class="result.textClass">{{ result.label }}</div>
+          <p class="text-sm font-medium text-gray-200 mt-2">{{ result.detail }}</p>
+          <p v-if="result.lastSeenDate" class="text-xs text-gray-500 mt-1">
+            Last activity: {{ result.lastSeenDate }}
+          </p>
+          <p class="text-xs mt-2" :class="result.deletionStatus.textClass">
+            {{ result.deletionStatus.icon }} {{ result.deletionStatus.text }}
+          </p>
+        </div>
+
+        <!-- Brand watermark -->
+        <div class="flex items-center justify-center mt-5 pt-4 border-t border-white/10">
+          <span class="font-horror text-zombie-green text-lg [text-shadow:0_0_12px_rgb(92_219_92_/_0.35)]">
+            Plebs vs. Zombies
+          </span>
+        </div>
       </div>
 
       <button
@@ -120,45 +136,62 @@ function supportsAnatomicalHeart() {
   return heartGlyphSupported;
 }
 
+// Backgrounds are a colored tint fading into an opaque dark base, rather
+// than a plain low-opacity tint alone — the result card is designed to be
+// screenshotted, so it needs to look complete on its own regardless of
+// whatever's showing through from the page behind it.
 const CATEGORY_DISPLAY = {
   active: {
     emoji: '🫀',
     iconFallback: '/heart-anatomical.svg',
     label: 'Alive!',
-    borderClass: 'border-zombie-green bg-green-900/10',
+    borderClass: 'border-zombie-green bg-gradient-to-br from-green-900/40 to-zombie-dark',
     textClass: 'text-zombie-green',
     beat: true,
   },
   infected: {
     emoji: '💛',
     label: 'Possible Infection',
-    borderClass: 'border-yellow-500/50 bg-yellow-900/10',
+    borderClass: 'border-yellow-500/50 bg-gradient-to-br from-yellow-900/40 to-zombie-dark',
     textClass: 'text-yellow-300',
   },
   fresh: {
     emoji: '🧟',
     label: 'Fresh Zombie',
-    borderClass: 'border-yellow-600/50 bg-yellow-900/10',
+    borderClass: 'border-yellow-600/50 bg-gradient-to-br from-yellow-900/40 to-zombie-dark',
     textClass: 'text-yellow-400',
   },
   rotting: {
     emoji: '🧟‍♂️',
     label: 'Rotting Zombie',
-    borderClass: 'border-orange-600/50 bg-orange-900/10',
+    borderClass: 'border-orange-600/50 bg-gradient-to-br from-orange-900/40 to-zombie-dark',
     textClass: 'text-orange-400',
   },
   ancient: {
     emoji: '💀',
     label: 'Ancient Zombie',
-    borderClass: 'border-red-700/50 bg-red-900/10',
+    borderClass: 'border-red-700/50 bg-gradient-to-br from-red-900/40 to-zombie-dark',
     textClass: 'text-red-400',
   },
   burned: {
     emoji: '🔥',
     label: 'Burned',
-    borderClass: 'border-gray-600 bg-gray-800/40',
+    borderClass: 'border-gray-600 bg-gradient-to-br from-gray-800/60 to-zombie-dark',
     textClass: 'text-gray-300',
   },
+};
+
+// Deletion-request status is tracked independently of the zombie verdict
+// above — an account marked deleted and then reactivated still lands
+// outside the 'burned' bucket, so without this it would show no trace of
+// the deletion request ever having happened.
+// Weight tracks how actionable each state is: a clean result is no more
+// important than the "Last activity" line above it, so it stays at the
+// same quiet weight — only the two states worth acting on get bumped up.
+const DELETION_STATUS_STYLE = {
+  current: { icon: '⚠️', textClass: 'text-red-400 font-medium' },
+  past: { icon: '🩹', textClass: 'text-yellow-400 font-medium' },
+  none: { icon: '✅', textClass: 'text-gray-200 font-medium' },
 };
 
 export default {
@@ -249,7 +282,7 @@ export default {
           display_name: meta.display_name || profile.display_name,
         };
 
-        this.result = this.buildResult(category, info, displayProfile);
+        this.result = this.buildResult(category, info, displayProfile, meta);
       } catch (e) {
         console.error('Zombie Check failed:', e);
         this.error = e?.message || 'Failed to check this user. Try again.';
@@ -258,7 +291,7 @@ export default {
         this.progress = '';
       }
     },
-    buildResult(category, info, profile) {
+    buildResult(category, info, profile, meta = {}) {
       const days = info.daysSinceActivity;
 
       // Display-only refinement: the core classifier (used by the hunt) lumps
@@ -298,11 +331,36 @@ export default {
             ? display.iconFallback
             : null,
         detail,
+        deletionStatus: this.buildDeletionStatus(meta),
         profile,
         displayName: profile.display_name || profile.name || 'Anonymous',
         lastSeenDate: info.lastActivity
           ? format(new Date(info.lastActivity * 1000), 'PP')
           : null,
+      };
+    },
+    buildDeletionStatus(meta) {
+      if (meta.deleted) {
+        const markedAt = meta.deletionTimeline?.markedDeletedAt ?? meta.firstMarkedDeletedAt;
+        const deletedDays = markedAt != null
+          ? Math.floor((Date.now() / 1000 - markedAt) / 86400)
+          : null;
+        return {
+          ...DELETION_STATUS_STYLE.current,
+          text: deletedDays != null
+            ? `This profile is currently flagged as deleted (marked deleted ${this.formatGone(deletedDays)} ago).`
+            : 'This profile is currently flagged as deleted.',
+        };
+      }
+      if (meta.everMarkedDeleted) {
+        return {
+          ...DELETION_STATUS_STYLE.past,
+          text: 'A past deletion request was found in this profile\'s history, but it looks like it has since been restored.',
+        };
+      }
+      return {
+        ...DELETION_STATUS_STYLE.none,
+        text: 'No deletion request found.',
       };
     },
     formatGone(days) {

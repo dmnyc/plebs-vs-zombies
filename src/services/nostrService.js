@@ -889,6 +889,34 @@ class NostrService {
               }
             }
 
+            // Track whether a deletion flag has EVER appeared in this
+            // profile's history, even if a later update reversed it (e.g.
+            // via the Resurrector). `currentlyDeleted`/`deletionTimeline`
+            // above only reflect the latest event, so a resurrected profile
+            // would otherwise look as if deletion was never requested.
+            let everMarkedDeleted = currentlyDeleted;
+            let firstMarkedDeletedAt = deletionTimeline?.markedDeletedAt ?? null;
+            if (!currentlyDeleted) {
+              for (const evt of userEvents) {
+                try {
+                  const evtProfile = JSON.parse(evt.content);
+                  const wasDeleted =
+                    evtProfile.deleted === true || evtProfile.deleted === "true";
+                  if (wasDeleted) {
+                    everMarkedDeleted = true;
+                    if (
+                      firstMarkedDeletedAt === null ||
+                      evt.created_at < firstMarkedDeletedAt
+                    ) {
+                      firstMarkedDeletedAt = evt.created_at;
+                    }
+                  }
+                } catch (_) {
+                  // Already logged during the primary parse pass above.
+                }
+              }
+            }
+
             const updatedProfile = {
               ...existingProfile,
               name: latestProfile.name || null,
@@ -899,6 +927,8 @@ class NostrService {
               nip05: latestProfile.nip05 || null,
               deleted: currentlyDeleted,
               deletionTimeline: deletionTimeline,
+              everMarkedDeleted: everMarkedDeleted,
+              firstMarkedDeletedAt: firstMarkedDeletedAt,
               profileEventCount: userEvents.length,
               lastSeen: latestEvent.created_at,
             };
