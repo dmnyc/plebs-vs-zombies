@@ -191,7 +191,7 @@ const CATEGORY_DISPLAY = {
 const DELETION_STATUS_STYLE = {
   current: { icon: '⚠️', textClass: 'text-red-400 font-medium' },
   past: { icon: '🩹', textClass: 'text-yellow-400 font-medium' },
-  none: { icon: '☑️', textClass: 'text-gray-200 font-medium' },
+  none: { icon: '✅', textClass: 'text-gray-200 font-medium' },
 };
 
 export default {
