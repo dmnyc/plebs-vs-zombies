@@ -1,11 +1,11 @@
 <template>
   <div>
     <!-- Scout Mode Header -->
-    <div class="card mb-6 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border-yellow-600/30">
+    <div class="card mb-6 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border-yellow-600/30 animate-fade-up">
       <!-- Header row with title and buttons -->
       <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-4">
-          <div class="text-3xl flex-shrink-0">🔍</div>
+          <div class="text-3xl flex-shrink-0 animate-wobble-hover">🔍</div>
           <h2 class="page-title text-yellow-400 !mb-0">Scout Mode</h2>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
@@ -54,12 +54,13 @@
     </div>
 
     <!-- Scout New User Modal -->
-    <div 
-      v-if="showNewUserModal" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <Transition name="modal">
+    <div
+      v-if="showNewUserModal"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="showNewUserModal = false"
     >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
         <h3 class="text-lg font-medium text-yellow-400 mb-4">🔍 Scout New User</h3>
         
         <div class="space-y-4">
@@ -95,12 +96,16 @@
         </div>
       </div>
     </div>
+    </Transition>
 
     <!-- Scanning Progress -->
-    <div v-if="scanning" class="card mb-6 p-6">
+    <div v-if="scanning" class="card mb-6 p-6 animate-fade-up">
       <div class="flex flex-col">
-        <h3 class="text-xl mb-4 text-center text-yellow-400">🔍 Scouting {{ targetDisplay }}...</h3>
-        
+        <h3 class="text-xl mb-4 text-center text-yellow-400 flex items-center justify-center gap-2">
+          <span class="animate-lurch">🔍</span>
+          <span>Scouting {{ targetDisplay }}...</span>
+        </h3>
+
         <!-- Progress Bar -->
         <div class="mb-6">
           <div class="flex justify-between items-center text-sm text-gray-400 mb-2 gap-2">
@@ -108,8 +113,8 @@
             <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
           </div>
           <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-            <div 
-              class="bg-yellow-400 h-3 rounded-full transition-all duration-300"
+            <div
+              class="bg-yellow-400 h-3 rounded-full transition-all duration-300 progress-animated"
               :style="{ width: scanProgress.total > 0 ? Math.min(100, (scanProgress.processed / scanProgress.total * 100)) + '%' : '0%' }"
             ></div>
           </div>
@@ -151,159 +156,7 @@
       </div>
     </div>
 
-    <!-- Post Success Modal -->
-    <div
-      v-if="showPostModal"
-      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
-      @click.self="showPostModal = false"
-    >
-      <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
-        <!-- Header -->
-        <div class="p-6 border-b border-gray-700">
-          <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-bold text-purple-400 flex items-center gap-2">
-              📡 Scout Report Posted!
-            </h2>
-            <button
-              @click="showPostModal = false"
-              class="text-gray-400 hover:text-gray-200 text-2xl"
-            >
-              ×
-            </button>
-          </div>
-        </div>
 
-        <!-- Content -->
-        <div class="p-6 space-y-4">
-          <div class="text-center space-y-2">
-            <div class="text-4xl">🎯</div>
-            <h3 class="text-xl font-bold text-gray-100">
-              Successfully shared your Scout report!
-            </h3>
-            <p class="text-gray-400">
-              Your {{ isMyReport ? 'personal' : 'Scout' }} zombie analysis has been posted to Nostr
-            </p>
-          </div>
-
-          <div class="bg-gray-900 rounded-lg p-4">
-            <h4 class="text-lg font-semibold mb-3 text-gray-200">Report Summary:</h4>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between items-center">
-                <span class="text-blue-300">Total Follows:</span>
-                <span class="font-bold text-lg">{{ scoutResults?.totalFollows || 0 }}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-red-300">Zombies Found:</span>
-                <span class="font-bold text-lg">{{ scoutResults?.totalZombies || 0 }}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-green-300">Zombie Score™:</span>
-                <span class="font-bold text-lg">{{ scoutResults?.zombieScore || 0 }}%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-center">
-            <button 
-              @click="showPostModal = false" 
-              class="btn-primary px-6"
-            >
-              Awesome! 🎉
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Follow Count Explanation Modal -->
-    <div 
-      v-if="showFollowCountModal" 
-      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" 
-      @click.self="showFollowCountModal = false"
-    >
-      <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
-        <!-- Header -->
-        <div class="p-6 border-b border-gray-700">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-yellow-400 flex items-center gap-2">
-              📊 Follow Count Explanation
-            </h2>
-            <button 
-              @click="showFollowCountModal = false"
-              class="text-gray-400 hover:text-gray-200 text-2xl"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <!-- Content -->
-        <div class="p-6 space-y-4">
-          <div class="text-gray-300">
-            <p class="mb-4">
-              <strong class="text-yellow-400">Why might the follow count be different?</strong>
-            </p>
-            
-            <div class="space-y-3 text-sm">
-              <div class="flex items-start gap-2">
-                <span class="text-blue-400 text-lg">📡</span>
-                <div>
-                  <strong class="text-gray-200">Relay Distribution:</strong> Your follow list may be stored across different Nostr relays, and we might not have access to all of them.
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-2">
-                <span class="text-green-400 text-lg">📅</span>
-                <div>
-                  <strong class="text-gray-200">Multiple Versions:</strong> You may have updated your follows recently, and older versions exist on some relays.
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-2">
-                <span class="text-purple-400 text-lg">🔒</span>
-                <div>
-                  <strong class="text-gray-200">Network Limits:</strong> Some relays may be temporarily unavailable or have connection limits.
-                </div>
-              </div>
-              
-              <div class="flex items-start gap-2">
-                <span class="text-orange-400 text-lg">🔄</span>
-                <div>
-                  <strong class="text-gray-200">Batch Processing:</strong> Scout Mode analyzes follows in batches to determine zombie status. When network issues occur, it retries with smaller batches. Some follows may be skipped if they consistently fail analysis across multiple retry attempts.
-                </div>
-              </div>
-            </div>
-            
-            <div class="mt-4 p-3 bg-gray-900 rounded-lg">
-              <p class="text-xs text-gray-400 mb-2">
-                <strong class="text-yellow-400">Why counts vary between scans:</strong>
-              </p>
-              <ul class="text-xs text-gray-400 space-y-1 ml-2">
-                <li>• Batch processing may skip some follows due to network failures</li>
-                <li>• Relay timeouts can prevent analysis of certain accounts</li>
-                <li>• Retry attempts with smaller batches may not recover all data</li>
-                <li>• The scan analyzes only the accounts it can successfully reach</li>
-              </ul>
-            </div>
-            
-            <div class="mt-3 p-3 bg-gray-900 rounded-lg">
-              <p class="text-xs text-gray-400">
-                <strong class="text-yellow-400">Note:</strong> Scout Mode shows the most complete follow list we can access from available relays. The zombie analysis is performed on the follows we found.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex justify-center">
-            <button 
-              @click="showFollowCountModal = false" 
-              class="btn-primary px-6"
-            >
-              Got it! 👍
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Scout Results -->
     <div v-else-if="scoutComplete && scoutResults">
@@ -643,6 +496,164 @@
         🏹 Begin Scouting
       </button>
     </div>
+
+    <!-- Post Success Modal -->
+    <Transition name="modal">
+    <div
+      v-if="showPostModal"
+      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+      @click.self="showPostModal = false"
+    >
+      <div class="modal-panel bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold text-purple-400 flex items-center gap-2">
+              📡 Scout Report Posted!
+            </h2>
+            <button
+              @click="showPostModal = false"
+              class="text-gray-400 hover:text-gray-200 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <div class="text-center space-y-2">
+            <div class="text-4xl">🎯</div>
+            <h3 class="text-xl font-bold text-gray-100">
+              Successfully shared your Scout report!
+            </h3>
+            <p class="text-gray-400">
+              Your {{ isMyReport ? 'personal' : 'Scout' }} zombie analysis has been posted to Nostr
+            </p>
+          </div>
+
+          <div class="bg-gray-900 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-3 text-gray-200">Report Summary:</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-blue-300">Total Follows:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.totalFollows || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-red-300">Zombies Found:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.totalZombies || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-green-300">Zombie Score™:</span>
+                <span class="font-bold text-lg">{{ scoutResults?.zombieScore || 0 }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <button 
+              @click="showPostModal = false" 
+              class="btn-primary px-6"
+            >
+              Awesome! 🎉
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </Transition>
+
+    <!-- Follow Count Explanation Modal -->
+    <Transition name="modal">
+    <div
+      v-if="showFollowCountModal"
+      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+      @click.self="showFollowCountModal = false"
+    >
+      <div class="modal-panel bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-md w-full mx-4">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-yellow-400 flex items-center gap-2">
+              📊 Follow Count Explanation
+            </h2>
+            <button 
+              @click="showFollowCountModal = false"
+              class="text-gray-400 hover:text-gray-200 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <div class="text-gray-300">
+            <p class="mb-4">
+              <strong class="text-yellow-400">Why might the follow count be different?</strong>
+            </p>
+            
+            <div class="space-y-3 text-sm">
+              <div class="flex items-start gap-2">
+                <span class="text-blue-400 text-lg">📡</span>
+                <div>
+                  <strong class="text-gray-200">Relay Distribution:</strong> Your follow list may be stored across different Nostr relays, and we might not have access to all of them.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-green-400 text-lg">📅</span>
+                <div>
+                  <strong class="text-gray-200">Multiple Versions:</strong> You may have updated your follows recently, and older versions exist on some relays.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-purple-400 text-lg">🔒</span>
+                <div>
+                  <strong class="text-gray-200">Network Limits:</strong> Some relays may be temporarily unavailable or have connection limits.
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-2">
+                <span class="text-orange-400 text-lg">🔄</span>
+                <div>
+                  <strong class="text-gray-200">Batch Processing:</strong> Scout Mode analyzes follows in batches to determine zombie status. When network issues occur, it retries with smaller batches. Some follows may be skipped if they consistently fail analysis across multiple retry attempts.
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-4 p-3 bg-gray-900 rounded-lg">
+              <p class="text-xs text-gray-400 mb-2">
+                <strong class="text-yellow-400">Why counts vary between scans:</strong>
+              </p>
+              <ul class="text-xs text-gray-400 space-y-1 ml-2">
+                <li>• Batch processing may skip some follows due to network failures</li>
+                <li>• Relay timeouts can prevent analysis of certain accounts</li>
+                <li>• Retry attempts with smaller batches may not recover all data</li>
+                <li>• The scan analyzes only the accounts it can successfully reach</li>
+              </ul>
+            </div>
+            
+            <div class="mt-3 p-3 bg-gray-900 rounded-lg">
+              <p class="text-xs text-gray-400">
+                <strong class="text-yellow-400">Note:</strong> Scout Mode shows the most complete follow list we can access from available relays. The zombie analysis is performed on the follows we found.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex justify-center">
+            <button 
+              @click="showFollowCountModal = false" 
+              class="btn-primary px-6"
+            >
+              Got it! 👍
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </Transition>
   </div>
 </template>
 

@@ -702,12 +702,13 @@
     </div>
 
     <!-- Zap Modal -->
-    <div 
-      v-if="zapModal.show" 
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+    <Transition name="modal">
+    <div
+      v-if="zapModal.show"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="closeZapModal"
     >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-yellow-400 flex items-center gap-2">
             ⚡ Zap the Creator
@@ -771,6 +772,7 @@
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>
 

@@ -1,6 +1,6 @@
 {
   "name": "plebs-vs-zombies",
-  "version": "0.9.7",
+  "version": "1.0.0",
   "description": "A Nostr utility for managing dormant follows",
   "main": "index.js",
   "type": "module",
@@ -9,8 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "update-profiles": "node scripts/fetch-well-known-profiles.js",
-    "validate-leaderboard": "node scripts/validate-protected-entries.js"
+    "update-profiles": "node scripts/fetch-well-known-profiles.js"
   },
   "repository": {
     "type": "git",

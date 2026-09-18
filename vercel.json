@@ -4,14 +4,6 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/leaderboard",
-      "destination": "/leaderboard.html"
-    },
-    {
-      "source": "/competition",
-      "destination": "/competition.html"
-    },
-    {
       "source": "/resurrector",
       "destination": "/resurrector.html"
     },

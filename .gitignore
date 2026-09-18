@@ -55,3 +55,6 @@ scripts/batch-touch.js
 SURVIVOR-INDEX-PLAN.md
 .vercel
 .env*.local
+
+# Personal Nostr backup data — never publish
+archive/2025-competition/temp-user-backup-analysis/

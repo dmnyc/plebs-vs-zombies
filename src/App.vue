@@ -1,17 +1,22 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-gray-900">
-    <header :class="isLoginScreen ? 'bg-gray-900' : 'bg-zombie-dark border-b border-gray-700 shadow-lg'" :key="forceUpdateKey">
-      <div class="container mx-auto px-4" :class="isLoginScreen ? 'pt-8 pb-0' : 'py-4'">
+  <div class="min-h-screen flex flex-col" :class="{ 'zombie-mode': zombieMode }">
+    <!-- Ambient background: gradient field, drifting fog, grid, grain, distress overlay -->
+    <div class="app-bg" aria-hidden="true">
+      <div class="app-bg-fog app-bg-fog-a"></div>
+      <div class="app-bg-fog app-bg-fog-b"></div>
+      <div class="app-bg-distressed"></div>
+      <div class="app-bg-grain"></div>
+    </div>
+
+    <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl transition-all duration-300" :key="forceUpdateKey">
+      <div class="container mx-auto px-4 transition-all duration-300" :class="headerPad">
         <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
-          <div class="flex items-center gap-3" :class="isScoutMode ? '' : 'cursor-pointer'" @click="!isScoutMode && setActiveView('dashboard')">
-            <img src="/logo.svg" alt="Plebs vs Zombies" class="w-12 h-12" />
+          <div class="flex items-center gap-3 group" :class="isScoutMode ? '' : 'cursor-pointer'" @click="handleLogoClick">
+            <img src="/logo.svg" alt="Plebs vs Zombies" class="transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-[0_0_14px_rgba(92,219,92,0.55)]" :class="[logoSize, { 'animate-lurch': zombieMode }]" />
             <div class="flex flex-col">
               <h1
-                class="transition-colors"
-                :class="[
-                  isLoginScreen ? 'text-3xl sm:text-5xl' : 'text-2xl sm:text-3xl',
-                  isScoutMode ? '' : 'hover:text-zombie-green'
-                ]"
+                class="transition-all duration-300 animate-flicker text-gradient"
+                :class="brandSize"
               >
                 Plebs vs. Zombies
               </h1>
@@ -21,12 +26,13 @@
           <div class="flex items-center">
             <!-- Desktop Navigation for signed-in users -->
             <nav v-if="isConnected" class="hidden xl:block">
-              <ul class="flex gap-6">
+              <ul class="flex gap-1.5 items-center">
                 <li>
                   <a
                     href="#"
                     @click.prevent="setActiveView('dashboard')"
-                    :class="{'text-zombie-green': activeView === 'dashboard' && !isScoutMode, 'hover:text-zombie-green transition-colors': activeView !== 'dashboard' || isScoutMode}"
+                    class="nav-pill"
+                    :class="navPill(activeView === 'dashboard' && !isScoutMode)"
                   >
                     Dashboard
                   </a>
@@ -35,11 +41,10 @@
                   <a
                     href="#"
                     @click.prevent="setActiveView('hunting')"
-                    :class="{'text-zombie-green': activeView === 'hunting', 'hover:text-zombie-green transition-colors': activeView !== 'hunting'}"
-                    class="font-bold text-lg inline-flex items-center gap-1"
-                    style="line-height: 0.75rem;"
+                    class="nav-pill inline-flex items-center gap-1"
+                    :class="navPill(activeView === 'hunting')"
                   >
-                    <span class="text-base">🧟</span>
+                    <span>🧟</span>
                     <span>Hunt Zombies</span>
                   </a>
                 </li>
@@ -47,7 +52,8 @@
                   <a
                     href="#"
                     @click.prevent="setActiveView('follows')"
-                    :class="{'text-zombie-green': activeView === 'follows', 'hover:text-zombie-green transition-colors': activeView !== 'follows'}"
+                    class="nav-pill"
+                    :class="navPill(activeView === 'follows')"
                   >
                     Follows
                   </a>
@@ -56,7 +62,8 @@
                   <a
                     href="#"
                     @click.prevent="setActiveView('backups')"
-                    :class="{'text-zombie-green': activeView === 'backups', 'hover:text-zombie-green transition-colors': activeView !== 'backups'}"
+                    class="nav-pill"
+                    :class="navPill(activeView === 'backups')"
                   >
                     Backups
                   </a>
@@ -65,7 +72,8 @@
                   <a
                     href="#"
                     @click.prevent="setActiveView('settings')"
-                    :class="{'text-zombie-green': activeView === 'settings', 'hover:text-zombie-green transition-colors': activeView !== 'settings'}"
+                    class="nav-pill"
+                    :class="navPill(activeView === 'settings')"
                   >
                     Settings
                   </a>
@@ -73,17 +81,18 @@
                 <li class="relative more-dropdown">
                   <a
                     href="#"
-                    @click.prevent="moreDropdownOpen = !moreDropdownOpen"
-                    class="inline-flex items-center gap-1"
-                    :class="{'text-zombie-green': isMoreActive, 'hover:text-zombie-green transition-colors': !isMoreActive}"
+                    @click.prevent="moreDropdownOpen = !moreDropdownOpen; userDropdownOpen = false"
+                    class="nav-pill inline-flex items-center gap-1"
+                    :class="navPill(isMoreActive)"
                   >
                     More
-                    <span class="text-xs" :class="{'rotate-180': moreDropdownOpen}">▾</span>
+                    <span class="text-xs transition-transform duration-200" :class="{'rotate-180': moreDropdownOpen}">▾</span>
                   </a>
-                  <div
-                    v-if="moreDropdownOpen"
-                    class="absolute right-0 mt-2 w-44 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50 p-1"
-                  >
+                  <Transition name="drop">
+                    <div
+                      v-if="moreDropdownOpen"
+                      class="absolute right-0 mt-2 w-44 bg-zombie-dark/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 p-1.5 origin-top-right"
+                    >
                     <a
                       href="#"
                       @click.prevent="showScoutModeMenu(); moreDropdownOpen = false"
@@ -109,6 +118,7 @@
                       Resurrector
                     </a>
                   </div>
+                  </Transition>
                 </li>
               </ul>
             </nav>
@@ -133,7 +143,7 @@
               <!-- User Avatar and Dropdown -->
               <div v-if="isConnected && userProfile" class="relative">
                 <button
-                  @click="userDropdownOpen = !userDropdownOpen"
+                  @click="userDropdownOpen = !userDropdownOpen; moreDropdownOpen = false"
                   class="hover:bg-gray-800 rounded-lg transition-colors xl:ml-4"
                 >
                   <img
@@ -145,11 +155,12 @@
                 </button>
 
               <!-- Dropdown Menu -->
+              <Transition name="drop">
               <div
                 v-if="userDropdownOpen"
-                class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50"
+                class="absolute right-0 mt-2 w-48 bg-zombie-dark/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 origin-top-right"
               >
-                <div class="p-3 border-b border-gray-700">
+                <div class="p-3 border-b border-white/10">
                   <div class="font-medium text-white">{{ userProfile?.display_name || userProfile?.name || 'Anonymous' }}</div>
                   <div class="text-sm text-gray-400 flex items-center">
                     <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
@@ -163,12 +174,14 @@
                 <div class="p-1">
                   <button
                     @click="logout"
-                    class="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
+                    class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98]"
                   >
-                    🚪 Logout
+                    <span>🚪</span>
+                    <span>Logout</span>
                   </button>
                 </div>
               </div>
+              </Transition>
               </div>
 
               <!-- Mobile/Tablet Hamburger Button -->
@@ -187,7 +200,12 @@
         </div>
 
         <!-- Mobile/Tablet Navigation Menu -->
-        <nav v-if="isConnected && mobileMenuOpen" class="xl:hidden mt-4 pt-4 border-t border-gray-700">
+        <Transition name="collapse">
+        <nav
+          v-if="isConnected && mobileMenuOpen"
+          class="xl:hidden mt-4 pt-4 border-t border-gray-700 overflow-y-auto"
+          :style="{ maxHeight: 'calc(100vh - 6rem - ' + footerHeight + 'px)' }"
+        >
           <!-- User Info Section (Mobile) -->
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center gap-3 mb-3">
@@ -211,9 +229,10 @@
             </div>
             <button
               @click="logout"
-              class="w-full px-3 py-2 text-red-400 hover:bg-gray-700 rounded-lg transition-colors text-left flex items-center gap-2"
+              class="w-full px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none text-left transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98]"
             >
-              🚪 Logout
+              <span>🚪</span>
+              <span>Logout</span>
             </button>
           </div>
 
@@ -222,7 +241,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('dashboard'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'dashboard' && !isScoutMode}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'dashboard' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Dashboard
@@ -232,7 +251,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('hunting'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'hunting'}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'hunting'}"
                 class="block px-4 py-4 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors font-bold text-lg border-2 border-zombie-green/30"
               >
                 🧟 Hunt Zombies
@@ -242,7 +261,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('follows'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'follows'}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'follows'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Follows
@@ -252,7 +271,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('backups'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'backups'}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'backups'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Backups
@@ -262,7 +281,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('settings'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'settings'}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'settings'}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Settings
@@ -278,7 +297,7 @@
               <a
                 href="#"
                 @click.prevent="showScoutModeMenu(); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': isScoutMode}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Scout Mode
@@ -288,7 +307,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('zombieCheck'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'zombieCheck' && !isScoutMode}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'zombieCheck' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Zombie Check
@@ -298,7 +317,7 @@
               <a
                 href="#"
                 @click.prevent="setActiveView('resurrector'); mobileMenuOpen = false"
-                :class="{'text-zombie-green bg-gray-800': activeView === 'resurrector' && !isScoutMode}"
+                :class="{'text-zombie-green bg-zombie-green/10 shadow-[0_0_18px_rgba(92,219,92,0.15)]': activeView === 'resurrector' && !isScoutMode}"
                 class="block px-4 py-3 rounded-lg hover:bg-gray-800 hover:text-zombie-green transition-colors"
               >
                 Resurrector
@@ -306,8 +325,10 @@
             </li>
           </ul>
         </nav>
+        </Transition>
 
         <!-- Mobile/Tablet Navigation Menu for signed-out Scout Mode -->
+        <Transition name="collapse">
         <nav v-if="!isConnected && isScoutMode && mobileMenuOpen" class="lg:hidden mt-4 pt-4 border-t border-gray-700">
           <ul class="space-y-2">
             <li>
@@ -321,10 +342,14 @@
             </li>
           </ul>
         </nav>
+        </Transition>
       </div>
     </header>
 
-    <main class="container mx-auto px-4 py-8 flex-grow">
+    <main
+      class="container mx-auto px-4 py-8 flex-grow"
+      :style="{ marginTop: headerHeight + 'px', marginBottom: footerHeight + 'px' }"
+    >
       <!-- Scout Mode View -->
       <div v-if="isScoutMode">
         <ScoutModeView
@@ -339,75 +364,95 @@
       <!-- Login Screen -->
       <div v-else-if="!isConnected">
         <!-- Login Card -->
-        <div class="card max-w-2xl mx-auto mt-2 mb-12">
+        <div class="card max-w-2xl mx-auto mt-2 mb-12 animate-fade-up">
           <div class="text-center mb-8">
-            <div class="text-6xl mb-6">🧟‍♂️</div>
-            <h2 class="text-3xl mb-4">Connect to start hunting zombies!</h2>
+            <div class="relative inline-block mb-2 animate-float">
+              <div class="absolute inset-0 -m-10 rounded-full bg-zombie-green/15 blur-3xl" aria-hidden="true"></div>
+              <div class="relative text-7xl drop-shadow-[0_0_24px_rgba(92,219,92,0.5)]">🧟‍♂️</div>
+            </div>
+            <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
             <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
             <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
           </div>
 
-          <div class="space-y-4 mb-8">
-            <h3 class="text-lg text-gray-300 mb-4 text-center">How would you like to connect?</h3>
-
-            <label class="flex items-start gap-4 p-4 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
-                   :class="loginSigningMethod === 'nip07' ? 'border-zombie-green bg-green-900/20' : ''">
-              <input
-                type="radio"
-                value="nip07"
-                v-model="loginSigningMethod"
-                class="w-5 h-5 text-zombie-green focus:ring-zombie-green mt-0.5"
-              />
-              <div class="flex-grow">
-                <span class="text-lg font-medium text-gray-200">Browser Extension (NIP-07)</span>
-                <p class="text-sm text-gray-400 mt-1">Use Alby, nos2x, or other browser extensions</p>
-                <div class="flex flex-wrap gap-2 mt-2">
-                  <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Easy setup</span>
-                  <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">Fast signing</span>
-                </div>
-              </div>
-            </label>
-
-            <label class="flex items-start gap-4 p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors cursor-pointer"
-                   :class="loginSigningMethod === 'nip46' ? 'border-purple-500 bg-purple-900/20' : ''">
-              <input
-                type="radio"
-                value="nip46"
-                v-model="loginSigningMethod"
-                class="w-5 h-5 text-purple-500 mt-0.5"
-              />
-              <div class="flex-grow">
-                <span class="text-lg font-medium text-gray-100">Remote Signer (NIP-46)</span>
-                <p class="text-sm text-gray-400 mt-1">Connect via Amber, Primal, or other remote signers</p>
-                <div class="flex flex-wrap gap-2 mt-2">
-                  <span class="text-xs bg-purple-900 text-purple-300 px-2 py-1 rounded">Mobile friendly</span>
-                  <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">Enhanced security</span>
-                </div>
-              </div>
-            </label>
-          </div>
-
-          <div class="text-center mb-6">
+          <div class="space-y-3 mb-6">
+            <!-- Browser Extension: one click connects -->
             <button
-              @click="connectNostr"
+              @click="handleExtensionConnect"
               :disabled="isConnecting"
-              class="btn-primary text-lg px-8 py-3 transition-all"
-              :class="{'opacity-50 cursor-not-allowed': isConnecting}"
+              class="w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all duration-200 bg-black/20 hover:-translate-y-px disabled:opacity-60"
+              :class="hasNip07
+                ? 'border-pleb-purple/50 hover:border-pleb-purple hover:shadow-[0_0_24px_rgba(142,48,235,0.25)]'
+                : 'border-white/10 hover:border-white/25'"
             >
-              <span v-if="isConnecting">🔄 Signing in...</span>
-              <span v-else-if="loginSigningMethod === 'nip46'">Connect with Remote Signer</span>
-              <span v-else>Connect with Browser Extension</span>
+              <div class="w-11 h-11 rounded-xl grid place-items-center text-2xl flex-shrink-0"
+                   :class="hasNip07 ? 'bg-pleb-purple/20' : 'bg-white/5 grayscale opacity-60'">
+                <span v-if="isConnecting && connectingMethod === 'nip07'" class="spinner-md border-pleb-purple"></span>
+                <span v-else>⚡</span>
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-lg font-semibold text-gray-100">
+                    {{ isConnecting && connectingMethod === 'nip07' ? 'Connecting…' : 'Browser Extension' }}
+                  </span>
+                  <span v-if="hasNip07 && !(isConnecting && connectingMethod === 'nip07')"
+                        class="inline-flex items-center gap-1 text-[11px] font-medium text-green-300 bg-green-900/40 border border-green-500/30 px-2 py-0.5 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                    detected
+                  </span>
+                </div>
+                <p class="text-sm text-gray-400 mt-0.5">
+                  <template v-if="isConnecting && connectingMethod === 'nip07'">Approve the request in your extension…</template>
+                  <template v-else-if="hasNip07">One click — Sidecar, Alby or any NIP-07 extension</template>
+                  <template v-else>Click for install options — Sidecar, Alby or any NIP-07 extension</template>
+                </p>
+              </div>
             </button>
+
+            <!-- Install hints when no extension is present -->
+            <div v-if="showInstallHints" class="p-4 rounded-xl border border-pleb-blue/40 bg-pleb-blue/5 text-sm animate-fade-up">
+              <p class="font-semibold text-pleb-blue mb-1.5">Need a Nostr extension?</p>
+              <p class="text-gray-300">
+                Install
+                <a href="https://sidecar.top/" target="_blank" rel="noopener noreferrer" class="text-pleb-blue underline hover:no-underline">Sidecar</a>,
+                <a href="https://getalby.com/" target="_blank" rel="noopener noreferrer" class="text-pleb-blue underline hover:no-underline">Alby</a>
+                or
+                <a href="https://chromewebstore.google.com/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp" target="_blank" rel="noopener noreferrer" class="text-pleb-blue underline hover:no-underline">nos2x</a>,
+                then refresh this page.
+              </p>
+            </div>
+
+            <!-- Remote Signer: opens the bunker / QR flow -->
+            <button
+              @click="openNip46Setup"
+              :disabled="isConnecting"
+              class="w-full flex items-center gap-4 p-4 rounded-xl border border-pleb-blue/40 text-left transition-all duration-200 bg-black/20 hover:border-pleb-blue hover:shadow-[0_0_24px_rgba(30,144,255,0.25)] hover:-translate-y-px"
+            >
+              <div class="w-11 h-11 rounded-xl grid place-items-center text-2xl flex-shrink-0 bg-pleb-blue/15">
+                <span v-if="isConnecting && connectingMethod === 'nip46'" class="spinner-md border-pleb-blue"></span>
+                <span v-else>🔑</span>
+              </div>
+              <div class="flex-grow min-w-0">
+                <span class="text-lg font-semibold text-gray-100">Remote Signer</span>
+                <p class="text-sm text-gray-400 mt-0.5">Scan a QR or paste a bunker URL — Amber, Clave &amp; co.</p>
+              </div>
+            </button>
+
+            <!-- Inline error (replaces alert) -->
+            <div v-if="loginError" class="p-3 rounded-xl border border-red-500/50 bg-red-950/40 text-sm text-red-200 animate-fade-up">
+              {{ loginError }}
+            </div>
           </div>
 
           <!-- nsec login -->
-          <div class="pt-6">
+          <div class="pt-2">
             <button
               @click="showNsecLogin = !showNsecLogin"
               class="text-sm text-gray-400 hover:text-gray-200 transition-colors w-full text-center mb-3"
             >
-              Or sign in with your private key
+              {{ showNsecLogin ? 'Hide private key sign-in' : 'Or sign in with your private key' }}
             </button>
+            <Transition name="collapse">
             <div v-if="showNsecLogin">
               <div class="flex items-center gap-2 mb-3">
                 <span class="text-yellow-400">⚠️</span>
@@ -426,14 +471,15 @@
                   @click="connectWithNsec"
                   :disabled="isConnecting || !nsecInput.trim()"
                   class="btn-secondary px-5 whitespace-nowrap"
-                  :class="{'opacity-50 cursor-not-allowed': isConnecting || !nsecInput.trim()}"
                 >
                   <span v-if="isConnecting">Signing in...</span>
                   <span v-else>Sign in</span>
                 </button>
               </div>
             </div>
+            </Transition>
           </div>
+
 
           <!-- Scout Mode Section -->
           <div class="mt-10 pt-6 border-t border-gray-700/50">
@@ -582,18 +628,21 @@
       <!-- Main App Views -->
       <div v-else>
         <router-view @logout="logout" v-slot="{ Component }">
-          <component :is="Component" ref="currentViewComponent" />
+          <Transition name="page" mode="out-in">
+            <component :is="Component" :key="$route.path" ref="currentViewComponent" />
+          </Transition>
         </router-view>
       </div>
     </main>
 
     <!-- NIP-46 Setup Modal -->
+    <Transition name="modal">
     <div
       v-if="showNip46Setup"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       @click="closeNip46Setup"
     >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
         <div class="p-6">
           <div class="flex items-center justify-between mb-6">
             <div>
@@ -616,8 +665,9 @@
         </div>
       </div>
     </div>
+    </Transition>
 
-    <footer class="mt-auto py-6 bg-zombie-dark border-t border-gray-700">
+    <footer ref="footerEl" class="fixed bottom-0 left-0 right-0 z-40 py-6 bg-black/30 backdrop-blur-xl border-t border-white/10">
       <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
           <p class="text-gray-400 text-center lg:text-left">
@@ -652,12 +702,13 @@
     </footer>
 
     <!-- Zap Modal -->
+    <Transition name="modal">
     <div
       v-if="zapModal.show"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="closeZapModal"
     >
-      <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-yellow-400 flex items-center gap-2">
             ⚡ Zap the Creator
@@ -721,6 +772,7 @@
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 
   <!-- Client Authorization Modal -->
@@ -732,12 +784,13 @@
   />
 
   <!-- Scout Mode Modal for Signed-in Users -->
+  <Transition name="modal">
   <div
     v-if="showScoutModal"
     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
     @click="closeScoutModal"
   >
-    <div class="bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+    <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-yellow-400">👁️🔍 Start Scout Mode</h3>
         <button
@@ -785,7 +838,21 @@
       </div>
     </div>
   </div>
+  </Transition>
   <Analytics />
+
+  <!-- Easter egg: falling zombies overlay -->
+  <ZombieRain ref="zombieRain" />
+
+  <!-- Easter egg toast -->
+  <Transition name="drop">
+    <div
+      v-if="eggToast.show"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-800/95 backdrop-blur border border-zombie-green/50 text-gray-100 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-fade-up"
+    >
+      {{ eggToast.message }}
+    </div>
+  </Transition>
 </template>
 
 <script>
@@ -803,6 +870,7 @@ import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import ProfileSearchInput from './components/ProfileSearchInput.vue';
 import ZombieCheck from './components/ZombieCheck.vue';
+import ZombieRain from './components/ZombieRain.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
@@ -826,7 +894,8 @@ export default {
     Nip46Connection,
     ClientAuthorizationModal,
     ProfileSearchInput,
-    ZombieCheck
+    ZombieCheck,
+    ZombieRain
   },
   data() {
     return {
@@ -837,6 +906,10 @@ export default {
       moreDropdownOpen: false,
       userProfile: null,
       loginSigningMethod: 'nip07', // Default to NIP-07 for login
+      hasNip07: false, // NIP-07 extension detected in this browser
+      showInstallHints: false,
+      loginError: '',
+      connectingMethod: null, // Which card is spinning: 'nip07' | 'nip46' | 'nsec'
       forceUpdateKey: 0,
       showNip46Setup: false, // Show NIP-46 setup modal
       showNsecLogin: false,
@@ -875,12 +948,64 @@ export default {
       showScoutModal: false,
       selectedScoutProfile: null, // Stores selected profile from ProfileSearchInput
       scoutInputValue: '', // Tracks input value for button enable/disable
-      scoutInputError: '' // Error message for validation
+      scoutInputError: '', // Error message for validation
+      // Easter eggs
+      zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
+      eggToast: {
+        show: false,
+        message: '',
+        timer: null
+      },
+      logoClicks: 0,
+      logoClickTimer: null,
+      konamiProgress: 0,
+      scrolled: false,
+      // Separate from `scrolled` (which has a wide hysteresis band to avoid
+      // a layout-driven scroll-position feedback loop — see onScroll below).
+      // Opacity doesn't shift layout height, so it doesn't need that
+      // protection, and riding on the same 48px threshold as `scrolled`
+      // left the sticky header pinned-but-transparent for the first 48px
+      // of every scroll, letting page content show through underneath it.
+      headerSolid: false,
+      // Header and footer are both fixed (so overscroll bounce doesn't
+      // drag them with the page); main's margin tracks their real
+      // rendered height via ResizeObserver instead of a guessed constant.
+      // The header's height changes as it compacts on scroll; the
+      // footer's changes with its own flex-col/lg:flex-row responsive
+      // reflow, not scroll — different trigger, same reason it needs
+      // measuring rather than a hardcoded constant.
+      headerHeight: 90,
+      footerHeight: 90
     }
   },
   computed: {
     currentView() {
       return this.views[this.activeView];
+    },
+    // Header compacts once the page is scrolled (landing and in-app alike)
+    headerPad() {
+      if (!this.isLoginScreen) return this.scrolled ? 'py-2' : 'py-4';
+      return this.scrolled ? 'pt-3 pb-3' : 'pt-8 pb-7';
+    },
+    logoSize() {
+      return this.scrolled ? 'w-9 h-9' : 'w-12 h-12';
+    },
+    headerGlass() {
+      if (!this.isLoginScreen) {
+        return 'bg-black/85 border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
+      }
+      // Landing: transparent at the top, glass as soon as you scroll at all
+      // (headerSolid, not scrolled — see its comment in data()). Mostly-
+      // opaque fill (not just backdrop-blur) so the header still reliably
+      // hides page content if a browser's compositor doesn't keep the blur
+      // in sync with fast/momentum scrolling (seen on iOS Safari).
+      return this.headerSolid
+        ? 'bg-black/85 border-b border-white/10'
+        : 'bg-transparent border-b border-transparent';
+    },
+    brandSize() {
+      if (this.isLoginScreen) return this.scrolled ? 'text-2xl' : 'text-3xl sm:text-5xl';
+      return this.scrolled ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl';
     },
     signerLabel() {
       const method = nostrService.signingMethod;
@@ -924,9 +1049,33 @@ export default {
       if (viewName) {
         this.activeView = viewName;
       }
+    },
+    zombieMode(on) {
+      document.title = on
+        ? '🧟 BRAINZ! | Plebs vs. Zombies'
+        : 'Plebs vs. Zombies';
+    },
+    // :key="forceUpdateKey" on <header> destroys and recreates the header
+    // DOM node on login/profile-load, so $refs.headerEl points at a
+    // detached element afterward — re-observe the new one or headerHeight
+    // freezes stale and main's margin stops tracking the real header.
+    forceUpdateKey() {
+      this.$nextTick(() => this.observeHeaderEl());
     }
   },
   methods: {
+    observeHeaderEl() {
+      if (!this.headerResizeObserver) return;
+      this.headerResizeObserver.disconnect();
+      if (this.$refs.headerEl) {
+        // Measure synchronously now rather than waiting for the observer's
+        // first (async) callback — otherwise main briefly uses the
+        // guessed default (headerHeight's initial data() value) and then
+        // visibly snaps to the real height a frame or two later.
+        this.headerHeight = this.$refs.headerEl.getBoundingClientRect().height;
+        this.headerResizeObserver.observe(this.$refs.headerEl);
+      }
+    },
     setActiveView(view) {
       // Map view names to route names
       const viewToRoute = {
@@ -1128,17 +1277,20 @@ export default {
       this.scoutTarget = newTarget;
       console.log('🔄 Updated scout target:', newTarget);
     },
-    async connectNostr() {
+    async connectNostr(method = this.loginSigningMethod) {
       try {
         this.isConnecting = true;
-        console.log(`🚀 Starting Nostr connection with ${this.loginSigningMethod}...`);
+        this.connectingMethod = method;
+        this.loginError = '';
+        console.log(`🚀 Starting Nostr connection with ${method}...`);
 
         // Only set the signing method if it's different to avoid resetting NDK
-        if (nostrService.getSigningMethod() !== this.loginSigningMethod) {
-          nostrService.setSigningMethod(this.loginSigningMethod);
+        this.loginSigningMethod = method;
+        if (nostrService.getSigningMethod() !== method) {
+          nostrService.setSigningMethod(method);
         }
 
-        if (this.loginSigningMethod === 'nip07') {
+        if (method === 'nip07') {
           // Use NIP-07 connection flow
           const connectionResult = await nostrService.connectExtension();
           console.log('✅ Extension connected successfully:', connectionResult);
@@ -1152,7 +1304,7 @@ export default {
 
           console.log('🎉 Successfully connected to Nostr with', connectionResult.extensionType);
 
-        } else if (this.loginSigningMethod === 'nip46') {
+        } else if (method === 'nip46') {
           // For NIP-46, show the setup modal
           console.log('📱 Opening NIP-46 setup modal...');
           this.showNip46Setup = true;
@@ -1165,17 +1317,40 @@ export default {
         // Provide more specific error messages for different scenarios
         let userMessage = error.message;
         if (error.message.includes('timeout')) {
-          userMessage = 'Extension connection timed out. Please make sure your Alby extension is unlocked and responding, then try again.';
+          userMessage = 'Extension connection timed out. Please make sure your signer extension is unlocked and responding, then try again.';
         } else if (error.message.includes('denied') || error.message.includes('rejected')) {
           userMessage = 'Connection was denied. Please approve the connection request in your Nostr extension.';
         } else if (error.message.includes('No Nostr extension found')) {
-          userMessage = 'No Nostr extension found. Please install Alby, nos2x, or another NIP-07 compatible extension, then refresh the page.';
+          userMessage = 'No Nostr extension found. Please install Sidecar, Alby, nos2x, or another NIP-07 compatible extension, then refresh the page.';
         }
 
-        alert(`Failed to connect to Nostr:\n\n${userMessage}\n\nIf you continue having issues, try disconnecting and reconnecting this site in your Nostr extension settings.`);
+        this.loginError = `${userMessage} If issues persist, try disconnecting and reconnecting this site in your extension settings.`;
       } finally {
         this.isConnecting = false;
+        this.connectingMethod = null;
       }
+    },
+
+    // Landing widget: one-click extension connect; without an extension,
+    // surface install options instead of failing silently
+    handleExtensionConnect() {
+      this.refreshExtensionDetection();
+      if (!this.hasNip07) {
+        this.showInstallHints = !this.showInstallHints;
+        return;
+      }
+      this.showInstallHints = false;
+      this.connectNostr('nip07');
+    },
+
+    openNip46Setup() {
+      this.loginError = '';
+      this.loginSigningMethod = 'nip46';
+      this.showNip46Setup = true;
+    },
+
+    refreshExtensionDetection() {
+      this.hasNip07 = typeof window.nostr !== 'undefined';
     },
 
     async connectWithNsec() {
@@ -1235,22 +1410,10 @@ export default {
         console.log('[App] Connected with nsec, pubkey:', pubkey.substring(0, 8) + '...');
       } catch (error) {
         console.error('nsec login failed:', error);
-        alert(`Failed to sign in: ${error.message}`);
+        this.loginError = `Failed to sign in: ${error.message}`;
       } finally {
         this.isConnecting = false;
       }
-    },
-
-    getConnectButtonText() {
-      if (!this.loginSigningMethod) return 'Select a method';
-
-      if (this.loginSigningMethod === 'nip07') {
-        return 'Connect Browser Extension';
-      } else if (this.loginSigningMethod === 'nip46') {
-        return 'Setup Remote Signer';
-      }
-
-      return 'Connect to Nostr';
     },
 
     logout() {
@@ -1285,6 +1448,87 @@ export default {
       event.target.src = '/default-avatar.svg';
     },
 
+    // Classes for the header nav pills; active gets a glowing gradient chip
+    navPill(active) {
+      return active
+        ? 'text-zombie-dark bg-gradient-to-r from-zombie-green to-lime-400 shadow-[0_0_18px_rgba(92,219,92,0.45)] font-semibold'
+        : 'text-gray-300 hover:text-white hover:bg-white/5';
+    },
+
+    // ------------------------------------------------------------------
+    // Easter eggs
+    // ------------------------------------------------------------------
+
+    // Logo: normal click navigates to the dashboard; five rapid clicks
+    // wake up the horde.
+    handleLogoClick() {
+      if (!this.isScoutMode) {
+        this.setActiveView('dashboard');
+      }
+
+      this.logoClicks += 1;
+      clearTimeout(this.logoClickTimer);
+      this.logoClickTimer = setTimeout(() => {
+        this.logoClicks = 0;
+      }, 1500);
+
+      if (this.logoClicks >= 5) {
+        this.logoClicks = 0;
+        clearTimeout(this.logoClickTimer);
+        this.wakeTheHorde();
+      }
+    },
+
+    wakeTheHorde() {
+      this.$refs.zombieRain?.start(36);
+      this.showEggToast('🧟 The horde heard that. They\'re coming.');
+    },
+
+    toggleZombieMode() {
+      this.zombieMode = !this.zombieMode;
+      if (this.zombieMode) {
+        this.$refs.zombieRain?.start(50);
+        this.showEggToast('☢️ ZOMBIE MODE ACTIVATED — the horde has your scent. (Konami again to cure)', 5000);
+      } else {
+        this.showEggToast('💉 Vaccine administered. You\'re human again.');
+      }
+    },
+
+    handleKonamiKey(event) {
+      const konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+      const expected = konami[this.konamiProgress];
+      const pressed = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+
+      if (pressed === expected) {
+        this.konamiProgress += 1;
+        if (this.konamiProgress === konami.length) {
+          this.konamiProgress = 0;
+          this.toggleZombieMode();
+        }
+      } else {
+        // Allow a fresh sequence to start with this key if it matches the beginning
+        this.konamiProgress = pressed === konami[0] ? 1 : 0;
+      }
+    },
+
+    showEggToast(message, duration = 3500) {
+      clearTimeout(this.eggToast.timer);
+      this.eggToast.message = message;
+      this.eggToast.show = true;
+      this.eggToast.timer = setTimeout(() => {
+        this.eggToast.show = false;
+      }, duration);
+    },
+
+    logEasterEgg() {
+      const style = 'color:#5cdb5c;font-size:14px;font-weight:bold;text-shadow:0 0 8px rgba(92,219,92,.6)';
+      const styleDim = 'color:#9ca3af;font-size:12px';
+      console.log('%c🧟 Plebs vs. Zombies', style);
+      console.log('%cYou look like someone who reads console logs. Respect.', styleDim);
+      console.log('%cPsst... try the Konami Code on this page. ⬆️⬆️⬇️⬇️⬅️➡️⬅️➡️🅱️🅰️', styleDim);
+      console.log('%cAnd keep an eye on the logo... it doesn\'t like being poked.', styleDim);
+    },
+
     onNip46Connected(result) {
       console.log('✅ NIP-46 connected from setup modal:', result);
 
@@ -1293,8 +1537,16 @@ export default {
 
       if (!data || !data.pubkey) {
         console.error('❌ Invalid connection data:', result);
+        // Close the modal — leaving it open on a "Connected" screen with no
+        // way forward is how users get stuck; the error shows on the login card
+        this.loginError = 'The signer connected but did not return your public key. Please try connecting again.';
+        this.showNip46Setup = false;
         return;
       }
+
+      // Close the setup modal FIRST — if anything below throws, a stuck open
+      // modal over the dashboard is worse than a rough landing
+      this.showNip46Setup = false;
 
       console.log('🔄 Setting isConnected = true and userProfile');
       this.isConnected = true;
@@ -1329,9 +1581,8 @@ export default {
       backupService.init();
       immunityService.init();
 
-      // Close the setup modal and navigate to dashboard immediately
-      console.log('🔄 Closing modal and navigating to dashboard');
-      this.showNip46Setup = false;
+      // Navigate to dashboard immediately
+      console.log('🔄 Navigating to dashboard');
       this.activeView = 'dashboard';
 
       console.log('✅ Final state:', {
@@ -1517,6 +1768,60 @@ export default {
     // Listen for user profile loaded events
     window.addEventListener('user-profile-loaded', this.onUserProfileLoaded);
 
+    // Compacts the landing header once scrolled. Hysteresis on purpose:
+    // compacting shrinks the fixed header's rendered height, which would
+    // otherwise nudge scrollY back — a single threshold makes the logo
+    // oscillate (the "epileptic fit"), a dead zone cannot.
+    this.onScroll = () => {
+      const y = window.scrollY;
+      if (!this.scrolled && y > 48) this.scrolled = true;
+      else if (this.scrolled && y < 8) this.scrolled = false;
+      // No hysteresis needed here — see the headerSolid comment in data().
+      this.headerSolid = y > 2;
+    };
+    this.onScroll();
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+
+    // Header and footer are fixed and out of normal flow (so overscroll
+    // bounce doesn't drag them with the page); track their real rendered
+    // height so main's margin can keep content clear of both in every
+    // state (compact/expanded, login/in-app, mobile menu open, responsive
+    // breakpoints...).
+    if (window.ResizeObserver) {
+      // Read via getBoundingClientRect(), not entries[0].contentRect —
+      // contentRect excludes padding/border, and the footer carries its
+      // own py-6 directly (the header's padding lives on an inner div
+      // instead, which is why this only bit the footer: contentRect
+      // silently under-reported it by the full padding amount).
+      this.headerResizeObserver = new ResizeObserver(() => {
+        if (this.$refs.headerEl) this.headerHeight = this.$refs.headerEl.getBoundingClientRect().height;
+      });
+      this.observeHeaderEl();
+
+      // Footer's ref is stable (no :key forcing remounts like the header
+      // has), so a one-time observe is enough — no watcher needed to
+      // re-attach it.
+      this.footerResizeObserver = new ResizeObserver(() => {
+        if (this.$refs.footerEl) this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
+      });
+      if (this.$refs.footerEl) {
+        // Same reasoning as the header: measure now, don't wait for the
+        // observer's first async callback.
+        this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
+        this.footerResizeObserver.observe(this.$refs.footerEl);
+      }
+    }
+
+    // Detect NIP-07 extension; re-check when the tab regains focus
+    // (covers "installed the extension, came back" without a reload)
+    this.refreshExtensionDetection();
+    this.onWindowFocus = () => this.refreshExtensionDetection();
+    window.addEventListener('focus', this.onWindowFocus);
+
+    // Easter eggs: Konami code + console message
+    window.addEventListener('keydown', this.handleKonamiKey);
+    this.logEasterEgg();
+
     // Close menus when clicking outside
     document.addEventListener('click', (e) => {
       if (this.mobileMenuOpen && !e.target.closest('header')) {
@@ -1549,6 +1854,13 @@ export default {
   beforeUnmount() {
     window.removeEventListener('nip46-connected', this.onNip46Connected);
     window.removeEventListener('user-profile-loaded', this.onUserProfileLoaded);
+    window.removeEventListener('keydown', this.handleKonamiKey);
+    window.removeEventListener('scroll', this.onScroll);
+    window.removeEventListener('focus', this.onWindowFocus);
+    if (this.headerResizeObserver) this.headerResizeObserver.disconnect();
+    if (this.footerResizeObserver) this.footerResizeObserver.disconnect();
+    clearTimeout(this.eggToast.timer);
+    clearTimeout(this.logoClickTimer);
   }
 }
 </script>

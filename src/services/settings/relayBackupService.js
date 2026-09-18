@@ -10,6 +10,7 @@
 
 const FOLLOW_CHUNK_SIZE = 500;
 
+import { baseVersion } from '../../utils/version';
 import relayStorage from '../relayStorage';
 import syncManager from '../syncManager';
 import zombieClassificationSettings from './zombieClassificationSettings';
@@ -475,8 +476,7 @@ class RelayBackupService {
    */
   getAppVersion() {
     try {
-      // Try to get from package.json or a global variable
-      return '0.5.0'; // TODO: Import from package.json or version file
+      return baseVersion;
     } catch (error) {
       return 'unknown';
     }
