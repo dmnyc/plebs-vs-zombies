@@ -678,7 +678,7 @@
               target="_blank"
               class="flex items-center gap-2 text-sm px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded transition-colors"
             >
-              🟣 Follow on Nostr
+              ➕ Follow on Nostr
             </a>
             <button 
               @click="showZapModal"

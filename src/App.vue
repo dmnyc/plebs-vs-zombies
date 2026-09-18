@@ -576,8 +576,9 @@
           </div>
 
           <div class="mt-10 pt-6 border-t border-gray-700/50 text-center">
-            <div class="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-gray-400">
-              <span class="text-white font-medium">From the creator of</span>
+            <div class="text-xs text-gray-400 space-y-1.5">
+              <div class="text-white font-medium">From the creator of</div>
+              <div class="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
               <a
                 href="https://mutable.top"
                 target="_blank"
@@ -619,6 +620,7 @@
                   loading="lazy"
                 />
               </a>
+              </div>
             </div>
           </div>
         </div>
@@ -669,7 +671,7 @@
     <footer class="mt-auto py-6 bg-black/30 backdrop-blur-xl border-t border-white/10">
       <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
-          <p class="text-gray-400 text-center lg:text-left">
+          <p class="text-gray-400 text-sm text-center lg:text-left">
             <span class="block sm:inline">Plebs vs. Zombies v{{ appVersion }} &copy; {{ new Date().getFullYear() }}</span>
             <span class="hidden sm:inline"> | </span>
             <span class="block sm:inline">Made with 🧠 for the Nostr community</span>
@@ -680,7 +682,7 @@
               target="_blank"
               class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
             >
-              Follow on Nostr 🟣
+              Follow on Nostr ➕
             </a>
             <button
               @click="showZapModal"

@@ -171,7 +171,7 @@
               target="_blank"
               class="btn-nostr text-xs px-3 py-1 rounded-full inline-flex items-center gap-1"
             >
-              Follow on Nostr 🟣
+              Follow on Nostr ➕
             </a>
             <button 
               @click="showZapModal"
