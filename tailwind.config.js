@@ -12,7 +12,7 @@ export default {
         'abyss': '#0a0f0c',
         'pleb-gold': '#ffd700',
         'pleb-blue': '#1e90ff',
-        'pleb-purple': '#8e30eb',
+        'pleb-purple': '#c084fc',
       },
       fontFamily: {
         // Fallback is a plain sans-serif, not the `cursive` generic family —

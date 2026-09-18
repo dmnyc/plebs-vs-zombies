@@ -31,9 +31,9 @@
                 <span class="font-mono text-sm bg-gray-900 p-3 rounded-l border border-gray-700 truncate flex-grow">
                   {{ npub }}
                 </span>
-                <button 
-                  @click="copyToClipboard(npub)" 
-                  class="bg-gray-700 border border-l-0 border-gray-700 p-3 rounded-r hover:bg-gray-600 transition-colors"
+                <button
+                  @click="copyToClipboard(npub)"
+                  class="text-sm inline-flex items-center justify-center bg-gray-700 border border-l-0 border-gray-700 p-3 rounded-r hover:bg-gray-600 transition-colors"
                   title="Copy to clipboard"
                 >
                   📋
@@ -640,9 +640,9 @@
     <div class="mt-6 card">
       <h3 class="section-title">App Information</h3>
       
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
         <div>
-          <h4 class="text-lg mb-3">About Plebs vs. Zombies</h4>
+          <h4 class="text-base mb-2">About Plebs vs. Zombies</h4>
           <p class="text-gray-300 mb-2">
             Version: {{ appVersion }}
           </p>
@@ -653,9 +653,9 @@
             Made with 🧠 for the Nostr community
           </p>
         </div>
-        
+
         <div>
-          <h4 class="text-lg mb-3">Privacy & Data</h4>
+          <h4 class="text-base mb-2">Privacy & Data</h4>
           <p class="text-gray-300 mb-2">
             All data is stored locally in your browser.
           </p>
@@ -666,37 +666,34 @@
             Your keys remain secure in your Nostr extension.
           </p>
         </div>
-        
+
         <div>
-          <h4 class="text-lg mb-3">Support the Creator</h4>
+          <h4 class="text-base mb-2">Support the Creator</h4>
           <p class="text-gray-300 mb-3">
             Like this app? Show your support!
           </p>
           <div class="space-y-2">
-            <a 
-              href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h" 
+            <a
+              href="https://jumble.social/users/npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h"
               target="_blank"
-              class="flex items-center gap-2 text-sm px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded transition-colors"
+              class="flex items-center gap-2 text-xs px-3 py-2 bg-black/40 hover:bg-black/60 text-pleb-purple border border-pleb-purple/30 rounded transition-colors"
             >
-              🟣 Follow on Nostr
+              🤙 Follow on Nostr
             </a>
-            <button 
+            <button
               @click="showZapModal"
-              class="flex items-center gap-2 text-sm px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-black rounded transition-colors w-full"
+              class="flex items-center gap-2 text-xs px-3 py-2 bg-black/40 hover:bg-black/60 text-pleb-gold border border-pleb-gold/30 rounded transition-colors w-full"
             >
               ⚡ Zap the Creator
             </button>
-            <a 
-              href="https://github.com/dmnyc/plebs-vs-zombies" 
+            <a
+              href="https://github.com/dmnyc/plebs-vs-zombies"
               target="_blank"
-              class="flex items-center gap-2 text-sm px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+              class="flex items-center gap-2 text-xs px-3 py-2 bg-black/40 hover:bg-black/60 text-gray-300 border border-white/15 rounded transition-colors"
             >
               🤓 View on GitHub
             </a>
           </div>
-          <p class="text-xs text-gray-500 mt-2">
-            Contribute code, report issues, or just say thanks!
-          </p>
         </div>
       </div>
     </div>
