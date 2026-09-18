@@ -1067,7 +1067,14 @@ export default {
     observeHeaderEl() {
       if (!this.headerResizeObserver) return;
       this.headerResizeObserver.disconnect();
-      if (this.$refs.headerEl) this.headerResizeObserver.observe(this.$refs.headerEl);
+      if (this.$refs.headerEl) {
+        // Measure synchronously now rather than waiting for the observer's
+        // first (async) callback — otherwise main briefly uses the
+        // guessed default (headerHeight's initial data() value) and then
+        // visibly snaps to the real height a frame or two later.
+        this.headerHeight = this.$refs.headerEl.getBoundingClientRect().height;
+        this.headerResizeObserver.observe(this.$refs.headerEl);
+      }
     },
     setActiveView(view) {
       // Map view names to route names
@@ -1797,7 +1804,12 @@ export default {
       this.footerResizeObserver = new ResizeObserver(() => {
         if (this.$refs.footerEl) this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
       });
-      if (this.$refs.footerEl) this.footerResizeObserver.observe(this.$refs.footerEl);
+      if (this.$refs.footerEl) {
+        // Same reasoning as the header: measure now, don't wait for the
+        // observer's first async callback.
+        this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
+        this.footerResizeObserver.observe(this.$refs.footerEl);
+      }
     }
 
     // Detect NIP-07 extension; re-check when the tab regains focus
