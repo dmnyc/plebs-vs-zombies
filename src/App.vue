@@ -203,8 +203,7 @@
         <Transition name="collapse">
         <nav
           v-if="isConnected && mobileMenuOpen"
-          class="xl:hidden mt-4 pt-4 border-t border-gray-700 overflow-y-auto"
-          :style="{ maxHeight: 'calc(100vh - 6rem - ' + footerHeight + 'px)' }"
+          class="xl:hidden mt-4 pt-4 border-t border-gray-700 max-h-[calc(100vh-6rem)] overflow-y-auto"
         >
           <!-- User Info Section (Mobile) -->
           <div v-if="isConnected && userProfile" class="mb-4 p-3 bg-gray-800 rounded-lg">
@@ -348,7 +347,7 @@
 
     <main
       class="container mx-auto px-4 py-8 flex-grow"
-      :style="{ marginTop: headerHeight + 'px', marginBottom: footerHeight + 'px' }"
+      :style="{ marginTop: headerHeight + 'px' }"
     >
       <!-- Scout Mode View -->
       <div v-if="isScoutMode">
@@ -667,7 +666,7 @@
     </div>
     </Transition>
 
-    <footer ref="footerEl" class="fixed bottom-0 left-0 right-0 z-40 py-6 bg-black/30 backdrop-blur-xl border-t border-white/10">
+    <footer class="mt-auto py-6 bg-black/30 backdrop-blur-xl border-t border-white/10">
       <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
           <p class="text-gray-400 text-center lg:text-left">
@@ -967,15 +966,15 @@ export default {
       // left the sticky header pinned-but-transparent for the first 48px
       // of every scroll, letting page content show through underneath it.
       headerSolid: false,
-      // Header and footer are both fixed (so overscroll bounce doesn't
-      // drag them with the page); main's margin tracks their real
-      // rendered height via ResizeObserver instead of a guessed constant.
-      // The header's height changes as it compacts on scroll; the
-      // footer's changes with its own flex-col/lg:flex-row responsive
-      // reflow, not scroll — different trigger, same reason it needs
-      // measuring rather than a hardcoded constant.
-      headerHeight: 90,
-      footerHeight: 90
+      // Header is fixed (so overscroll bounce doesn't drag it with the
+      // page); main's margin tracks its real rendered height via
+      // ResizeObserver instead of a guessed constant, since the header's
+      // height changes as it compacts on scroll. The footer stays in
+      // normal flow: fixed positioning made it permanently eat screen
+      // space on mobile (worse than the overscroll bounce it prevented),
+      // and unlike the header it doesn't need bounce-prevention badly
+      // enough to justify that cost.
+      headerHeight: 90
     }
   },
   computed: {
@@ -1782,34 +1781,17 @@ export default {
     this.onScroll();
     window.addEventListener('scroll', this.onScroll, { passive: true });
 
-    // Header and footer are fixed and out of normal flow (so overscroll
-    // bounce doesn't drag them with the page); track their real rendered
-    // height so main's margin can keep content clear of both in every
-    // state (compact/expanded, login/in-app, mobile menu open, responsive
-    // breakpoints...).
+    // Header is fixed and out of normal flow (so overscroll bounce doesn't
+    // drag it with the page); track its real rendered height so main's
+    // margin can keep content clear of it in every state (compact/
+    // expanded, login/in-app, mobile menu open, responsive breakpoints...).
     if (window.ResizeObserver) {
       // Read via getBoundingClientRect(), not entries[0].contentRect —
-      // contentRect excludes padding/border, and the footer carries its
-      // own py-6 directly (the header's padding lives on an inner div
-      // instead, which is why this only bit the footer: contentRect
-      // silently under-reported it by the full padding amount).
+      // contentRect excludes padding/border.
       this.headerResizeObserver = new ResizeObserver(() => {
         if (this.$refs.headerEl) this.headerHeight = this.$refs.headerEl.getBoundingClientRect().height;
       });
       this.observeHeaderEl();
-
-      // Footer's ref is stable (no :key forcing remounts like the header
-      // has), so a one-time observe is enough — no watcher needed to
-      // re-attach it.
-      this.footerResizeObserver = new ResizeObserver(() => {
-        if (this.$refs.footerEl) this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
-      });
-      if (this.$refs.footerEl) {
-        // Same reasoning as the header: measure now, don't wait for the
-        // observer's first async callback.
-        this.footerHeight = this.$refs.footerEl.getBoundingClientRect().height;
-        this.footerResizeObserver.observe(this.$refs.footerEl);
-      }
     }
 
     // Detect NIP-07 extension; re-check when the tab regains focus
@@ -1858,7 +1840,6 @@ export default {
     window.removeEventListener('scroll', this.onScroll);
     window.removeEventListener('focus', this.onWindowFocus);
     if (this.headerResizeObserver) this.headerResizeObserver.disconnect();
-    if (this.footerResizeObserver) this.footerResizeObserver.disconnect();
     clearTimeout(this.eggToast.timer);
     clearTimeout(this.logoClickTimer);
   }

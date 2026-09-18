@@ -102,28 +102,6 @@
     backdrop-filter: inherit;
     pointer-events: none;
   }
-  /* Same fixes as header, mirrored for the footer: its own compositing
-     layer against iOS Safari's sticky/fixed repaint bug, and a downward
-     background extension so bottom-of-page overscroll can't reveal the
-     ambient page background below it. */
-  footer {
-    position: relative;
-    transform: translateZ(0);
-    will-change: transform;
-  }
-  footer::after {
-    content: '';
-    position: absolute;
-    bottom: -150px;
-    left: 0;
-    right: 0;
-    height: 150px;
-    background: inherit;
-    -webkit-backdrop-filter: inherit;
-    backdrop-filter: inherit;
-    pointer-events: none;
-  }
-
   /* Visible keyboard focus everywhere */
   :focus-visible {
     outline: 2px solid var(--zombie-green);
