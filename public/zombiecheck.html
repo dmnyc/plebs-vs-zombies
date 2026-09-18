@@ -25,6 +25,15 @@ Classification bands mirror the in-app ZombieCheck.vue component:
   <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Inline fallback so the page is never white while the Tailwind CDN
+       <script> below (which blocks parsing) is still loading over the
+       network — the full gradient further down repaints over this once
+       it's ready. -->
+  <style>
+    html, body { background: #0a0f0c; }
+  </style>
+  <meta name="theme-color" content="#0a0f0c" />
+
   <title>Zombie Check | Is that Nostr user a zombie?</title>
   <meta name="description" content="Check whether any Nostr user is a zombie and see how long they've been gone. No sign-in required." />
 
@@ -60,13 +69,14 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         extend: {
           colors: {
             'zombie-green': '#5cdb5c',
-            'zombie-dark': '#2c3531',
+            'zombie-dark': '#141b17',
+            'abyss': '#0a0f0c',
             'pleb-gold': '#ffd700',
             'pleb-blue': '#1e90ff',
-            'pleb-purple': '#8e30eb',
+            'pleb-purple': '#c084fc',
           },
           fontFamily: {
-            'horror': ['"Creepster"', 'cursive'],
+            'horror': ['"Creepster"', 'sans-serif'],
             'main': ['"Geist"', 'sans-serif'],
           }
         }
@@ -76,33 +86,83 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
   <style>
     body {
-      background: #111827;
+      background:
+        radial-gradient(1100px 750px at 12% 0%, rgba(92, 219, 92, 0.09), transparent 60%),
+        radial-gradient(1000px 720px at 100% 8%, rgba(142, 48, 235, 0.10), transparent 60%),
+        linear-gradient(180deg, #0c130f 0%, #0a0f0c 30%, #0a100c 100%);
+      background-repeat: no-repeat;
+      min-height: 100vh;
       color: #e5e7eb;
       font-family: 'Geist', sans-serif;
     }
+
+    ::selection {
+      background: rgba(92, 219, 92, 0.35);
+      color: #fff;
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #2b352f transparent;
+    }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      background: #2b352f;
+      border-radius: 8px;
+      border: 2px solid #0a0f0c;
+    }
+    *::-webkit-scrollbar-thumb:hover { background: #3d4a44; }
+
     h1, h2, h3 {
-      font-family: 'Creepster', cursive;
+      font-family: 'Creepster', sans-serif;
       color: #5cdb5c;
+      text-shadow: 0 0 28px rgba(92, 219, 92, 0.28), 0 2px 12px rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.01em;
     }
     .card {
-      background: #2c3531;
-      border: 1px solid #374151;
-      border-radius: 0.75rem;
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%),
+        rgba(20, 27, 23, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 24px 48px -12px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
     .btn-primary {
-      background: #5cdb5c;
-      color: #2c3531;
+      font-family: inherit;
+      background-image: linear-gradient(180deg, #6fe66f 0%, #4ec94e 100%);
+      color: #141b17;
       font-weight: 600;
-      transition: background 0.15s;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 2px 8px rgba(92, 219, 92, 0.25);
+      transition: all 0.2s ease-out;
     }
-    .btn-primary:hover { background: #4ade80; }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary:hover:not(:disabled) {
+      background-image: linear-gradient(180deg, #7dff7d 0%, #5cdb5c 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 4px 16px rgba(92, 219, 92, 0.45);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .input {
-      background: #1f2937;
-      border: 1px solid #374151;
-      border-radius: 0.5rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      transition: border-color 0.2s ease-out;
     }
-    .input:focus { outline: none; border-color: #5cdb5c; }
+    .input:focus {
+      outline: none;
+      border-color: rgba(92, 219, 92, 0.7);
+      box-shadow: 0 0 0 2px rgba(92, 219, 92, 0.35);
+    }
     .spinner {
       border: 2px solid rgba(92,219,92,0.25);
       border-top-color: #5cdb5c;
@@ -143,7 +203,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
   <main class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto card p-6">
       <div class="text-center mb-6">
-        <div class="text-4xl mb-3">🧟‍♀️🔍</div>
+        <div class="text-4xl mb-3">🧟‍♀️☑️</div>
         <h2 class="text-2xl mb-2">Zombie Check</h2>
         <p class="text-gray-400 text-sm">
           Check whether any Nostr user is a zombie and see how long they've been gone.
@@ -182,7 +242,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       </div>
 
       <!-- Result -->
-      <div id="result" class="mt-6 rounded-lg border-2 p-5 hidden">
+      <!-- Self-contained frame: designed to be screenshotted and shared as-is,
+           so it carries its own opaque background and a small brand mark
+           rather than relying on whatever's behind it on the page. Mirrors
+           src/components/ZombieCheck.vue. -->
+      <div id="result" class="mt-6 rounded-2xl border-2 p-6 hidden">
         <div class="flex items-center gap-4 mb-4">
           <img id="r-avatar" src="/default-avatar.svg" alt="" class="w-14 h-14 rounded-full object-cover bg-gray-700 flex-shrink-0" />
           <div class="min-w-0 flex-1">
@@ -193,8 +257,16 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         <div class="text-center py-2">
           <div id="r-emoji" class="text-5xl mb-2"></div>
           <div id="r-label" class="text-2xl font-bold"></div>
-          <p id="r-detail" class="text-sm text-gray-300 mt-2"></p>
+          <p id="r-detail" class="text-sm font-medium text-gray-200 mt-2"></p>
           <p id="r-lastseen" class="text-xs text-gray-500 mt-1"></p>
+          <p id="r-deletion" class="text-xs mt-2"></p>
+        </div>
+
+        <!-- Brand watermark -->
+        <div class="flex items-center justify-center mt-5 pt-4 border-t border-white/10">
+          <span class="font-horror text-zombie-green text-lg" style="text-shadow: 0 0 12px rgba(92, 219, 92, 0.35);">
+            Plebs vs. Zombies
+          </span>
         </div>
       </div>
 
@@ -329,35 +401,93 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       return heartGlyphSupported;
     }
 
+    // Category chrome (border/gradient/text classes) — mirrors
+    // CATEGORY_DISPLAY in src/components/ZombieCheck.vue exactly, so the
+    // result card looks identical whether it's rendered here or in the app.
+    const CATEGORY_STYLE = {
+      active: {
+        borderClass: 'border-zombie-green bg-gradient-to-br from-green-900/40 to-zombie-dark',
+        textClass: 'text-zombie-green',
+      },
+      infected: {
+        borderClass: 'border-yellow-500/50 bg-gradient-to-br from-yellow-900/40 to-zombie-dark',
+        textClass: 'text-yellow-300',
+      },
+      fresh: {
+        borderClass: 'border-yellow-600/50 bg-gradient-to-br from-yellow-900/40 to-zombie-dark',
+        textClass: 'text-yellow-400',
+      },
+      rotting: {
+        borderClass: 'border-orange-600/50 bg-gradient-to-br from-orange-900/40 to-zombie-dark',
+        textClass: 'text-orange-400',
+      },
+      ancient: {
+        borderClass: 'border-red-700/50 bg-gradient-to-br from-red-900/40 to-zombie-dark',
+        textClass: 'text-red-400',
+      },
+      burned: {
+        borderClass: 'border-gray-600 bg-gradient-to-br from-gray-800/60 to-zombie-dark',
+        textClass: 'text-gray-300',
+      },
+    };
+
     // Display bands — mirrors src/components/ZombieCheck.vue
     function classify(days, deleted) {
       if (deleted) {
-        return { emoji: '🔥', label: 'Burned', color: '#d1d5db', border: '#4b5563',
+        return { key: 'burned', emoji: '🔥', label: 'Burned',
           detail: 'This account has been marked as deleted.' };
       }
       if (days == null) {
-        return { emoji: '💀', label: 'Ancient Zombie', color: '#f87171', border: '#b91c1c',
+        return { key: 'ancient', emoji: '💀', label: 'Ancient Zombie',
           detail: 'No activity found on any relay we checked.' };
       }
       if (days < 60) {
-        return { emoji: '🫀', iconFallback: HEART_FALLBACK_SRC,
-          label: 'Alive!', color: '#5cdb5c', border: '#5cdb5c',
-          detail: `Active — last seen ${formatGone(days)} ago.`, beat: true };
+        return { key: 'active', emoji: '🫀', iconFallback: HEART_FALLBACK_SRC,
+          label: 'Alive!', detail: `Active — last seen ${formatGone(days)} ago.`, beat: true };
       }
       if (days < 120) {
-        return { emoji: '💛', label: 'Possible Infection', color: '#fde047', border: '#eab308',
+        return { key: 'infected', emoji: '💛', label: 'Possible Infection',
           detail: `Quiet for ${formatGone(days)}. Has anyone done a wellness visit lately?` };
       }
       if (days < 180) {
-        return { emoji: '🧟', label: 'Fresh Zombie', color: '#facc15', border: '#ca8a04',
+        return { key: 'fresh', emoji: '🧟', label: 'Fresh Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
       if (days < 365) {
-        return { emoji: '🧟‍♂️', label: 'Rotting Zombie', color: '#fb923c', border: '#ea580c',
+        return { key: 'rotting', emoji: '🧟‍♂️', label: 'Rotting Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
-      return { emoji: '💀', label: 'Ancient Zombie', color: '#f87171', border: '#b91c1c',
+      return { key: 'ancient', emoji: '💀', label: 'Ancient Zombie',
         detail: `Gone for ${formatGone(days)}.` };
+    }
+
+    // Deletion-request status — mirrors buildDeletionStatus() in
+    // src/components/ZombieCheck.vue. Tracked independently of the zombie
+    // verdict above: an account marked deleted and then reactivated still
+    // lands outside the 'burned' bucket, so without this it would show no
+    // trace of the deletion request ever having happened.
+    function buildDeletionStatus(deleted, everMarkedDeleted, firstMarkedDeletedAt) {
+      if (deleted) {
+        const deletedDays = firstMarkedDeletedAt != null
+          ? Math.floor((Date.now() / 1000 - firstMarkedDeletedAt) / 86400)
+          : null;
+        return {
+          icon: '⚠️', textClass: 'text-red-400 font-medium',
+          text: deletedDays != null
+            ? `This profile is currently flagged as deleted (marked deleted ${formatGone(deletedDays)} ago).`
+            : 'This profile is currently flagged as deleted.',
+        };
+      }
+      if (everMarkedDeleted) {
+        return {
+          icon: '🩹', textClass: 'text-yellow-400 font-medium',
+          text: 'A past deletion request was found in this profile\'s history, but it looks like it has since been restored.',
+        };
+      }
+      return {
+        icon: '☑️', textClass: 'text-gray-200 font-medium',
+        text: 'No deletion request found.',
+      };
     }
 
     function formatGone(days) {
@@ -403,6 +533,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       rlabel: document.getElementById('r-label'),
       detail: document.getElementById('r-detail'),
       lastseen: document.getElementById('r-lastseen'),
+      deletion: document.getElementById('r-deletion'),
     };
 
     function looksLikeIdentifier(value) {
@@ -542,7 +673,9 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         // along in parallel so nothing waits on them.
         const [events, profileEvents, relayListEvents] = await Promise.all([
           scanRelays(pool, RELAYS, { authors: [hex], limit: 20 }, 'default relays', settledAlive),
-          pool.querySync(RELAYS, { kinds: [0], authors: [hex], limit: 5 }, { maxWait: PROFILE_TIMEOUT }),
+          // limit: 100 (not just the latest) so deletion-request history can
+          // be reconstructed even if the account has since been resurrected.
+          pool.querySync(RELAYS, { kinds: [0], authors: [hex], limit: 100 }, { maxWait: PROFILE_TIMEOUT }),
           pool.querySync(RELAYS, { kinds: [10002], authors: [hex], limit: 1 }, { maxWait: PROFILE_TIMEOUT }),
         ]);
 
@@ -586,15 +719,36 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         const newest = sorted[0] || null;
         const days = newestDays(events);
 
+        // Track deletion-request history across ALL fetched profile events,
+        // not just the latest — mirrors getProfileMetadata() in
+        // src/services/nostrService.js. A profile that was marked deleted
+        // and later resurrected would otherwise show no trace of it.
         let profile = {};
         let deleted = false;
+        let everMarkedDeleted = false;
+        let firstMarkedDeletedAt = null;
         if (profileEvents.length) {
-          const latest = profileEvents.slice().sort((a, b) => b.created_at - a.created_at)[0];
+          const byDate = profileEvents.slice().sort((a, b) => b.created_at - a.created_at);
+          const latest = byDate[0];
           try { profile = JSON.parse(latest.content) || {}; } catch (_) { profile = {}; }
           deleted = profile.deleted === true || profile.deleted === 'true';
+
+          for (const evt of byDate) {
+            try {
+              const evtProfile = JSON.parse(evt.content) || {};
+              const wasDeleted = evtProfile.deleted === true || evtProfile.deleted === 'true';
+              if (wasDeleted) {
+                everMarkedDeleted = true;
+                if (firstMarkedDeletedAt === null || evt.created_at < firstMarkedDeletedAt) {
+                  firstMarkedDeletedAt = evt.created_at;
+                }
+              }
+            } catch (_) { /* already logged during the primary parse pass above */ }
+          }
         }
 
-        render(hex, profile, classify(days, deleted), newest);
+        const deletionStatus = buildDeletionStatus(deleted, everMarkedDeleted, firstMarkedDeletedAt);
+        render(hex, profile, classify(days, deleted), newest, deletionStatus);
       } catch (e) {
         console.error('Zombie Check failed:', e);
         els.error.textContent = e?.message || 'Failed to check this user. Try again.';
@@ -607,7 +761,9 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
     }
 
-    function render(hex, profile, verdict, newest) {
+    const RESULT_BASE_CLASSES = 'mt-6 rounded-2xl border-2 p-6';
+
+    function render(hex, profile, verdict, newest, deletionStatus) {
       const npub = nip19.npubEncode(hex);
       els.avatar.src = profile.picture || '/default-avatar.svg';
       els.avatar.onerror = () => { els.avatar.src = '/default-avatar.svg'; };
@@ -626,15 +782,18 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         els.emoji.textContent = verdict.emoji;
       }
       els.emoji.classList.toggle('animate-heartbeat', !!verdict.beat);
+
+      const style = CATEGORY_STYLE[verdict.key] || CATEGORY_STYLE.ancient;
       els.rlabel.textContent = verdict.label;
-      els.rlabel.style.color = verdict.color;
+      els.rlabel.className = `text-2xl font-bold ${style.textClass}`;
       els.detail.textContent = verdict.detail;
       els.lastseen.textContent = newest
         ? `Last activity: ${new Date(newest.created_at * 1000).toLocaleDateString()}`
         : '';
+      els.deletion.textContent = `${deletionStatus.icon} ${deletionStatus.text}`;
+      els.deletion.className = `text-xs mt-2 ${deletionStatus.textClass}`;
 
-      els.result.style.borderColor = verdict.border;
-      els.result.classList.remove('hidden');
+      els.result.className = `${RESULT_BASE_CLASSES} ${style.borderClass}`;
     }
 
     els.btn.addEventListener('click', () => check());
