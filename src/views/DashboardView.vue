@@ -649,6 +649,13 @@ export default {
       }
     },
     async checkFirstTimeUser() {
+      // Dev/QA escape hatch: ?welcome=1 always shows it, regardless of
+      // pvz-welcome-seen or existing backups/scan history.
+      if (this.$route.query.welcome) {
+        this.showWelcomeModal = true;
+        return;
+      }
+
       try {
         // Check if user has seen welcome modal
         const welcomeSeen = localStorage.getItem('pvz-welcome-seen');

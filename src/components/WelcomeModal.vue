@@ -23,7 +23,7 @@
             🎯 What are "Zombies"?
           </h3>
           <p class="text-gray-300 text-sm mb-4">
-            Nostr accounts you follow that have gone inactive — or been deleted.
+            Nostr accounts you follow that have gone inactive or been deleted.
           </p>
           <div class="grid grid-cols-2 gap-2 text-sm">
             <div class="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2.5">
@@ -74,20 +74,20 @@
             ⚠️ Create a Backup First
           </h3>
           <p class="text-gray-300 text-sm mb-5">
-            Strongly recommended before purging — lets you restore your follows if anything goes wrong.
+            Strongly recommended before purging, so you can restore your follows if anything goes wrong.
           </p>
           <div class="flex flex-col sm:flex-row gap-3">
             <button
               @click="goToBackups"
-              class="btn-primary flex-1 inline-flex items-center justify-center gap-2"
+              class="btn-primary flex-1 inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <span>💾</span> Create My First Backup
+              <span>💾</span><span>Create Backup</span>
             </button>
             <button
               @click="skipBackup"
-              class="btn-tertiary flex-1 inline-flex items-center justify-center gap-2"
+              class="btn-tertiary flex-1 inline-flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <span>⏭️</span> Skip for Now
+              <span>⏭️</span><span>Skip for Now</span>
             </button>
           </div>
         </div>
