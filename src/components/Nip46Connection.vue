@@ -438,6 +438,9 @@ export default {
           this.error = 'No signer responded within 2 minutes. If you scanned with Amber, its nostrconnect flow often fails silently — try the bunker flow instead: create the connection inside Amber, copy the bunker:// URL it generates, and paste it in the Use Bunker URL tab.';
         } else if (error.message?.includes('subscription closed')) {
           this.error = 'The connection to the relay dropped before your signer responded. If you switched apps on the same device to approve (e.g. Clave on iPhone), the browser tab gets suspended mid-handshake — paste a bunker:// URL instead for same-device pairing.';
+        } else if (error.nip46Actionable) {
+          // Already a self-explanatory message — prefixing it buries the advice.
+          this.error = error.message;
         } else {
           this.error = 'Connection failed: ' + error.message;
         }
