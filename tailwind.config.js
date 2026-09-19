@@ -8,6 +8,9 @@ export default {
     extend: {
       colors: {
         'zombie-green': '#5cdb5c',
+        // Desaturated green for labels that should read as secondary next to
+        // zombie-green rather than compete with it.
+        'zombie-moss': '#617f61',
         'zombie-dark': '#141b17',
         'abyss': '#0a0f0c',
         'pleb-gold': '#ffd700',

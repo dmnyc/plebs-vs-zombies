@@ -369,7 +369,7 @@
               <div class="absolute inset-0 -m-10 rounded-full bg-zombie-green/15 blur-3xl" aria-hidden="true"></div>
               <div class="relative text-7xl drop-shadow-[0_0_24px_rgba(92,219,92,0.5)]">🧟‍♂️</div>
             </div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-[#617f61] mb-2">Nostr Follow List Manager</p>
+            <p class="text-xs font-semibold uppercase tracking-widest text-zombie-moss mb-2">Nostr Follow List Manager</p>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
             <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
             <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
