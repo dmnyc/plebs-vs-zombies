@@ -1,4 +1,8 @@
-import NDK, { NDKEvent, NDKNip07Signer } from "@nostr-dev-kit/ndk";
+import NDK, {
+  NDKEvent,
+  NDKNip07Signer,
+  NDKRelaySet,
+} from "@nostr-dev-kit/ndk";
 import { nip19, finalizeEvent, SimplePool } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
@@ -1061,7 +1065,7 @@ class NostrService {
    * @returns {Promise<Array>} events sorted newest-first, capped at `limit`
    */
   async fetchLivenessEvents(pubkey, limit = 10, options = {}) {
-    const { ndk = this.ndk, timeoutMs = 10000 } = options;
+    const { ndk = this.ndk, timeoutMs = 10000, onRelayProgress = null } = options;
 
     const toPlain = (events) =>
       Array.from(events)
@@ -1074,13 +1078,73 @@ class NostrService {
           kind: e.kind,
         }));
 
-    const run = async (filter) => {
-      const events = await Promise.race([
-        ndk.fetchEvents(filter, { closeOnEose: true }),
-        new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-      ]);
-      return events && events.size > 0 ? toPlain(events) : [];
-    };
+    const relaySet = this.relaySetFor(ndk);
+    const relayCount =
+      relaySet?.relays?.size || ndk?.pool?.relays?.size || 0;
+
+    // Subscribe rather than fetchEvents: fetchEvents overrides onEvent/onEose
+    // with its own, so it can only report a result at the very end. A deep
+    // lookup can run for ten seconds, and a UI that says nothing for that long
+    // looks broken — so collect the events here and report each relay as it
+    // answers, the way the standalone /zombiecheck page does.
+    const run = (filter) =>
+      new Promise((resolve) => {
+        const collected = new Map();
+        const namedSoFar = new Set();
+        let sub = null;
+        let ticker = null;
+        let done = false;
+
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          clearInterval(ticker);
+          try {
+            sub?.stop();
+          } catch (_) {}
+          resolve(collected.size > 0 ? toPlain(collected.values()) : []);
+        };
+
+        const timer = setTimeout(finish, timeoutMs);
+
+        // eosesSeen counts relays that answered at all, including the ones with
+        // nothing to say — onEvent alone would only ever see the relays that
+        // had a match, which is the number least useful to someone waiting.
+        let lastReported = -1;
+        const tick = () => {
+          if (done || !onRelayProgress) return;
+          const seen = Array.from(sub?.eosesSeen || []);
+          // Key on the displayed form: the pool can hold the same relay under
+          // both `wss://host` and `wss://host/`, which would otherwise get
+          // announced twice under one name.
+          const fresh = seen
+            .map((relay) => relay?.url?.replace(/\/$/, ""))
+            .filter((url) => url && !namedSoFar.has(url));
+          // Nothing moved since the last tick — repeating the line would just
+          // make a stalled lookup look like a stuttering one.
+          if (fresh.length === 0 && seen.length === lastReported) return;
+          fresh.forEach((url) => namedSoFar.add(url));
+          lastReported = seen.length;
+          onRelayProgress({
+            answered: seen.length,
+            total: relayCount,
+            latest: fresh[fresh.length - 1] || null,
+            events: Array.from(collected.values()),
+          });
+        };
+
+        sub = ndk.subscribe(filter, {
+          closeOnEose: true,
+          relaySet,
+          onEvent: (event) => {
+            if (event?.id) collected.set(event.id, event);
+          },
+          onEose: finish,
+        });
+
+        if (onRelayProgress) ticker = setInterval(tick, 250);
+      });
 
     const base = { authors: [pubkey], limit: Math.max(limit, 10) };
 
@@ -1118,11 +1182,42 @@ class NostrService {
       return Math.floor((Date.now() / 1000 - newest) / 86400);
     };
 
+    const describeNewest = (events) => {
+      if (!events.length) return "nothing yet";
+      const newest = Math.max(...events.map((e) => e.created_at));
+      const days = Math.floor((Date.now() / 1000 - newest) / 86400);
+      if (days < 1) return "newest today";
+      if (days < 30) return `newest ${days} day${days === 1 ? "" : "s"} ago`;
+      if (days < 365) {
+        const months = Math.floor(days / 30);
+        return `newest ${months} month${months === 1 ? "" : "s"} ago`;
+      }
+      const years = Math.floor(days / 365);
+      return `newest ${years} year${years === 1 ? "" : "s"} ago`;
+    };
+
+    // Name each relay as it answers. A silent UI during a ten-second lookup
+    // reads as broken, and the running count is what makes a "nothing found"
+    // verdict checkable afterwards.
+    const relayProgress =
+      (label) =>
+      ({ answered, total, latest, events }) => {
+        const where = latest
+          ? ` (${latest.replace(/^wss?:\/\//, "").replace(/\/$/, "")})`
+          : "";
+        report(
+          `Searching ${label} — ${answered}/${total} answered${where} · ` +
+            `${events.length} events, ${describeNewest(events)}`,
+        );
+      };
+
     // Pass 1: default relays. The subject's relay list rides along in parallel
     // so we never wait on it serially.
     report(`Searching ${this.relays.length} default relays…`);
     const [defaultEvents, relayList] = await Promise.all([
-      this.fetchLivenessEvents(pubkey, limit).catch((error) => {
+      this.fetchLivenessEvents(pubkey, limit, {
+        onRelayProgress: relayProgress("default relays"),
+      }).catch((error) => {
         console.warn("⚠️ Default-relay activity lookup failed:", error.message);
         return [];
       }),
@@ -1165,11 +1260,19 @@ class NostrService {
       try {
         // No signer: this is a read-only lookup that must work for logged-out
         // visitors on the homepage without ever prompting to sign.
-        userNdk = new NDK({ explicitRelayUrls: extraRelays });
+        // Outbox model off: we asked for these relays specifically, and it
+        // would otherwise re-target the query and open a second pool.
+        userNdk = new NDK({
+          explicitRelayUrls: extraRelays,
+          enableOutboxModel: false,
+        });
         await userNdk.connect(3000);
         const events = await this.fetchLivenessEvents(pubkey, limit, {
           ndk: userNdk,
           timeoutMs: 6000,
+          onRelayProgress: relayProgress(
+            `${pubkey.substring(0, 8)}…'s own relays`,
+          ),
         });
         if (events.length > 0) {
           results.push(...events);
@@ -1178,8 +1281,13 @@ class NostrService {
       } catch (error) {
         console.warn(`⚠️ User-relay activity lookup failed: ${error.message}`);
       } finally {
+        // NDKPool has no close() in 2.x — calling it threw into the empty
+        // catch below and left every socket of this throwaway pool open,
+        // reconnecting for the life of the tab. Disconnect the relays.
         try {
-          userNdk?.pool?.close();
+          for (const relay of userNdk?.pool?.relays?.values() || []) {
+            relay.disconnect();
+          }
         } catch (_) {}
       }
     }
@@ -1198,6 +1306,36 @@ class NostrService {
       relaysQueried: [...this.relays, ...extraRelays],
       reachable: reachable || merged.length > 0,
     };
+  }
+
+  /**
+   * Build an explicit relay set for a read query.
+   *
+   * Called without one, `fetchEvents` lets NDK choose the relays itself: for an
+   * authored filter it asks roughly two that its outbox tracker associates with
+   * the author, and only blankets the pool while the tracker still knows
+   * nothing about them. So the first lookup on a pubkey queries everything and
+   * succeeds, and every lookup after it queries a narrow guess that, for an
+   * account whose events live elsewhere, returns nothing at all. That surfaces
+   * as "No activity found on any relay we checked" for an account that is
+   * plainly alive — the false positive this app treats as its worst failure.
+   *
+   * Liveness queries must therefore name their relays explicitly. Defaults to
+   * every relay in the pool, which includes any NDK attached beyond our own.
+   */
+  relaySetFor(ndk = this.ndk, urls = null) {
+    const list = Array.from(
+      new Set(urls || Array.from(ndk?.pool?.relays?.keys() || [])),
+    ).filter(Boolean);
+    // No relays to name: fall back to NDK's own selection rather than
+    // handing it an empty set, which would match nothing at all.
+    if (list.length === 0) return undefined;
+    try {
+      return NDKRelaySet.fromRelayUrls(list, ndk);
+    } catch (error) {
+      console.warn(`⚠️ Could not build relay set: ${error.message}`);
+      return undefined;
+    }
   }
 
   /**
@@ -1280,7 +1418,7 @@ class NostrService {
           );
 
           events = await Promise.race([
-            this.ndk.fetchEvents(filter),
+            this.ndk.fetchEvents(filter, {}, this.relaySetFor()),
             timeoutPromise,
           ]);
 
@@ -1448,7 +1586,7 @@ class NostrService {
         };
 
         const events = await Promise.race([
-          this.ndk.fetchEvents(individualFilter),
+          this.ndk.fetchEvents(individualFilter, {}, this.relaySetFor()),
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error("Individual search timeout")),
@@ -1507,7 +1645,7 @@ class NostrService {
           };
 
           const events = await Promise.race([
-            this.ndk.fetchEvents(basicFilter),
+            this.ndk.fetchEvents(basicFilter, {}, this.relaySetFor()),
             new Promise((_, reject) =>
               setTimeout(
                 () => reject(new Error("Basic search timeout")),
@@ -3042,13 +3180,24 @@ class NostrService {
 
     // Query 1: User-specific relays (if different from defaults)
     if (hasUserSpecificRelays) {
+      // Outbox model off: these relays were chosen deliberately, and leaving
+      // it on lets NDK re-target the query away from them.
       const userRelayNDK = new (await import("@nostr-dev-kit/ndk")).default({
         explicitRelayUrls: userSpecificRelays,
+        enableOutboxModel: false,
       });
 
       queries.push(
         Promise.race([
-          userRelayNDK.connect().then(() => userRelayNDK.fetchEvents(filter)),
+          userRelayNDK
+            .connect()
+            .then(() =>
+              userRelayNDK.fetchEvents(
+                filter,
+                {},
+                this.relaySetFor(userRelayNDK, userSpecificRelays),
+              ),
+            ),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error("User relay timeout")), 8000),
           ),
@@ -3065,7 +3214,7 @@ class NostrService {
     // Query 2: Default relays (always query for comprehensive coverage)
     queries.push(
       Promise.race([
-        this.ndk.fetchEvents(filter),
+        this.ndk.fetchEvents(filter, {}, this.relaySetFor()),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Default relay timeout")), 8000),
         ),
