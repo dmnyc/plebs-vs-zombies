@@ -37,7 +37,7 @@ const routes = [
     path: '/recover',
     name: 'Recover',
     component: BackupsView,
-    meta: { title: 'Follow List Recovery - Plebs vs Zombies', defaultTab: 'recover' }
+    meta: { title: 'Data Recovery - Plebs vs Zombies', defaultTab: 'recover' }
   },
   {
     path: '/resurrector',

@@ -1,6 +1,7 @@
 import localforage from 'localforage';
 import nostrService from './nostrService';
 import { format } from 'date-fns';
+import { markDeliberateEdit } from '../lib/lazarus/deliberate.js';
 
 // Configure localforage for backups
 localforage.config({
@@ -373,7 +374,12 @@ class BackupService {
       if (publishResults.successful === 0) {
         throw new Error('Failed to publish to any relays. Check your relay connections.');
       }
-      
+
+      // The restored backup is now the list the next purge must build on, and
+      // restoring a smaller one is a cut the user chose, not a clobber.
+      nostrService.rememberOwnEvent(signedEvent);
+      markDeliberateEdit(currentPubkey, signedEvent.id);
+
       // Verify the restoration by fetching the updated follow list
       console.log('🔍 Verifying restoration...');
       

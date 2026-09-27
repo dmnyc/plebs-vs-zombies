@@ -45,7 +45,7 @@
             <div>
               <h3 class="text-lg font-bold text-blue-200 mb-1">Follow list get eaten?</h3>
               <p class="text-sm text-blue-300">
-                If another client wiped or shrank your follows, the Recovery tool can scan your relays for older versions and republish a prior one. No backup required.
+                If another client wiped or shrank your follows, the Recovery tool can scan relays for older versions and restore one. It recovers mutes, your profile, bookmarks, and relay lists too. No backup required.
               </p>
             </div>
           </div>
@@ -75,8 +75,8 @@
       role="tabpanel"
       aria-labelledby="tab-recover"
     >
-      <!-- Follow List Recovery (new feature) -->
-      <FollowRecovery class="mb-6" />
+      <!-- Recover from relay history (Lazarus) -->
+      <LazarusRecovery class="mb-6" @backups-changed="refreshBackupHistory" />
 
       <!-- External + Encrypted Relay Backup cards -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -241,8 +241,8 @@
 <script>
 import BackupControls from '../components/BackupControls.vue';
 import BackupHistory from '../components/BackupHistory.vue';
-import FollowRecovery from '../components/FollowRecovery.vue';
 import GlideTabs from '../components/GlideTabs.vue';
+import LazarusRecovery from '../components/lazarus/LazarusRecovery.vue';
 import nostrService from '../services/nostrService';
 
 export default {
@@ -250,8 +250,8 @@ export default {
   components: {
     BackupControls,
     BackupHistory,
-    FollowRecovery,
-    GlideTabs
+    GlideTabs,
+    LazarusRecovery
   },
   data() {
     return {
@@ -355,6 +355,10 @@ export default {
     },
     handleBackupRestored(result) {
       console.log('📢 Backup restored in parent:', result);
+    },
+    // A restore from relay history snapshots the replaced follow list first.
+    refreshBackupHistory() {
+      this.$refs.backupHistory?.loadBackups(true);
     }
   },
   mounted() {
