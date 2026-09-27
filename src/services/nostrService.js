@@ -3,9 +3,10 @@ import NDK, {
   NDKNip07Signer,
   NDKRelaySet,
 } from "@nostr-dev-kit/ndk";
-import { nip19, finalizeEvent, SimplePool } from "nostr-tools";
+import { nip19, nip04, nip44, finalizeEvent, SimplePool } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
+import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
 // Liveness detection: any event a user signs proves their key is still in use.
 // A lurker who only reacts, zaps, or edits their mute list is alive, not a
@@ -46,6 +47,9 @@ class NostrService {
     this.pubkey = null;
     this.userProfile = null;
     this.follows = new Map();
+    // Newest of the user's own replaceable events this session has published
+    // or restored, per kind. See rememberOwnEvent().
+    this.ownEvents = new Map();
     this.relays = [
       "wss://relay.damus.io",
       "wss://nos.lol",
@@ -217,6 +221,19 @@ class NostrService {
       }
       if (algorithm === 'nip04') {
         return await this.nip46Service.nip04Decrypt(pubkey, ciphertext);
+      }
+      throw new Error(`Unknown encryption algorithm: ${algorithm}`);
+    }
+
+    // A local key decrypts directly. Without this branch every nsec session
+    // fell through to "No signing method configured".
+    if (this.signingMethod === 'nsec') {
+      if (!this.secretKey) throw new Error('No secret key available');
+      if (algorithm === 'nip44') {
+        return nip44.decrypt(ciphertext, nip44.getConversationKey(this.secretKey, pubkey));
+      }
+      if (algorithm === 'nip04') {
+        return nip04.decrypt(this.secretKey, pubkey, ciphertext);
       }
       throw new Error(`Unknown encryption algorithm: ${algorithm}`);
     }
@@ -993,18 +1010,18 @@ class NostrService {
     };
 
     console.log("Fetching follow list...");
-    const events = await this.ndk.fetchEvents(followListFilter);
+    const events = await this.ndk.fetchEvents(
+      followListFilter,
+      {},
+      this.relaySetFor(),
+    );
 
-    if (!events || events.size === 0) {
+    const mostRecentEvent = this.newestWithOwnCopy(3, events);
+    if (!mostRecentEvent) {
       console.log("No follow list events found");
       return [];
     }
-
-    // Convert to array and sort by created_at to get the most recent
-    const eventArray = Array.from(events).sort(
-      (a, b) => b.created_at - a.created_at,
-    );
-    const mostRecentEvent = eventArray[0];
+    const eventArray = Array.from(events || []);
 
     console.log(
       `Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`,
@@ -1336,6 +1353,46 @@ class NostrService {
       console.warn(`⚠️ Could not build relay set: ${error.message}`);
       return undefined;
     }
+  }
+
+  /**
+   * Remember one of the user's own replaceable events as the local copy.
+   *
+   * Relays keep serving an older version for a while after a newer one is
+   * published, and a read that reaches only those relays returns the older
+   * one. For the follow list that is how a clobber comes back: restore an old
+   * list, then run a purge whose read happens to land on stale relays, and the
+   * purge rebuilds from the clobbered list and publishes it again, dated newer
+   * than the restore. The Lazarus spec requires a client to keep its own copy
+   * current for exactly this reason. Reads merge this copy in and keep
+   * whichever version is newest.
+   */
+  rememberOwnEvent(event) {
+    if (!event || !this.pubkey || event.pubkey !== this.pubkey) return;
+    const known = this.ownEvents.get(event.kind);
+    // Newer by NIP-01's order: later created_at, then the lowest id.
+    if (
+      !known ||
+      event.created_at > known.created_at ||
+      (event.created_at === known.created_at && event.id < known.id)
+    ) {
+      this.ownEvents.set(event.kind, event);
+    }
+  }
+
+  /**
+   * The newest of `events` and the remembered copy of `kind`, same-second ties
+   * going to the lowest id as relays apply them (NIP-01).
+   */
+  newestWithOwnCopy(kind, events) {
+    // Checked here rather than trusted from logout(): an account can change
+    // without passing through it, and another account's follow list merged
+    // into this one's purge would publish their follows as ours.
+    const known = this.ownEvents.get(kind);
+    const own = known && known.pubkey === this.pubkey ? known : null;
+    return [...(own ? [own] : []), ...Array.from(events || [])].sort(
+      (a, b) => b.created_at - a.created_at || (a.id < b.id ? -1 : 1),
+    )[0];
   }
 
   /**
@@ -1721,17 +1778,19 @@ class NostrService {
       limit: 5,
     };
 
-    const events = await this.ndk.fetchEvents(followListFilter);
+    const events = await this.ndk.fetchEvents(
+      followListFilter,
+      {},
+      this.relaySetFor(),
+    );
 
-    if (!events || events.size === 0) {
+    // The newest version found, or this session's own copy if that is newer:
+    // a stale relay must not hand the purge a list it has since replaced.
+    const mostRecentEvent = this.newestWithOwnCopy(3, events);
+    if (!mostRecentEvent) {
       throw new Error("No follow list events found");
     }
-
-    // Get the most recent contacts event
-    const eventArray = Array.from(events).sort(
-      (a, b) => b.created_at - a.created_at,
-    );
-    const mostRecentEvent = eventArray[0];
+    const eventArray = Array.from(events || []);
 
     console.log(
       `Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`,
@@ -1811,10 +1870,16 @@ class NostrService {
 
     console.log("Preserved all non-user tags and filtered user follows only");
 
-    // Create the event with preserved content and all tags
+    // Create the event with preserved content and all tags. Dated after the
+    // version it replaces even when that one is from the future: a clobbering
+    // client with a skewed clock would otherwise outrank this edit, and relays
+    // would keep serving the clobber as if the purge never happened.
     const event = {
       kind: 3,
-      created_at: Math.floor(Date.now() / 1000),
+      created_at: Math.max(
+        Math.floor(Date.now() / 1000),
+        mostRecentEvent.created_at + 1,
+      ),
       tags: tags,
       content: mostRecentEvent.content || "",
     };
@@ -1872,6 +1937,11 @@ class NostrService {
           "Failed to publish to any relays. Please check your internet connection.",
         );
       }
+
+      this.rememberOwnEvent(signedEvent);
+      // A purge is a cut the user asked for. Recovery would otherwise read it
+      // as a clobber and recommend re-following everyone it removed.
+      markDeliberateEdit(this.pubkey, signedEvent.id);
 
       return {
         success: true,
@@ -2032,6 +2102,7 @@ class NostrService {
     this.pubkey = null;
     this.userProfile = null;
     this.follows.clear();
+    this.ownEvents.clear();
     this.userRelayList = null;
     this.followsRelayLists.clear();
 

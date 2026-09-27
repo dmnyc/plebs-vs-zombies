@@ -16,8 +16,8 @@ Plebs vs. Zombies helps you identify and manage these dormant accounts to mainta
 - **Customizable Time Thresholds**: Set your own definition of "dormant" (90, 180, 365 days). Accounts that marked themselves deleted are classified separately as "burned"
 - **Batch Processing**: Purge zombies in manageable batches
 - **Immunity List**: Mark accounts that should never be flagged, no matter how quiet they get
-- **Follow List Backup**: Safely back up your existing follow list before making changes
-- **Follow List Recovery**: Restore a previous follow list from a backup if a purge went further than you wanted
+- **Follow List Backup**: Safely back up your existing follow list before making changes, and restore a backup if a purge went further than you wanted
+- **Recover from Relay History**: Scan relays for older versions of your follow list, mute list, profile, bookmarks, NIP-4e keys, and relay lists, then restore one after reviewing exactly what changes. No backup needed. Follows the [Lazarus](https://github.com/dmnyc/lazarus) recovery spec: your current version is confirmed on your write relays first, and nothing is published without your explicit click. Your zombie purges are remembered, so a purge is never mistaken for a clobber. Signed versions can also be downloaded as JSON and imported later
 - **Export Zombie Lists**: Export your zombie lists in JSON or TXT format for sharing or record-keeping
 - **Statistics**: Track your zombie hunting progress and bandwidth savings
 - **Zombie Check**: Look up any single account to see whether it is a zombie, how long it has been gone, and whether it has an outstanding deletion request. Results render as a self-contained card meant to be screenshotted and shared
