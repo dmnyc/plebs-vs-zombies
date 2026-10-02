@@ -338,7 +338,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
   <script type="module">
     // Keep in step with the nostr-tools version in package.json.
-    import { SimplePool, nip19, finalizeEvent, generateSecretKey } from 'https://esm.sh/nostr-tools@2.25.2';
+    import { SimplePool, nip19, finalizeEvent, generateSecretKey, verifyEvent } from 'https://esm.sh/nostr-tools@2.25.2';
     // Renders the result card to a PNG for sharing (see the share section at
     // the bottom of this script).
     import html2canvas from 'https://esm.sh/html2canvas@1.4.1';
@@ -375,7 +375,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     ];
 
     const RELAY_TIMEOUT = 4000;   // per relay — one slow relay must not stall the check
-    const PROFILE_TIMEOUT = 2500; // profile/relay-list lookups aren't verdict-critical
+    // Profile lookups ride along with the activity scan, which usually runs
+    // longer — the wider window catches profiles that only slow relays still
+    // hold. Relays prune inactive accounts' events, and inactive accounts are
+    // exactly what this page checks, so profiles routinely live in few places.
+    const PROFILE_TIMEOUT = 6000;
     const ALIVE_DAYS = 60;        // inside this band the verdict can't change, so stop early
 
     function newestDays(events) {
@@ -668,6 +672,44 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       } catch (_) { return null; }
     }
 
+    // Profile fallback via the Primal cache. Relays prune events from
+    // inactive accounts — the very accounts this page checks — so profiles
+    // sometimes survive only there. Primal's user_search matches the bech32
+    // npub string for the profiles it holds (the raw hex does not match), so
+    // we search by npub and keep only validly-signed kind-0 events authored
+    // by the target. Same endpoint failover as searchUsers above.
+    function fetchPrimalProfileEvents(hex, limit = 8) {
+      const npub = nip19.npubEncode(hex);
+      return new Promise((resolve) => {
+        let endpointIndex = 0;
+        const results = [];
+
+        function tryEndpoint() {
+          if (endpointIndex >= PRIMAL_ENDPOINTS.length) { resolve(results); return; }
+          const ws = new WebSocket(PRIMAL_ENDPOINTS[endpointIndex++]);
+          const reqId = `zcp_${Date.now()}_${endpointIndex}`;
+          const timeout = setTimeout(() => { try { ws.close(); } catch (_) {} settle(); }, 5000);
+
+          function settle() {
+            clearTimeout(timeout);
+            try { ws.close(); } catch (_) {}
+            resolve(results);
+          }
+
+          ws.onopen = () => ws.send(JSON.stringify(['REQ', reqId, { cache: ['user_search', { query: npub, limit }] }]));
+          ws.onmessage = (ev) => {
+            try {
+              const msg = JSON.parse(ev.data);
+              if (msg[0] === 'EVENT' && msg[2] && msg[2].kind === 0 && msg[2].pubkey === hex) results.push(msg[2]);
+              if (msg[0] === 'EOSE') settle();
+            } catch (_) {}
+          };
+          ws.onerror = () => { clearTimeout(timeout); tryEndpoint(); };
+        }
+        tryEndpoint();
+      });
+    }
+
     let searchSeq = 0;
     function renderSearchResults(profiles) {
       els.results.innerHTML = '';
@@ -753,6 +795,20 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           pool.querySync(RELAYS, { kinds: [10002], authors: [hex], limit: 1 }, { maxWait: PROFILE_TIMEOUT }),
         ]);
 
+        // No relay returned a profile — relays prune inactive accounts, and
+        // Primal's cache often still holds what they dropped. Anything valid
+        // from there joins the profile history below (including deletion
+        // flags, so a cached "deleted" profile is still reported).
+        if (!profileEvents.length) {
+          els.progress.textContent = 'Checking profile cache…';
+          const cached = await fetchPrimalProfileEvents(hex);
+          for (const e of cached) {
+            try {
+              if (verifyEvent(e)) profileEvents.push(e);
+            } catch (_) {}
+          }
+        }
+
         // Escalate only when the verdict could still change. If we already
         // found activity inside the "Alive" band, no additional relay or kind
         // list can make them more alive — so stop here instead of spending
@@ -786,6 +842,15 @@ Classification bands mirror the in-app ZombieCheck.vue component:
               'their own relays',
             );
             events.push(...own);
+            // Their home relays may also be the only ones still holding
+            // their profile.
+            if (!profileEvents.length) {
+              const ownProfiles = await pool.querySync(
+                extraRelays, { kinds: [0], authors: [hex], limit: 5 },
+                { maxWait: PROFILE_TIMEOUT },
+              );
+              profileEvents.push(...ownProfiles);
+            }
           }
         }
 

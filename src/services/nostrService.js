@@ -3,9 +3,10 @@ import NDK, {
   NDKNip07Signer,
   NDKRelaySet,
 } from "@nostr-dev-kit/ndk";
-import { nip19, nip04, nip44, finalizeEvent, SimplePool } from "nostr-tools";
+import { nip19, nip04, nip44, finalizeEvent, SimplePool, verifyEvent } from "nostr-tools";
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
+import primalCacheService from "./primalCacheService.js";
 import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
 // Liveness detection: any event a user signs proves their key is still in use.
@@ -843,6 +844,45 @@ class NostrService {
         // Sort events by timestamp for each user
         for (const [pubkey, userEvents] of profileEventsByUser) {
           userEvents.sort((a, b) => b.created_at - a.created_at); // Most recent first
+        }
+
+        // Relays prune events from inactive accounts — the very accounts this
+        // tool inspects — so profiles sometimes survive only in caches. Ask
+        // Primal for anyone the relays came up empty on. Its user_search
+        // matches on the pubkey string for the profiles it holds; keep only
+        // validly-signed kind-0 events authored by the target. NDK events are
+        // unwrapped to their raw form for signature verification.
+        const missingProfiles = batch.filter(
+          (pubkey) => !profileEventsByUser.has(pubkey),
+        );
+        if (missingProfiles.length) {
+          const cached = await Promise.allSettled(
+            missingProfiles.map((pubkey) =>
+              // Primal's user_search matches the bech32 npub string, not the
+              // raw hex, so search by npub and filter back down to the key.
+              primalCacheService.searchUsers(this.hexToNpub(pubkey), 10),
+            ),
+          );
+          cached.forEach((settled, i) => {
+            if (settled.status !== "fulfilled" || !Array.isArray(settled.value)) {
+              return;
+            }
+            const pubkey = missingProfiles[i];
+            const owned = (settled.value || []).filter(
+              (e) => e && e.kind === 0 && e.pubkey === pubkey,
+            );
+            const valid = [];
+            for (const e of owned) {
+              try {
+                const raw = typeof e.rawEvent === "function" ? e.rawEvent() : e;
+                if (verifyEvent(raw)) valid.push(raw);
+              } catch (_) {}
+            }
+            if (valid.length) {
+              valid.sort((a, b) => b.created_at - a.created_at);
+              profileEventsByUser.set(pubkey, valid);
+            }
+          });
         }
 
         // Parse profile data with deletion timeline tracking
