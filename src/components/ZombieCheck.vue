@@ -39,10 +39,12 @@
     <div v-if="result" class="mt-6">
       <!-- Self-contained frame: designed to be screenshotted and shared as-is,
            so it carries its own opaque background and a small brand mark
-           rather than relying on whatever's behind it on the page. The
-           "Check another user" button below is deliberately outside this
-           frame, so a screenshot of just this card doesn't include it. -->
+           rather than relying on whatever's behind it on the page. The share
+           actions and "Check another user" button below are deliberately
+           outside this frame, so a screenshot of just this card — or the
+           html2canvas capture of it — doesn't include them. -->
       <div
+        ref="resultCard"
         class="rounded-2xl border-2 p-6"
         :class="result.borderClass"
       >
@@ -94,6 +96,69 @@
         </div>
       </div>
 
+      <!-- Share actions: capture the card above as an image, upload it to
+           Blossom, and hand the user a finished note / download / link.
+           Share as Note is for signed-in users; everyone else gets the
+           copy-and-post-yourself path. -->
+      <div class="mt-4 grid grid-cols-2 gap-2">
+        <button
+          @click="shareAsNote"
+          :disabled="shareBusy || !canPublishNotes"
+          class="btn-primary rounded-lg px-4 py-2 flex items-center justify-center gap-2"
+          :class="{ 'opacity-50 cursor-not-allowed': shareBusy || !canPublishNotes }"
+        >
+          <span v-if="shareBusy" class="spinner-sm inline-block"></span>
+          <span>{{ shareBusy ? 'Sharing…' : '📤 Share as Note' }}</span>
+        </button>
+        <button
+          @click="copyNoteText"
+          :disabled="shareBusy"
+          class="rounded-lg px-4 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors"
+          :class="{ 'opacity-50 cursor-not-allowed': shareBusy }"
+        >
+          {{ copiedNoteText ? '✅ Copied!' : '📋 Copy Note Text' }}
+        </button>
+        <button
+          @click="downloadImage"
+          :disabled="shareBusy"
+          class="rounded-lg px-4 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors"
+          :class="{ 'opacity-50 cursor-not-allowed': shareBusy }"
+        >
+          ⬇️ Download Image
+        </button>
+        <button
+          @click="copyImageLink"
+          :disabled="shareBusy"
+          class="rounded-lg px-4 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors"
+          :class="{ 'opacity-50 cursor-not-allowed': shareBusy }"
+        >
+          {{ copiedImageLink ? '✅ Link Copied!' : '🔗 Copy Image Link' }}
+        </button>
+      </div>
+      <p
+        v-if="!canPublishNotes"
+        class="mt-2 text-xs text-center text-gray-500"
+      >
+        Publishing needs a Nostr signer (NIP-07). Copy the note text and
+        attach the downloaded PNG to post it yourself.
+      </p>
+      <p
+        v-if="shareStatus"
+        class="mt-2 text-xs text-center"
+        :class="shareStatusKind === 'error' ? 'text-red-400' : 'text-green-400'"
+      >
+        {{ shareStatus }}
+      </p>
+      <a
+        v-if="publishedNoteId"
+        :href="`https://jumble.social/notes/${publishedNoteId}`"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="block mt-2 text-xs text-center text-zombie-green hover:text-green-300 underline"
+      >
+        View your note ↗
+      </a>
+
       <button
         @click="reset"
         class="btn-secondary w-full mt-4 text-sm"
@@ -101,13 +166,52 @@
         Check another user
       </button>
     </div>
+
+    <!-- Off-screen share frame: the PVZ-branded outer shell that only exists
+         for the shared PNG (html2canvas can't capture display:none elements,
+         so it parks at -10000px). The visible result card above stays as-is;
+         at capture time the card is cloned into the verdict slot. Mirrors
+         #share-frame in public/zombiecheck.html. -->
+    <div
+      aria-hidden="true"
+      style="position: absolute; top: -10000px; left: -10000px; width: 640px;"
+    >
+      <div
+        ref="shareFrameCard"
+        class="rounded-3xl overflow-hidden"
+        style="border: 1px solid rgba(92, 219, 92, 0.22); background: radial-gradient(600px 420px at 12% 0%, rgba(92, 219, 92, 0.10), transparent 60%), radial-gradient(560px 400px at 100% 10%, rgba(142, 48, 235, 0.12), transparent 60%), linear-gradient(180deg, #0d1512 0%, #0a0f0c 100%);"
+      >
+        <div class="flex items-center justify-center gap-3 px-8 pt-7 pb-3">
+          <img src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0" />
+          <!-- top: -17px — html2canvas places Creepster text ~17px below the
+               flex centerline (browser centers it correctly; measured from
+               the captured PNG). The frame is capture-only, so correct it. -->
+          <span
+            class="font-horror text-zombie-green text-4xl leading-none"
+            style="position: relative; top: -17px; text-shadow: 0 0 28px rgba(92, 219, 92, 0.35), 0 2px 12px rgba(0, 0, 0, 0.6); letter-spacing: 0.01em;"
+          >Plebs vs. Zombies</span>
+        </div>
+        <div ref="shareVerdict" class="px-8"></div>
+        <div class="px-8 pb-6 pt-5 text-center">
+          <span class="text-sm text-gray-500 font-mono">plebsvszombies.cc/zombiecheck</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { format } from 'date-fns';
+import html2canvas from 'html2canvas';
+import { nip19 } from 'nostr-tools';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
+import {
+  uploadImageToBlossom,
+  canvasToBlob,
+  loadImageAsBase64,
+} from '../services/imageUpload';
+import { buildShareNote } from '../lib/sharing/noteText';
 import ProfileSearchInput from './ProfileSearchInput.vue';
 
 // U+1FAC0 (anatomical heart) arrived in Emoji 13.0 (2020). Every other emoji
@@ -205,7 +309,38 @@ export default {
       progress: '',
       error: null,
       result: null,
+      // Share flow state. uploadedImageUrl caches the Blossom URL for the
+      // current result so repeated share actions don't re-upload.
+      shareBusy: false,
+      shareStatus: '',
+      shareStatusKind: null, // 'success' | 'error' | null
+      copiedNoteText: false,
+      uploadedImageUrl: null,
+      copiedImageLink: false,
+      publishedNoteId: null,
     };
+  },
+  computed: {
+    canPublishNotes() {
+      // Either a signing method is already live, or a NIP-07 extension is
+      // present and can be connected on demand by publishTextNote().
+      return (
+        nostrService.isSigningReady() ||
+        (nostrService.signingMethod === 'nip07' &&
+          typeof window.nostr !== 'undefined')
+      );
+    },
+  },
+  mounted() {
+    // Deep link: /zombiecheck?npub=… (or ?q=…) pre-fills the search and
+    // auto-runs the check, so a shared link replays the check live.
+    const query = this.$route?.query || {};
+    const shared = String(query.npub || query.q || '').trim();
+    if (shared) {
+      this.inputValue = shared;
+      this.$refs.searchInput?.setValue(shared);
+      this.check();
+    }
   },
   methods: {
     onInputChanged(value) {
@@ -219,6 +354,7 @@ export default {
     async check(profileArg = null) {
       this.error = null;
       this.result = null;
+      this.clearShareState();
       this.checking = true;
       this.progress = 'Resolving profile…';
 
@@ -276,6 +412,7 @@ export default {
         // Prefer freshly-fetched metadata for display, fall back to search result.
         const meta = profileMap.get(hex) || {};
         const displayProfile = {
+          pubkey: hex,
           npub: profile.npub || meta.npub,
           picture: meta.picture || profile.picture,
           name: meta.name || profile.name,
@@ -385,11 +522,170 @@ export default {
     onAvatarError(event) {
       event.target.src = '/default-avatar.svg';
     },
+    clearShareState() {
+      this.shareBusy = false;
+      this.shareStatus = '';
+      this.shareStatusKind = null;
+      this.copiedNoteText = false;
+      this.uploadedImageUrl = null;
+      this.copiedImageLink = false;
+      this.publishedNoteId = null;
+    },
+    // The shared PNG is built in the off-screen PVZ-branded frame (see the
+    // shareFrameCard markup in the template), not captured from the live
+    // card directly. The clone gets fixed up for capture-hostile styling:
+    // `truncate` (overflow:hidden) clips text bottoms in html2canvas output,
+    // and the in-card brand watermark is redundant under the frame's header.
+    prepareCardClone() {
+      const clone = this.$refs.resultCard.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.classList.remove('mt-6');
+      clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+      const watermark = clone.querySelector('.border-t');
+      if (watermark) watermark.remove();
+      clone.querySelectorAll('.truncate').forEach((n) => {
+        n.classList.remove('truncate');
+        n.style.overflow = 'visible';
+        n.style.whiteSpace = 'normal';
+        n.style.overflowWrap = 'anywhere';
+      });
+      return clone;
+    },
+    async captureResultCard() {
+      if (!this.$refs.resultCard) {
+        throw new Error('Result card is not rendered.');
+      }
+      const verdictSlot = this.$refs.shareVerdict;
+      verdictSlot.innerHTML = '';
+      const clone = this.prepareCardClone();
+      // Proxied data-URL avatar: html2canvas cannot read pixels back from a
+      // cross-origin image, and a tainted canvas would fail later at toBlob
+      // with no useful error. Falls back to the local default avatar.
+      const picture = this.result.profile.picture;
+      const proxied = picture ? await loadImageAsBase64(picture) : null;
+      const avatarImg = clone.querySelector('img');
+      if (avatarImg) avatarImg.src = proxied || '/default-avatar.svg';
+      verdictSlot.appendChild(clone);
+      // Let the avatar decode and layout settle before rasterizing.
+      await this.$nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const canvas = await html2canvas(this.$refs.shareFrameCard, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+      });
+      return await canvasToBlob(canvas);
+    },
+    async ensureShareImage() {
+      if (this.uploadedImageUrl) return this.uploadedImageUrl;
+      const blob = await this.captureResultCard();
+      const filename = `zombie-check-${(this.result.profile.npub || 'result').slice(0, 20)}.png`;
+      // Sign the BUD-01 upload auth with the user's identity when one is
+      // ready; otherwise upload anonymously with a throwaway key — either
+      // way the visitor is prompted at most once.
+      const signer = nostrService.isSigningReady()
+        ? { signEvent: (e) => nostrService.signEventWithCurrentMethod(e) }
+        : undefined;
+      const res = await uploadImageToBlossom({ blob, filename, signer });
+      this.uploadedImageUrl = res.url;
+      return res.url;
+    },
+    async shareAsNote() {
+      if (!this.result || this.shareBusy) return;
+      // Publishing is signed-in territory; unsigned visitors have the hint
+      // and the Copy Note Text button instead.
+      if (!this.canPublishNotes) return;
+      this.shareBusy = true;
+      this.shareStatus = 'Rendering image…';
+      this.shareStatusKind = null;
+      this.publishedNoteId = null;
+      try {
+        const imageUrl = await this.ensureShareImage();
+        const { content, tags } = buildShareNote(this.result, { imageUrl });
+
+        this.shareStatus = 'Publishing note…';
+        const res = await nostrService.publishTextNote(content, tags);
+        if (!res.success) {
+          throw new Error('Failed to publish to any relays. Try again.');
+        }
+        this.publishedNoteId = nip19.noteEncode(res.eventId);
+        this.shareStatusKind = 'success';
+        this.shareStatus = `Note published to ${res.publishedToRelays} relay${res.publishedToRelays === 1 ? '' : 's'}!`;
+      } catch (e) {
+        console.error('Share as note failed:', e);
+        this.shareStatusKind = 'error';
+        this.shareStatus = e?.message || 'Sharing failed. Try again.';
+      } finally {
+        this.shareBusy = false;
+      }
+    },
+    async copyNoteText() {
+      if (!this.result || this.shareBusy) return;
+      try {
+        // Text only — the poster attaches the downloaded PNG themselves, so
+        // the image URL line stays out.
+        const { content } = buildShareNote(this.result);
+        await navigator.clipboard.writeText(content);
+        this.copiedNoteText = true;
+        setTimeout(() => {
+          this.copiedNoteText = false;
+        }, 2000);
+      } catch (e) {
+        console.error('Note text copy failed:', e);
+        this.shareStatusKind = 'error';
+        this.shareStatus = e?.message || 'Could not copy the note text. Try again.';
+      }
+    },
+    async downloadImage() {
+      if (!this.result || this.shareBusy) return;
+      this.shareBusy = true;
+      this.shareStatus = 'Rendering image…';
+      this.shareStatusKind = null;
+      try {
+        const blob = await this.captureResultCard();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `zombie-check-${(this.result.profile.npub || 'result').slice(0, 20)}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.shareStatus = '';
+      } catch (e) {
+        console.error('Image download failed:', e);
+        this.shareStatusKind = 'error';
+        this.shareStatus = e?.message || 'Could not render the image. Try again.';
+      } finally {
+        this.shareBusy = false;
+      }
+    },
+    async copyImageLink() {
+      if (!this.result || this.shareBusy || this.copiedImageLink) return;
+      this.shareBusy = true;
+      this.shareStatus = 'Uploading image…';
+      this.shareStatusKind = null;
+      try {
+        const url = await this.ensureShareImage();
+        await navigator.clipboard.writeText(url);
+        this.copiedImageLink = true;
+        this.shareStatus = '';
+        setTimeout(() => {
+          this.copiedImageLink = false;
+        }, 2000);
+      } catch (e) {
+        console.error('Image link copy failed:', e);
+        this.shareStatusKind = 'error';
+        this.shareStatus = e?.message || 'Upload failed. Try again.';
+      } finally {
+        this.shareBusy = false;
+      }
+    },
     reset() {
       this.result = null;
       this.error = null;
       this.selectedProfile = null;
       this.inputValue = '';
+      this.clearShareState();
       this.$refs.searchInput?.clear();
     },
   },

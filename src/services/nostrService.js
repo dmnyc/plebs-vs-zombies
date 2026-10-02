@@ -2078,6 +2078,49 @@ class NostrService {
     };
   }
 
+  /**
+   * Sign and publish a kind:1 text note (e.g. a shared Zombie Check result)
+   * with the user's current signing method and publish relays. Follows the
+   * same readiness flow as _publishRelayListUpdate: attempt the extension
+   * connection on first use, then fail with a clear message if still unable.
+   */
+  async publishTextNote(content, tags = []) {
+    const event = {
+      kind: 1,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+      content,
+    };
+
+    if (!this.isSigningReady()) {
+      if (this.signingMethod === "nip07") {
+        await this.connectExtension();
+      } else if (this.signingMethod === "nip46") {
+        throw new Error(
+          "NIP-46 bunker not connected. Please connect your bunker first.",
+        );
+      } else {
+        throw new Error("No signing method available to publish the note.");
+      }
+    }
+
+    if (!this.isSigningReady()) {
+      throw new Error(
+        `Unable to establish connection with signing method: ${this.signingMethod}`,
+      );
+    }
+
+    const signedEvent = await this.signEventWithCurrentMethod(event);
+    const publishResults = await this.publishEventToRelays(signedEvent);
+
+    return {
+      success: publishResults.successful > 0,
+      eventId: signedEvent.id,
+      publishedToRelays: publishResults.successful,
+      totalRelays: publishResults.total,
+    };
+  }
+
   async backupFollowList() {
     if (!this.pubkey) {
       throw new Error("Public key not set");

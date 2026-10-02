@@ -321,6 +321,11 @@ export default {
       this.validationState = null;
       this.selectedProfile = null;
     },
+    setValue(value) {
+      // Programmatic prefill (deep link ?npub=). The input-changed watcher
+      // keeps the parent in sync; validateAndFetch() reads from here.
+      this.inputValue = value || '';
+    },
     focus() {
       this.$refs.input?.focus();
     },

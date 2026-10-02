@@ -19,23 +19,20 @@ export default defineConfig({
       name: 'html-rewrite',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          // Rewrite /resurrector to /resurrector.html
-          if (req.url === '/resurrector') {
-            req.url = '/resurrector.html'
+          // Deep links like /zombiecheck?npub=… carry a query string, so
+          // match on the pathname alone and carry the query over — matching
+          // how Vercel's rewrites (which ignore the query) behave in prod.
+          const [pathname, query = ''] = (req.url || '').split('?');
+          const cleanPages = {
+            '/resurrector': '/resurrector.html',
+            '/leaderboard': '/leaderboard.html',
+            '/competition': '/competition.html',
+            '/zombiecheck': '/zombiecheck.html',
+          };
+          if (cleanPages[pathname]) {
+            req.url = cleanPages[pathname] + (query ? `?${query}` : '');
           }
-          // Rewrite /leaderboard to /leaderboard.html
-          else if (req.url === '/leaderboard') {
-            req.url = '/leaderboard.html'
-          }
-          // Rewrite /competition to /competition.html
-          else if (req.url === '/competition') {
-            req.url = '/competition.html'
-          }
-          // Rewrite /zombiecheck to /zombiecheck.html
-          else if (req.url === '/zombiecheck') {
-            req.url = '/zombiecheck.html'
-          }
-          next()
+          next();
         })
       }
     }
