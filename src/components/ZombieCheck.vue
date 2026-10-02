@@ -166,6 +166,23 @@
         View your note ↗
       </a>
 
+      <!-- Copyable deep link straight back to this exact check (the route
+           auto-runs it on load) -->
+      <div class="mt-4 flex items-center gap-2">
+        <input
+          :value="directLink"
+          readonly
+          class="input flex-1 px-3 py-2 text-xs font-mono text-gray-400"
+          @focus="$event.target.select()"
+        />
+        <button
+          @click="copyDirectLink"
+          class="rounded-lg px-3 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors whitespace-nowrap"
+        >
+          {{ copiedDirectLink ? '✅ Copied!' : '🔗 Copy Link' }}
+        </button>
+      </div>
+
       <button
         @click="reset"
         class="btn-secondary w-full mt-4 text-sm"
@@ -323,6 +340,7 @@ export default {
       shareStatusKind: null, // 'success' | 'error' | null
       shareIncludeImage: true,
       copiedNoteText: false,
+      copiedDirectLink: false,
       uploadedImageUrl: null,
       copiedImageLink: false,
       publishedNoteId: null,
@@ -337,6 +355,10 @@ export default {
         (nostrService.signingMethod === 'nip07' &&
           typeof window.nostr !== 'undefined')
       );
+    },
+    directLink() {
+      const npub = this.result?.profile?.npub;
+      return `https://plebsvszombies.cc/zombiecheck${npub ? `?npub=${npub}` : ''}`;
     },
   },
   mounted() {
@@ -535,6 +557,7 @@ export default {
       this.shareStatus = '';
       this.shareStatusKind = null;
       this.copiedNoteText = false;
+      this.copiedDirectLink = false;
       this.uploadedImageUrl = null;
       this.copiedImageLink = false;
       this.publishedNoteId = null;
@@ -653,6 +676,17 @@ export default {
         this.shareStatus = e?.message || 'Could not copy the note text. Try again.';
       } finally {
         this.shareBusy = false;
+      }
+    },
+    async copyDirectLink() {
+      try {
+        await navigator.clipboard.writeText(this.directLink);
+        this.copiedDirectLink = true;
+        setTimeout(() => {
+          this.copiedDirectLink = false;
+        }, 2000);
+      } catch (_) {
+        // Focus-fallback: select it so a manual Ctrl/Cmd-C still works.
       }
     },
     async downloadImage() {

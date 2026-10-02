@@ -305,6 +305,27 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         </a>
       </div>
 
+      <!-- Result footer: a copyable deep link to re-run this exact check, and
+           the reset back to a blank search. Deliberately outside the result
+           frame, so screenshots stay clean. -->
+      <div id="result-footer" class="mt-4 space-y-2 hidden">
+        <div class="flex items-center gap-2">
+          <input
+            id="direct-link"
+            type="text"
+            readonly
+            class="input flex-1 px-3 py-2 text-xs font-mono text-gray-400"
+            onclick="this.select()"
+          />
+          <button id="copy-link-btn" class="rounded-lg px-3 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+            🔗 Copy Link
+          </button>
+        </div>
+        <button id="reset-btn" class="w-full rounded-lg px-4 py-2 text-sm border border-gray-600 text-gray-300 hover:bg-gray-700/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          🔁 Check another user
+        </button>
+      </div>
+
       <div class="mt-8 pt-6 border-t border-gray-700/50 text-center">
         <a href="/" class="text-sm text-zombie-green hover:underline">
           ← Back to Plebs vs. Zombies
@@ -693,6 +714,10 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       shareHint: document.getElementById('share-hint'),
       shareStatus: document.getElementById('share-status'),
       shareNoteLink: document.getElementById('share-note-link'),
+      resultFooter: document.getElementById('result-footer'),
+      directLink: document.getElementById('direct-link'),
+      copyLinkBtn: document.getElementById('copy-link-btn'),
+      resetBtn: document.getElementById('reset-btn'),
     };
 
     function looksLikeIdentifier(value) {
@@ -862,6 +887,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.error.textContent = '';
       els.result.classList.add('hidden');
       els.shareActions.classList.add('hidden');
+      els.resultFooter.classList.add('hidden');
       els.spinner.classList.remove('hidden');
       els.label.textContent = 'Checking…';
       els.btn.disabled = true;
@@ -1073,6 +1099,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       els.shareBtn.disabled = !canPublishNotes();
       els.shareHint.classList.toggle('hidden', canPublishNotes());
       els.shareActions.classList.remove('hidden');
+
+      // Deep link straight back to this exact check — the page auto-runs it
+      // on load (see the ?npub= handling at the bottom).
+      els.directLink.value = `${ZOMBIECHECK_BASE_URL}?npub=${npub}`;
+      els.resultFooter.classList.remove('hidden');
     }
 
     els.btn.addEventListener('click', () => check());
@@ -1470,6 +1501,42 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     els.copyNoteBtn.addEventListener('click', copyNoteText);
     els.downloadBtn.addEventListener('click', downloadImage);
     els.copyImgBtn.addEventListener('click', copyImageLink);
+
+    // Reset back to a blank search: clear everything the check produced and
+    // drop the deep-link param, so a reload doesn't re-run this check.
+    function resetPage() {
+      lastResult = null;
+      uploadedImageUrl = null;
+      shareBusy = false;
+      els.result.classList.add('hidden');
+      els.shareActions.classList.add('hidden');
+      els.resultFooter.classList.add('hidden');
+      els.error.textContent = '';
+      els.progress.textContent = '';
+      els.input.value = '';
+      els.directLink.value = '';
+      hideResults();
+      history.replaceState(null, '', location.pathname);
+      els.input.focus();
+    }
+
+    async function copyDirectLink() {
+      if (!els.directLink.value) return;
+      try {
+        await navigator.clipboard.writeText(els.directLink.value);
+        els.copyLinkBtn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          els.copyLinkBtn.textContent = '🔗 Copy Link';
+        }, 2000);
+      } catch (_) {
+        // Focus-fallback: select it so a manual Ctrl/Cmd-C still works.
+        els.directLink.focus();
+        els.directLink.select();
+      }
+    }
+
+    els.resetBtn.addEventListener('click', resetPage);
+    els.copyLinkBtn.addEventListener('click', copyDirectLink);
   </script>
 </body>
 </html>
