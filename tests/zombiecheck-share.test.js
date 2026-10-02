@@ -31,16 +31,18 @@ const zombieResult = {
 };
 
 describe("buildShareNote", () => {
-  it("leads with the verdict, name, and a nostr: mention of the subject", () => {
+  it("opens first-person with the subject's name and nostr: mention", () => {
     const { content } = buildShareNote(aliveResult);
     const firstLine = content.split("\n")[0];
     expect(firstLine).toBe(
-      "🫀 Alive! — Wallet of Satoshi (nostr:npub1hcwcj72example000000000000000000000000000j4h9rq)",
+      "I just ran a zombie check on Wallet of Satoshi (nostr:npub1hcwcj72example000000000000000000000000000j4h9rq) and here's what I found:",
     );
   });
 
-  it("includes the detail and deletion-status lines", () => {
+  it("states the verdict on its own line, then detail and deletion status", () => {
     const { content } = buildShareNote(zombieResult);
+    const lines = content.split("\n");
+    expect(lines[2]).toBe("💀 Ancient Zombie");
     expect(content).toContain("Gone for 2 years, 3 months.");
     expect(content).toContain("⚠️ This profile is currently flagged as deleted.");
   });
@@ -82,13 +84,15 @@ describe("buildShareNote", () => {
     expect(tags.every(([name]) => name !== "p")).toBe(true);
   });
 
-  it("falls back to a bare tool link when there is no npub", () => {
+  it("falls back to the mention-only subject and bare tool link when there is no name or npub", () => {
     const { content } = buildShareNote({
       ...aliveResult,
       displayName: "",
       profile: { pubkey: aliveResult.profile.pubkey },
     });
+    expect(content).toContain(
+      "I just ran a zombie check on Anonymous and here's what I found:",
+    );
     expect(content).toContain(`Run your own zombie check: ${ZOMBIECHECK_BASE_URL}`);
-    expect(content).toContain("🫀 Alive! — This user");
   });
 });

@@ -18,9 +18,22 @@ export const ZOMBIECHECK_BASE_URL = 'https://plebsvszombies.cc/zombiecheck';
 export function buildShareNote(result, { imageUrl = null, baseUrl = '' } = {}) {
   const base = baseUrl || ZOMBIECHECK_BASE_URL;
   const npub = result.profile?.npub || '';
-  const name = result.displayName || 'This user';
+  const name = result.displayName || result.profile?.name || '';
 
-  const lines = [`${result.emoji} ${result.label} — ${name}${npub ? ` (nostr:${npub})` : ''}`];
+  // Lead with a first-person opener. The plain name stays in the raw text so
+  // it survives clients that don't render mentions, and the nostr: mention
+  // rides alongside so clients tag and thread the subject.
+  const subject = name
+    ? `${name}${npub ? ` (nostr:${npub})` : ''}`
+    : npub
+      ? `nostr:${npub}`
+      : 'Anonymous';
+
+  const lines = [
+    `I just ran a zombie check on ${subject} and here's what I found:`,
+    '',
+    `${result.emoji} ${result.label}`,
+  ];
 
   if (result.detail) {
     lines.push(result.detail);
@@ -30,7 +43,7 @@ export function buildShareNote(result, { imageUrl = null, baseUrl = '' } = {}) {
   }
 
   lines.push('');
-  lines.push(`Run your own zombie check: ${base}${npub ? `?npub=${npub}` : ''}`);
+  lines.push(`🧟 Run your own zombie check: ${base}${npub ? `?npub=${npub}` : ''}`);
 
   if (imageUrl) {
     lines.push('');

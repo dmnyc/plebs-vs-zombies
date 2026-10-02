@@ -1093,15 +1093,18 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
     function buildShareNote(result, imageUrl) {
       const name = result.profile.display_name || result.profile.name || 'Anonymous';
+      const subject = `${name}${result.npub ? ` (nostr:${result.npub})` : ''}`;
       const lines = [
-        `${result.verdict.emoji} ${result.verdict.label} — ${name}${result.npub ? ` (nostr:${result.npub})` : ''}`,
+        `I just ran a zombie check on ${subject} and here's what I found:`,
+        '',
+        `${result.verdict.emoji} ${result.verdict.label}`,
       ];
       if (result.verdict.detail) lines.push(result.verdict.detail);
       if (result.deletionStatus?.text) {
         lines.push(`${result.deletionStatus.icon} ${result.deletionStatus.text}`);
       }
       lines.push('');
-      lines.push(`Run your own zombie check: ${ZOMBIECHECK_BASE_URL}${result.npub ? `?npub=${result.npub}` : ''}`);
+      lines.push(`🧟 Run your own zombie check: ${ZOMBIECHECK_BASE_URL}${result.npub ? `?npub=${result.npub}` : ''}`);
       if (imageUrl) {
         lines.push('');
         lines.push(imageUrl);
