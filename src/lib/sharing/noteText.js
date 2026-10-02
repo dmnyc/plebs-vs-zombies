@@ -20,14 +20,13 @@ export function buildShareNote(result, { imageUrl = null, baseUrl = '' } = {}) {
   const npub = result.profile?.npub || '';
   const name = result.displayName || result.profile?.name || '';
 
-  // Lead with a first-person opener. The plain name stays in the raw text so
-  // it survives clients that don't render mentions, and the nostr: mention
-  // rides alongside so clients tag and thread the subject.
-  const subject = name
-    ? `${name}${npub ? ` (nostr:${npub})` : ''}`
-    : npub
-      ? `nostr:${npub}`
-      : 'Anonymous';
+  // Lead with a first-person opener and reference the subject purely as a
+  // nostr: mention — clients render it as @name and thread it via the p-tag,
+  // so a plain name beside it just reads as a duplicate. A plain name (or
+  // Anonymous) only appears when there's no npub to link.
+  const subject = npub
+    ? `nostr:${npub}`
+    : name || 'Anonymous';
 
   const lines = [
     `I just ran a zombie check on ${subject} and here's what I found:`,

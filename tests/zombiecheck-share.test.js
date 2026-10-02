@@ -31,11 +31,11 @@ const zombieResult = {
 };
 
 describe("buildShareNote", () => {
-  it("opens first-person with the subject's name and nostr: mention", () => {
+  it("opens first-person with the subject as a bare nostr: mention", () => {
     const { content } = buildShareNote(aliveResult);
     const firstLine = content.split("\n")[0];
     expect(firstLine).toBe(
-      "I just ran a zombie check on Wallet of Satoshi (nostr:npub1hcwcj72example000000000000000000000000000j4h9rq) and here's what I found:",
+      "I just ran a zombie check on nostr:npub1hcwcj72example000000000000000000000000000j4h9rq and here's what I found:",
     );
   });
 
@@ -84,7 +84,7 @@ describe("buildShareNote", () => {
     expect(tags.every(([name]) => name !== "p")).toBe(true);
   });
 
-  it("falls back to the mention-only subject and bare tool link when there is no name or npub", () => {
+  it("falls back to a plain name only when there is no npub to mention", () => {
     const { content } = buildShareNote({
       ...aliveResult,
       displayName: "",

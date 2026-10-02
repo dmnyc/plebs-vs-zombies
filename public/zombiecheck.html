@@ -1099,7 +1099,9 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
     function buildShareNote(result, imageUrl) {
       const name = result.profile.display_name || result.profile.name || 'Anonymous';
-      const subject = `${name}${result.npub ? ` (nostr:${result.npub})` : ''}`;
+      // Pure nostr: mention — clients render it as @name and thread it via
+      // the p-tag; mirrors noteText.js.
+      const subject = result.npub ? `nostr:${result.npub}` : name;
       const lines = [
         `I just ran a zombie check on ${subject} and here's what I found:`,
         '',
