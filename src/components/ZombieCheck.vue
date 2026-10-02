@@ -15,7 +15,7 @@
         </label>
         <ProfileSearchInput
           ref="searchInput"
-          placeholder="Search by username or paste npub/nprofile/hex..."
+          placeholder="name or npub1…"
           @profile-selected="onProfileSelected"
           @input-changed="onInputChanged"
         />
