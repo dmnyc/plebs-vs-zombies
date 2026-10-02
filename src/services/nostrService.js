@@ -7,6 +7,7 @@ import { nip19, nip04, nip44, finalizeEvent, SimplePool, verifyEvent } from "nos
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 import primalCacheService from "./primalCacheService.js";
+import * as nostrArchivesService from "./nostrArchivesService.js";
 import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
 // Liveness detection: any event a user signs proves their key is still in use.
@@ -1021,6 +1022,30 @@ class NostrService {
     console.log(
       `Profile fetch complete. Found metadata for ${Array.from(profileMap.values()).filter((p) => p.name || p.display_name).length} out of ${pubkeys.length} profiles.`,
     );
+
+    // Final rung: the Nostr Archives name index (the same API Sidecar uses).
+    // Relays prune inactive accounts' events — the very accounts this tool
+    // hunts — and caches miss some too, so otherwise-anonymous profiles get
+    // their name/picture resolved here. Follow lists are public kind-3 data;
+    // the trade is that the index sees the queried pubkeys. Only fills
+    // fields the relays and caches left empty.
+    const unresolved = validPubkeys.filter((pubkey) => {
+      const p = profileMap.get(pubkey);
+      return p && !p.name && !p.display_name && !p.picture;
+    });
+    if (unresolved.length) {
+      const meta = await nostrArchivesService.getProfilesMetadata(unresolved);
+      meta.forEach((m, pubkey) => {
+        const p = profileMap.get(pubkey);
+        if (!p) return;
+        if (!nostrArchivesService.hasIdentity(m)) return;
+        const name = m.display_name || m.preferred_name || m.name || null;
+        if (name && !p.name) p.name = name;
+        if (name && !p.display_name) p.display_name = name;
+        if (m.picture && !p.picture) p.picture = m.picture;
+        if (m.nip05 && !p.nip05) p.nip05 = m.nip05;
+      });
+    }
 
     // Final progress update
     if (progressCallback) {

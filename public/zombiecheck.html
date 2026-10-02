@@ -629,6 +629,34 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
     }
 
+    // Global username search from the archive — merged into the dropdown's
+    // results to widen discovery (same third-party note as
+    // fetchArchivesProfile above).
+    async function fetchArchivesSuggest(query, limit = 8) {
+      if (Date.now() < naCooldownUntil) return [];
+      try {
+        const resp = await fetch(
+          NA_BASE + '/v1/search/suggest?q=' + encodeURIComponent(query) + '&limit=' + limit,
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (resp.status === 429) {
+          const secs = Math.min(3600, Math.max(30, Number(resp.headers.get('retry-after')) || 60));
+          naCooldownUntil = Date.now() + secs * 1000;
+          return [];
+        }
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        return (data.suggestions || [])
+          .filter((s) => s && typeof s.pubkey === 'string' && /^[0-9a-f]{64}$/i.test(s.pubkey))
+          .map((s) => {
+            const name = s.display_name || s.preferred_name || s.name || null;
+            return { pubkey: s.pubkey.toLowerCase(), name, display_name: name, picture: s.picture || null, nip05: null };
+          });
+      } catch (_) {
+        return [];
+      }
+    }
+
     const els = {
       input: document.getElementById('npub-input'),
       results: document.getElementById('search-results'),
@@ -806,6 +834,13 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           const profiles = events
             .map(parseProfile)
             .filter((p) => p && !(p.nip05 && p.nip05.includes('mostr.pub')));
+          // Widen discovery with the Nostr Archives name index, deduping by
+          // pubkey — Primal results win.
+          const archived = await fetchArchivesSuggest(value, 8);
+          for (const s of archived) {
+            if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
+          }
+          if (seq !== searchSeq) return; // re-check after the archive round-trip
           renderSearchResults(profiles);
         } catch (_) { hideResults(); }
       }, 400);
