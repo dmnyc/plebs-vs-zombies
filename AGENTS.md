@@ -1,5 +1,13 @@
 - Our website url is plebsvszombies.cc
 
+## Versioning
+
+Every shipped change gets a `package.json` version bump — in the same commit
+or the one immediately after, never left behind:
+
+- **patch** (third number, e.g. 1.2.1 → 1.2.2) for small fixes and UI updates
+- **minor** (second number, e.g. 1.2.1 → 1.3.0) for features
+
 ## Relay reliability check (self-improvement process)
 
 With every PR merge or version bump, run `node scripts/relay-health.js` and
