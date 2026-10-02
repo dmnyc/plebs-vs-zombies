@@ -135,12 +135,19 @@
           {{ copiedImageLink ? '✅ Link Copied!' : '🔗 Copy Image Link' }}
         </button>
       </div>
+      <label
+        class="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer select-none"
+      >
+        <input v-model="shareIncludeImage" type="checkbox" class="accent-zombie-green" />
+        Include image link in note
+      </label>
       <p
         v-if="!canPublishNotes"
         class="mt-2 text-xs text-center text-gray-500"
       >
-        Publishing needs a Nostr signer (NIP-07). Copy the note text and
-        attach the downloaded PNG to post it yourself.
+        Publishing needs a Nostr signer (NIP-07). Copy the note text to post
+        it yourself — tick "Include image link" and the card image attaches
+        at the end.
       </p>
       <p
         v-if="shareStatus"
@@ -314,6 +321,7 @@ export default {
       shareBusy: false,
       shareStatus: '',
       shareStatusKind: null, // 'success' | 'error' | null
+      shareIncludeImage: true,
       copiedNoteText: false,
       uploadedImageUrl: null,
       copiedImageLink: false,
@@ -601,7 +609,7 @@ export default {
       this.shareStatusKind = null;
       this.publishedNoteId = null;
       try {
-        const imageUrl = await this.ensureShareImage();
+        const imageUrl = this.shareIncludeImage ? await this.ensureShareImage() : null;
         const { content, tags } = buildShareNote(this.result, { imageUrl });
 
         this.shareStatus = 'Publishing note…';
@@ -622,12 +630,20 @@ export default {
     },
     async copyNoteText() {
       if (!this.result || this.shareBusy) return;
+      // With "Include image link" on, the card is rendered, uploaded to
+      // Blossom, and its URL attaches at the end of the text — so the pasted
+      // note carries the image without any manual attaching. The upload is
+      // cached and shared with the other share actions.
+      this.shareBusy = true;
+      this.shareStatusKind = null;
+      this.publishedNoteId = null;
+      if (this.shareIncludeImage) this.shareStatus = 'Uploading image…';
       try {
-        // Text only — the poster attaches the downloaded PNG themselves, so
-        // the image URL line stays out.
-        const { content } = buildShareNote(this.result);
+        const imageUrl = this.shareIncludeImage ? await this.ensureShareImage() : null;
+        const { content } = buildShareNote(this.result, { imageUrl });
         await navigator.clipboard.writeText(content);
         this.copiedNoteText = true;
+        this.shareStatus = '';
         setTimeout(() => {
           this.copiedNoteText = false;
         }, 2000);
@@ -635,6 +651,8 @@ export default {
         console.error('Note text copy failed:', e);
         this.shareStatusKind = 'error';
         this.shareStatus = e?.message || 'Could not copy the note text. Try again.';
+      } finally {
+        this.shareBusy = false;
       }
     },
     async downloadImage() {

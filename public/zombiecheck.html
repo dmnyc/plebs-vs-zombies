@@ -290,9 +290,14 @@ Classification bands mirror the in-app ZombieCheck.vue component:
             🔗 Copy Image Link
           </button>
         </div>
+        <label class="flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+          <input id="share-include-image" type="checkbox" checked class="accent-zombie-green" />
+          Include image link in note
+        </label>
         <p id="share-hint" class="hidden text-xs text-center text-gray-500">
-          Publishing needs a Nostr signer (NIP-07). Copy the note text and
-          attach the downloaded PNG to post it yourself.
+          Publishing needs a Nostr signer (NIP-07). Copy the note text to post
+          it yourself — tick "Include image link" and the card image attaches
+          at the end.
         </p>
         <p id="share-status" class="text-xs text-center"></p>
         <a id="share-note-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden block text-xs text-center text-zombie-green hover:text-green-300 underline">
@@ -598,6 +603,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       copyNoteBtn: document.getElementById('copy-note-btn'),
       downloadBtn: document.getElementById('download-img-btn'),
       copyImgBtn: document.getElementById('copy-img-btn'),
+      includeImage: document.getElementById('share-include-image'),
       shareHint: document.getElementById('share-hint'),
       shareStatus: document.getElementById('share-status'),
       shareNoteLink: document.getElementById('share-note-link'),
@@ -1189,7 +1195,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       if (!canPublishNotes()) return;
       setShareBusy(true, 'Rendering image…');
       try {
-        const imageUrl = await ensureShareImage();
+        const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
         const { content, tags } = buildShareNote(lastResult, imageUrl);
 
         setShareBusy(true, 'Publishing note…');
@@ -1208,18 +1214,25 @@ Classification bands mirror the in-app ZombieCheck.vue component:
 
     async function copyNoteText() {
       if (!lastResult || shareBusy) return;
+      // With "Include image link" on, the card is rendered, uploaded to
+      // Blossom, and its URL attaches at the end of the text — so the pasted
+      // note carries the image without any manual attaching. The upload is
+      // cached in uploadedImageUrl and shared with the other share actions.
+      setShareBusy(true, els.includeImage.checked ? 'Rendering image…' : '');
       try {
-        // Text only — the poster attaches the downloaded PNG themselves, so
-        // the image URL line stays out.
-        const { content } = buildShareNote(lastResult, null);
+        const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
+        const { content } = buildShareNote(lastResult, imageUrl);
         await navigator.clipboard.writeText(content);
         els.copyNoteBtn.textContent = '✅ Copied!';
+        els.shareStatus.textContent = '';
         setTimeout(() => {
           els.copyNoteBtn.textContent = '📋 Copy Note Text';
         }, 2000);
       } catch (e) {
         console.error('Note text copy failed:', e);
         setShareStatus(e?.message || 'Could not copy the note text. Try again.', 'error');
+      } finally {
+        setShareBusy(false);
       }
     }
 
