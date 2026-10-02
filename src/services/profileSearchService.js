@@ -1,6 +1,7 @@
 import { nip19 } from 'nostr-tools';
 import nostrService from './nostrService';
 import primalCacheService from './primalCacheService';
+import * as nostrArchivesService from './nostrArchivesService';
 
 // DEPRECATED: This cache will be removed once Vertex API is integrated
 // Currently used as fallback when Primal cache is unavailable
@@ -139,7 +140,10 @@ class ProfileSearchService {
     }
 
     try {
-      // Strategy 1: Try Primal cache first (if enabled)
+      // Strategy 1: Try Primal cache first (if enabled), then widen with the
+      // Nostr Archives name index — a complementary third-party discovery
+      // source (see nostrArchivesService for the trade it takes).
+      let merged = [];
       if (this.usePrimalCache) {
         try {
           console.log(`🔍 Searching Primal cache for "${query}"...`);
@@ -154,7 +158,7 @@ class ProfileSearchService {
             console.log(`✅ Primal cache returned ${primalResults.length} results`);
 
             // Parse profile events and add npub
-            const profiles = primalResults
+            merged = primalResults
               .map(event => {
                 const profile = primalCacheService.parseProfileEvent(event);
                 if (profile) {
@@ -175,15 +179,40 @@ class ProfileSearchService {
                 return profile;
               })
               .filter(p => p !== null);
-
-            // Cache and return results
-            this.cacheSearchResults(cacheKey, profiles);
-            return profiles;
           }
         } catch (primalError) {
           console.warn('⚠️ Primal cache search failed, falling back:', primalError.message);
           // Fall through to next strategy
         }
+      }
+
+      // Merge Nostr Archives suggestions, deduping by pubkey (Primal wins).
+      const naSuggestions = await nostrArchivesService.suggestNames(query, limit);
+      if (naSuggestions.length) {
+        const seen = new Set(merged.map((p) => p.pubkey));
+        for (const s of naSuggestions) {
+          if (seen.has(s.pubkey)) continue;
+          const profile = {
+            pubkey: s.pubkey,
+            name: s.name,
+            display_name: s.display_name,
+            picture: s.picture,
+            nip05: null,
+            about: null,
+            npub: nip19.npubEncode(s.pubkey),
+          };
+          this.cacheProfile(s.pubkey, profile);
+          if (onResult) {
+            onResult(profile);
+          }
+          merged.push(profile);
+        }
+      }
+
+      if (merged.length > 0) {
+        // Cache and return results
+        this.cacheSearchResults(cacheKey, merged);
+        return merged;
       }
 
       // Strategy 2: Fall back to well-known profiles + relay search

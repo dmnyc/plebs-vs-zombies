@@ -7,6 +7,7 @@ import { nip19, nip04, nip44, finalizeEvent, SimplePool, verifyEvent } from "nos
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 import primalCacheService from "./primalCacheService.js";
+import * as nostrArchivesService from "./nostrArchivesService.js";
 import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
 // Liveness detection: any event a user signs proves their key is still in use.
@@ -36,6 +37,13 @@ const LIVENESS_KINDS = [
 // Below this many days the Zombie Check verdict is "Alive" and no additional
 // relay or kind list can change it — used to stop scanning early.
 const ZOMBIE_CHECK_ALIVE_DAYS = 60;
+
+// High-retention public relays, scanned only when the activity verdict is
+// still unsettled (stale or missing). They keep events long after the
+// default relays have pruned them, so an account that looks years-dead on
+// the defaults sometimes has recent activity here — a false zombie.
+// Read-open at the time of writing; curated list, extend as needed.
+const DEEP_SCAN_RELAYS = ["wss://soloco.nl", "wss://atlas.nostr.land"];
 
 function isRelayConnected(relay) {
   const status = relay?.connectivity?.status;
@@ -1022,6 +1030,30 @@ class NostrService {
       `Profile fetch complete. Found metadata for ${Array.from(profileMap.values()).filter((p) => p.name || p.display_name).length} out of ${pubkeys.length} profiles.`,
     );
 
+    // Final rung: the Nostr Archives name index (the same API Sidecar uses).
+    // Relays prune inactive accounts' events — the very accounts this tool
+    // hunts — and caches miss some too, so otherwise-anonymous profiles get
+    // their name/picture resolved here. Follow lists are public kind-3 data;
+    // the trade is that the index sees the queried pubkeys. Only fills
+    // fields the relays and caches left empty.
+    const unresolved = validPubkeys.filter((pubkey) => {
+      const p = profileMap.get(pubkey);
+      return p && !p.name && !p.display_name && !p.picture;
+    });
+    if (unresolved.length) {
+      const meta = await nostrArchivesService.getProfilesMetadata(unresolved);
+      meta.forEach((m, pubkey) => {
+        const p = profileMap.get(pubkey);
+        if (!p) return;
+        if (!nostrArchivesService.hasIdentity(m)) return;
+        const name = m.display_name || m.preferred_name || m.name || null;
+        if (name && !p.name) p.name = name;
+        if (name && !p.display_name) p.display_name = name;
+        if (m.picture && !p.picture) p.picture = m.picture;
+        if (m.nip05 && !p.nip05) p.nip05 = m.nip05;
+      });
+    }
+
     // Final progress update
     if (progressCallback) {
       progressCallback({
@@ -1304,48 +1336,72 @@ class NostrService {
     const days = newestDays();
     const verdictSettled = days !== null && days < ZOMBIE_CHECK_ALIVE_DAYS;
 
-    if (verdictSettled) {
-      report(`Active ${days} days ago — no further relays needed.`);
-    } else if (extraRelays.length > 0) {
-      report(
-        `Checking ${extraRelays.length} relay(s) ${pubkey.substring(0, 8)}… advertises…`,
-      );
-      console.log(
-        `📡 Also scanning ${extraRelays.length} relay(s) advertised by ${pubkey.substring(0, 8)}...`,
-      );
-      let userNdk = null;
+    // Scan a throwaway read-only NDK pool over specific relays. No signer:
+    // this is a read-only lookup that must work for logged-out visitors on
+    // the homepage without ever prompting to sign. Outbox model off: we
+    // asked for these relays specifically, and it would otherwise re-target
+    // the query and open a second pool. Disconnects every socket when done —
+    // NDKPool has no close() in 2.x, and leaking them left every socket of
+    // the throwaway pool open, reconnecting for the life of the tab.
+    const scanSpecificRelays = async (relayUrls, label, timeoutMs = 6000) => {
+      report(`Checking ${relayUrls.length} ${label}…`);
+      let ndk = null;
       try {
-        // No signer: this is a read-only lookup that must work for logged-out
-        // visitors on the homepage without ever prompting to sign.
-        // Outbox model off: we asked for these relays specifically, and it
-        // would otherwise re-target the query and open a second pool.
-        userNdk = new NDK({
-          explicitRelayUrls: extraRelays,
+        ndk = new NDK({
+          explicitRelayUrls: relayUrls,
           enableOutboxModel: false,
         });
-        await userNdk.connect(3000);
-        const events = await this.fetchLivenessEvents(pubkey, limit, {
-          ndk: userNdk,
-          timeoutMs: 6000,
-          onRelayProgress: relayProgress(
-            `${pubkey.substring(0, 8)}…'s own relays`,
-          ),
+        await ndk.connect(3000);
+        return await this.fetchLivenessEvents(pubkey, limit, {
+          ndk,
+          timeoutMs,
+          onRelayProgress: relayProgress(label),
         });
+      } catch (error) {
+        console.warn(`⚠️ ${label} activity lookup failed:`, error.message);
+        return [];
+      } finally {
+        try {
+          for (const relay of ndk?.pool?.relays?.values() || []) {
+            relay.disconnect();
+          }
+        } catch (_) {}
+      }
+    };
+
+    if (verdictSettled) {
+      report(`Active ${days} days ago — no further relays needed.`);
+    } else {
+      if (extraRelays.length > 0) {
+        console.log(
+          `📡 Also scanning ${extraRelays.length} relay(s) advertised by ${pubkey.substring(0, 8)}...`,
+        );
+        const events = await scanSpecificRelays(
+          extraRelays,
+          `${pubkey.substring(0, 8)}…'s own relays`,
+        );
         if (events.length > 0) {
           results.push(...events);
           reachable = true;
         }
-      } catch (error) {
-        console.warn(`⚠️ User-relay activity lookup failed: ${error.message}`);
-      } finally {
-        // NDKPool has no close() in 2.x — calling it threw into the empty
-        // catch below and left every socket of this throwaway pool open,
-        // reconnecting for the life of the tab. Disconnect the relays.
-        try {
-          for (const relay of userNdk?.pool?.relays?.values() || []) {
-            relay.disconnect();
+      }
+
+      // High-retention relays, only when the verdict could still change:
+      // they keep events long after the defaults pruned them, so a
+      // years-dead-looking account may have recent activity there.
+      const daysNow = newestDays();
+      if (daysNow === null || daysNow >= ZOMBIE_CHECK_ALIVE_DAYS) {
+        const deepRelays = DEEP_SCAN_RELAYS.filter(
+          (url) => !this.relays.includes(url) && !extraRelays.includes(url),
+        );
+        if (deepRelays.length > 0) {
+          console.log(`📡 Scanning ${deepRelays.length} high-retention relay(s)...`);
+          const events = await scanSpecificRelays(deepRelays, "high-retention relays");
+          if (events.length > 0) {
+            results.push(...events);
+            reachable = true;
           }
-        } catch (_) {}
+        }
       }
     }
 
