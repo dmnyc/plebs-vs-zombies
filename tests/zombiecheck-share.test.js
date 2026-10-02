@@ -47,11 +47,12 @@ describe("buildShareNote", () => {
     expect(content).toContain("⚠️ This profile is currently flagged as deleted.");
   });
 
-  it("deep-links back to a re-runnable check for the same npub", () => {
+  it("links back to the bare tool URL — the subject already rides in the mention", () => {
     const { content } = buildShareNote(aliveResult);
     expect(content).toContain(
-      `${ZOMBIECHECK_BASE_URL}?npub=${aliveResult.profile.npub}`,
+      `Run your own zombie check: ${ZOMBIECHECK_BASE_URL}`,
     );
+    expect(content).not.toContain("?npub=");
   });
 
   it("appends the image URL on its own line so clients render it", () => {

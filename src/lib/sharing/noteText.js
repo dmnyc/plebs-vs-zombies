@@ -42,7 +42,10 @@ export function buildShareNote(result, { imageUrl = null, baseUrl = '' } = {}) {
   }
 
   lines.push('');
-  lines.push(`🧟 Run your own zombie check: ${base}${npub ? `?npub=${npub}` : ''}`);
+  // The subject's npub already rides in the opener's mention — this CTA
+  // invites the reader to check their own follows, so it stays a bare link
+  // rather than deep-linking a re-run of the subject's check.
+  lines.push(`🧟 Run your own zombie check: ${base}`);
 
   if (imageUrl) {
     lines.push('');

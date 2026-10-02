@@ -1112,7 +1112,10 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         lines.push(`${result.deletionStatus.icon} ${result.deletionStatus.text}`);
       }
       lines.push('');
-      lines.push(`🧟 Run your own zombie check: ${ZOMBIECHECK_BASE_URL}${result.npub ? `?npub=${result.npub}` : ''}`);
+      // Bare tool link — the subject's npub already rides in the opener's
+      // mention, and the CTA invites readers to check their own follows.
+      // Mirrors noteText.js.
+      lines.push(`🧟 Run your own zombie check: ${ZOMBIECHECK_BASE_URL}`);
       if (imageUrl) {
         lines.push('');
         lines.push(imageUrl);
