@@ -582,6 +582,53 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       throw new Error('Enter a valid npub, nprofile, or hex pubkey');
     }
 
+    // Final rung: the Nostr Archives name index — the same API Sidecar uses
+    // for name lookups. This sends the checked pubkey to a third-party index
+    // (one more observer, like the Primal cache above), so it only fires when
+    // the relays and Primal both came up empty. A 429 backs off per
+    // retry-after. Returns a pseudo kind-0 event (created_at 0, so any real
+    // relay event wins recency) that the existing profile parsing handles,
+    // or null when the archive has nothing usable.
+    const NA_BASE = 'https://api.nostrarchives.com';
+    let naCooldownUntil = 0; // epoch ms; a 429 backs us off until then
+    async function fetchArchivesProfile(hex) {
+      if (Date.now() < naCooldownUntil) return null;
+      try {
+        const resp = await fetch(NA_BASE + '/v1/profiles/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pubkeys: [hex] }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (resp.status === 429) {
+          const secs = Math.min(3600, Math.max(30, Number(resp.headers.get('retry-after')) || 60));
+          naCooldownUntil = Date.now() + secs * 1000;
+          return null;
+        }
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const p = (data.profiles || []).find(
+          (p) => p && typeof p.pubkey === 'string' && p.pubkey.toLowerCase() === hex,
+        );
+        if (!p) return null;
+        const name = p.display_name || p.preferred_name || p.name || null;
+        if (!name && !p.picture) return null; // known-but-empty: not a find
+        return {
+          kind: 0,
+          pubkey: hex,
+          created_at: 0,
+          content: JSON.stringify({
+            name,
+            display_name: name,
+            picture: p.picture || null,
+            nip05: p.nip05 || null,
+          }),
+        };
+      } catch (_) {
+        return null; // best-effort — the card already works without a name
+      }
+    }
+
     const els = {
       input: document.getElementById('npub-input'),
       results: document.getElementById('search-results'),
@@ -807,6 +854,13 @@ Classification bands mirror the in-app ZombieCheck.vue component:
               if (verifyEvent(e)) profileEvents.push(e);
             } catch (_) {}
           }
+        }
+        // Still nothing — the Nostr Archives name index, last rung of the
+        // ladder (see fetchArchivesProfile above for the disclosure note).
+        if (!profileEvents.length) {
+          els.progress.textContent = 'Checking name archives…';
+          const archived = await fetchArchivesProfile(hex);
+          if (archived) profileEvents.push(archived);
         }
 
         // Escalate only when the verdict could still change. If we already
