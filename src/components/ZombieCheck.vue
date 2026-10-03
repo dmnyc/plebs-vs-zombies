@@ -206,7 +206,7 @@
         style="border: 1px solid rgba(92, 219, 92, 0.22); background: radial-gradient(600px 420px at 12% 0%, rgba(92, 219, 92, 0.10), transparent 60%), radial-gradient(560px 400px at 100% 10%, rgba(142, 48, 235, 0.12), transparent 60%), linear-gradient(180deg, #0d1512 0%, #0a0f0c 100%);"
       >
         <div class="flex items-center justify-center gap-3 px-8 pt-7 pb-3">
-          <img src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0" />
+          <img ref="shareLogo" src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0" />
           <!-- top: -17px — html2canvas places Creepster text ~17px below the
                flex centerline (browser centers it correctly; measured from
                the captured PNG). The frame is capture-only, so correct it. -->
@@ -321,6 +321,21 @@ const DELETION_STATUS_STYLE = {
   past: { icon: '🩹', textClass: 'text-yellow-400 font-medium' },
   none: { icon: '✅', textClass: 'text-gray-200 font-medium' },
 };
+
+// html2canvas re-fetches every image itself and silently drops any that
+// fail — a flaky same-origin re-fetch of /logo.svg cost captured PNGs their
+// header zombie face. Fetch it once as a data URL and keep it, so the
+// capture never depends on a second network round-trip.
+let logoDataUrl = null;
+async function sameOriginSvgDataUrl(path) {
+  const svg = await (await fetch(path)).text();
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+// 268-byte fallback avatar, inlined — same failure class as the logo, and
+// it's the face shown when a profile has no picture.
+const DEFAULT_AVATAR_DATA_URL =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzM3NDE1MSIvPgogIDxjaXJjbGUgY3g9IjE2IiBjeT0iMTIiIHI9IjUiIGZpbGw9IiM5Q0EzQUYiLz4KICA8cGF0aCBkPSJNNiAyNmMwLTUuNSA0LjUtMTAgMTAtMTBzMTAgNC41IDEwIDEwIiBmaWxsPSIjOUNBM0FGIi8+Cjwvc3ZnPg==';
 
 export default {
   name: 'ZombieCheck',
@@ -586,16 +601,23 @@ export default {
       if (!this.$refs.resultCard) {
         throw new Error('Result card is not rendered.');
       }
+      // Inline the header logo as a data URL (see sameOriginSvgDataUrl).
+      // Best-effort: if even this fetch fails, keep the original src.
+      const frameLogo = this.$refs.shareLogo;
+      if (frameLogo && !logoDataUrl) {
+        try { logoDataUrl = await sameOriginSvgDataUrl('/logo.svg'); } catch (_) {}
+      }
+      if (frameLogo && logoDataUrl) frameLogo.src = logoDataUrl;
       const verdictSlot = this.$refs.shareVerdict;
       verdictSlot.innerHTML = '';
       const clone = this.prepareCardClone();
       // Proxied data-URL avatar: html2canvas cannot read pixels back from a
       // cross-origin image, and a tainted canvas would fail later at toBlob
-      // with no useful error. Falls back to the local default avatar.
+      // with no useful error. Falls back to the inlined default avatar.
       const picture = this.result.profile.picture;
       const proxied = picture ? await loadImageAsBase64(picture) : null;
       const avatarImg = clone.querySelector('img');
-      if (avatarImg) avatarImg.src = proxied || '/default-avatar.svg';
+      if (avatarImg) avatarImg.src = proxied || DEFAULT_AVATAR_DATA_URL;
       verdictSlot.appendChild(clone);
       // Let the avatar decode and layout settle before rasterizing.
       await this.$nextTick();
