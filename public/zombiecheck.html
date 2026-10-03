@@ -1432,6 +1432,21 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       return uploadedImageUrl;
     }
 
+    // Clipboard writes must start inside the user-activation window. The
+    // capture+upload work between click and writeText can outlast it, and
+    // the browser then denies the write with a NotAllowedError about focus
+    // or "lack of user activation". Starting the write synchronously with a
+    // promise payload (ClipboardItem) keeps the activation alive for the
+    // slow path; writeText stays the fallback where ClipboardItem is missing.
+    function writeClipboardWhenReady(textPromise) {
+      if (typeof ClipboardItem === 'undefined') {
+        return textPromise.then((t) => navigator.clipboard.writeText(t));
+      }
+      return navigator.clipboard.write([
+        new ClipboardItem({ 'text/plain': textPromise }),
+      ]);
+    }
+
     async function shareAsNote() {
       if (!lastResult || shareBusy) return;
       // Publishing is signed-in territory; unsigned visitors have the hint
@@ -1464,9 +1479,13 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       // cached in uploadedImageUrl and shared with the other share actions.
       setShareBusy(true, els.includeImage.checked ? 'Rendering image…' : '');
       try {
-        const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
-        const { content } = buildShareNote(lastResult, imageUrl);
-        await navigator.clipboard.writeText(content);
+        // The clipboard write is initiated synchronously (see
+        // writeClipboardWhenReady) — only the text resolution is async.
+        const textPromise = (async () => {
+          const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
+          return buildShareNote(lastResult, imageUrl).content;
+        })();
+        await writeClipboardWhenReady(textPromise);
         els.copyNoteBtn.textContent = '✅ Copied!';
         els.shareStatus.textContent = '';
         setTimeout(() => {
@@ -1504,8 +1523,10 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       if (!lastResult || shareBusy) return;
       setShareBusy(true, 'Uploading image…');
       try {
-        const url = await ensureShareImage();
-        await navigator.clipboard.writeText(url);
+        // Same activation rule as copyNoteText: the upload is the async
+        // part; the write itself starts at click time.
+        const urlPromise = ensureShareImage();
+        await writeClipboardWhenReady(urlPromise);
         els.copyImgBtn.textContent = '✅ Link Copied!';
         setTimeout(() => {
           els.copyImgBtn.textContent = '🔗 Copy Image Link';

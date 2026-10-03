@@ -337,6 +337,21 @@ async function sameOriginSvgDataUrl(path) {
 const DEFAULT_AVATAR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iIzM3NDE1MSIvPgogIDxjaXJjbGUgY3g9IjE2IiBjeT0iMTIiIHI9IjUiIGZpbGw9IiM5Q0EzQUYiLz4KICA8cGF0aCBkPSJNNiAyNmMwLTUuNSA0LjUtMTAgMTAtMTBzMTAgNC41IDEwIDEwIiBmaWxsPSIjOUNBM0FGIi8+Cjwvc3ZnPg==';
 
+// Clipboard writes must start inside the user-activation window. The
+// capture+upload work between click and writeText can outlast it, and the
+// browser then denies the write with a NotAllowedError about focus or
+// "lack of user activation". Starting the write synchronously with a
+// promise payload (ClipboardItem) keeps the activation alive for the slow
+// path; writeText stays the fallback where ClipboardItem is missing.
+function writeClipboardWhenReady(textPromise) {
+  if (typeof ClipboardItem === 'undefined') {
+    return textPromise.then((t) => navigator.clipboard.writeText(t));
+  }
+  return navigator.clipboard.write([
+    new ClipboardItem({ 'text/plain': textPromise }),
+  ]);
+}
+
 export default {
   name: 'ZombieCheck',
   components: { ProfileSearchInput },
@@ -684,9 +699,13 @@ export default {
       this.publishedNoteId = null;
       if (this.shareIncludeImage) this.shareStatus = 'Uploading image…';
       try {
-        const imageUrl = this.shareIncludeImage ? await this.ensureShareImage() : null;
-        const { content } = buildShareNote(this.result, { imageUrl });
-        await navigator.clipboard.writeText(content);
+        // The clipboard write is initiated synchronously (see
+        // writeClipboardWhenReady) — only the text resolution is async.
+        const textPromise = (async () => {
+          const imageUrl = this.shareIncludeImage ? await this.ensureShareImage() : null;
+          return buildShareNote(this.result, { imageUrl }).content;
+        })();
+        await writeClipboardWhenReady(textPromise);
         this.copiedNoteText = true;
         this.shareStatus = '';
         setTimeout(() => {
@@ -702,7 +721,7 @@ export default {
     },
     async copyDirectLink() {
       try {
-        await navigator.clipboard.writeText(this.directLink);
+        await writeClipboardWhenReady(Promise.resolve(this.directLink));
         this.copiedDirectLink = true;
         setTimeout(() => {
           this.copiedDirectLink = false;
@@ -734,13 +753,14 @@ export default {
       }
     },
     async copyImageLink() {
-      if (!this.result || this.shareBusy || this.copiedImageLink) return;
+      if (!this.result || this.shareBusy) return;
       this.shareBusy = true;
       this.shareStatus = 'Uploading image…';
       this.shareStatusKind = null;
       try {
-        const url = await this.ensureShareImage();
-        await navigator.clipboard.writeText(url);
+        // Same activation rule as copyNoteText: the upload is the async
+        // part; the write itself starts at click time.
+        await writeClipboardWhenReady(this.ensureShareImage());
         this.copiedImageLink = true;
         this.shareStatus = '';
         setTimeout(() => {
