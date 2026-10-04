@@ -338,20 +338,20 @@ Classification bands mirror the in-app ZombieCheck.vue component:
        for the shared PNG (html2canvas can't capture display:none elements,
        so it parks at -10000px). The visible result card above stays as-is;
        at capture time the card is cloned into #sf-verdict. -->
-  <div id="share-frame" aria-hidden="true" style="position: absolute; top: -10000px; left: -10000px; width: 640px;">
+  <div id="share-frame" aria-hidden="true" style="position: absolute; top: -10000px; left: -10000px; width: 540px;">
     <div id="share-frame-card" class="rounded-3xl overflow-hidden" style="border: 1px solid rgba(92, 219, 92, 0.22); background:
       radial-gradient(600px 420px at 12% 0%, rgba(92, 219, 92, 0.10), transparent 60%),
       radial-gradient(560px 400px at 100% 10%, rgba(142, 48, 235, 0.12), transparent 60%),
       linear-gradient(180deg, #0d1512 0%, #0a0f0c 100%);">
-      <div class="flex items-center justify-center gap-3 px-8 pt-7 pb-3">
+      <div class="flex items-center justify-center gap-3 px-6 pt-8 pb-3">
         <img id="sf-logo" src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0" />
         <!-- top: -17px — html2canvas places Creepster text ~17px below the
              flex centerline (browser centers it correctly; measured from the
              captured PNG). The frame is capture-only, so correct it here. -->
-        <span class="font-horror text-zombie-green text-4xl leading-none" style="position: relative; top: -17px; text-shadow: 0 0 28px rgba(92, 219, 92, 0.35), 0 2px 12px rgba(0, 0, 0, 0.6); letter-spacing: 0.01em;">Plebs vs. Zombies</span>
+        <span class="font-horror text-zombie-green text-3xl leading-none" style="position: relative; top: -17px; text-shadow: 0 0 28px rgba(92, 219, 92, 0.35), 0 2px 12px rgba(0, 0, 0, 0.6); letter-spacing: 0.01em;">Plebs vs. Zombies</span>
       </div>
-      <div id="sf-verdict" class="px-8"></div>
-      <div class="px-8 pb-6 pt-5 text-center">
+      <div id="sf-verdict" class="px-7 py-3"></div>
+      <div class="px-8 pt-6 pb-8 text-center">
         <span class="text-sm text-gray-500 font-mono">plebsvszombies.cc/zombiecheck</span>
       </div>
     </div>
