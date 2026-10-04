@@ -1,6 +1,10 @@
 <template>
-  <!-- :duration: dismissal on a timer, so a lost transitionend can never
-       strand the dimmed backdrop in the DOM (see ZombieBatchSelector). -->
+  <!-- Teleported to <body>: any caller rendered inside a .card would make
+       backdrop-filter the containing block for this fixed overlay, sizing
+       it to the card instead of the viewport. :duration keeps dismissal on
+       a timer so a lost transitionend can't strand the backdrop (see
+       ZombieBatchSelector). -->
+  <Teleport to="body">
   <Transition name="modal" :duration="300">
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click="handleBackdropClick">
     <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
@@ -63,6 +67,7 @@
     </div>
   </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script>

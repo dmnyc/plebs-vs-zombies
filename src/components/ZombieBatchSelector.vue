@@ -355,10 +355,13 @@
       </div>
     </div>
 
-    <!-- Alert Modal. :duration keeps dismissal on a timer — a lost
-         transitionend (throttled tab, focus churn after the download
-         prompt) otherwise strands the half-faded backdrop in the DOM until
-         the next re-render, which read as "the screen stays dimmed". -->
+    <!-- Alert Modal. Teleported to <body>: this component's root is a .card,
+         whose backdrop-filter makes it the containing block for fixed
+         descendants — without the teleport, "fixed inset-0" spans the card
+         instead of the viewport and the dialog renders mid-document.
+         :duration keeps dismissal on a timer, so a lost transitionend can
+         never strand the backdrop either. -->
+    <Teleport to="body">
     <Transition name="modal" :duration="250">
     <div
       v-if="alertModal.show"
@@ -413,6 +416,7 @@
       </div>
     </div>
     </Transition>
+    </Teleport>
   </div>
 </template>
 
