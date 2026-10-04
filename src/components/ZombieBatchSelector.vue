@@ -355,8 +355,11 @@
       </div>
     </div>
 
-    <!-- Alert Modal -->
-    <Transition name="modal">
+    <!-- Alert Modal. :duration keeps dismissal on a timer — a lost
+         transitionend (throttled tab, focus churn after the download
+         prompt) otherwise strands the half-faded backdrop in the DOM until
+         the next re-render, which read as "the screen stays dimmed". -->
+    <Transition name="modal" :duration="250">
     <div
       v-if="alertModal.show"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"

@@ -1,5 +1,7 @@
 <template>
-  <Transition name="modal">
+  <!-- :duration: dismissal on a timer, so a lost transitionend can never
+       strand the dimmed backdrop in the DOM (see ZombieBatchSelector). -->
+  <Transition name="modal" :duration="300">
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" @click="handleBackdropClick">
     <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
       <div class="flex items-center mb-4">

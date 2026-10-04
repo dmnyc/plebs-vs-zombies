@@ -294,7 +294,7 @@
     </div>
 
     <!-- Zombie Purge Celebration Modal -->
-    <Transition name="modal">
+    <Transition name="modal" :duration="300">
     <ZombiePurgeCelebration
       v-if="showCelebration && lastPurgeResult && prePurgeStats"
       :purgeResult="lastPurgeResult"
