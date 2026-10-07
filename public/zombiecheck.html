@@ -370,11 +370,8 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       'wss://relay.primal.net',
       'wss://relay.snort.social',
       'wss://purplepag.es',
-      'wss://relay.nostr.net',
-      'wss://offchain.pub',
       'wss://nostr.mom',
       'wss://relay.noswhere.com',
-      'wss://relay.0xchat.com',
     ];
     // Liveness detection: any event a user signs proves their key is still in
     // use, so the activity query below omits `kinds` entirely. A lurker who
@@ -407,7 +404,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     // pruned them — an account that looks years-dead on the defaults sometimes
     // has recent activity only here, which would otherwise read as a false
     // zombie. Read-open at the time of writing; curated list, extend as needed.
-    const DEEP_RELAYS = ['wss://soloco.nl', 'wss://atlas.nostr.land'];
+    const DEEP_RELAYS = ['wss://soloco.nl', 'wss://atlas.nostr.land', 'wss://relay.ditto.pub'];
     const ALIVE_DAYS = 60;        // inside this band the verdict can't change, so stop early
 
     function newestDays(events) {

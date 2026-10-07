@@ -43,7 +43,11 @@ const ZOMBIE_CHECK_ALIVE_DAYS = 60;
 // default relays have pruned them, so an account that looks years-dead on
 // the defaults sometimes has recent activity here — a false zombie.
 // Read-open at the time of writing; curated list, extend as needed.
-const DEEP_SCAN_RELAYS = ["wss://soloco.nl", "wss://atlas.nostr.land"];
+const DEEP_SCAN_RELAYS = [
+  "wss://soloco.nl",
+  "wss://atlas.nostr.land",
+  "wss://relay.ditto.pub",
+];
 
 function isRelayConnected(relay) {
   const status = relay?.connectivity?.status;
