@@ -19,12 +19,12 @@
  * relay answers it with events. A clean EOSE with zero events from a
  * general query is treated as a finding (empty), not a pass.
  *
- * CAVEAT: this probes from one vantage point using the `ws` client, which
- * sends no Origin header. Some CDN-fronted relays (nostr.wine, nos.lol,
- * nostr.mom have all shown this) drop handshakes without one — a DEAD
- * verdict here is a signal to cross-check in a browser, not proof. Real
- * infrastructure failures look different: ECONNREFUSED / ENOTFOUND (host
- * actually down or DNS gone) survive the Origin re-test.
+ * CAVEAT: this probes from one vantage point using the `ws` client. It sends
+ * the site's Origin header (handshake drops without one were the main source
+ * of false DEADs — nostr.wine, nos.lol and nostr.mom all showed this), but a
+ * DEAD verdict is still only a signal to cross-check in a browser, not proof.
+ * Real infrastructure failures look different: ECONNREFUSED / ENOTFOUND (host
+ * actually down or DNS gone) survive any re-test.
  */
 import WebSocket from "ws";
 
@@ -43,22 +43,19 @@ const LISTS = {
     "wss://relay.primal.net",
     "wss://relay.snort.social",
     "wss://purplepag.es",
-    "wss://relay.nostr.net",
-    "wss://offchain.pub",
     "wss://nostr.mom",
     "wss://relay.noswhere.com",
-    "wss://relay.0xchat.com",
   ],
   "deep scan (DEEP_SCAN_RELAYS / DEEP_RELAYS)": [
     "wss://soloco.nl",
     "wss://atlas.nostr.land",
+    "wss://relay.ditto.pub",
   ],
   "candidates (not currently shipped)": [
     "wss://nostr.fmt.wiz.biz",
     "wss://relay.nostr.band",
     "wss://e.nos.lol",
     "wss://nostr.mother.net",
-    "wss://ditto.pub",
   ],
 };
 
@@ -84,7 +81,9 @@ function probe(relay) {
     };
     const timer = setTimeout(() => finish(opened ? "TIMEOUT" : "DEAD"), TIMEOUT_MS);
     try {
-      ws = new WebSocket(relay);
+      ws = new WebSocket(relay, {
+        headers: { Origin: "https://plebsvszombies.cc" },
+      });
     } catch (e) {
       clearTimeout(timer);
       result.note = e.message;

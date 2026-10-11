@@ -9,6 +9,16 @@
     },
     {
       "source": "/zombiecheck",
+      "destination": "/api/zombiecheck-preview",
+      "has": [{ "type": "query", "key": "npub" }]
+    },
+    {
+      "source": "/zombiecheck",
+      "destination": "/api/zombiecheck-preview",
+      "has": [{ "type": "query", "key": "pubkey" }]
+    },
+    {
+      "source": "/zombiecheck",
       "destination": "/zombiecheck.html"
     },
     {

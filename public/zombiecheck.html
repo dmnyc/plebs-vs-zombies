@@ -38,6 +38,12 @@ Classification bands mirror the in-app ZombieCheck.vue component:
   <meta name="description" content="Check whether any Nostr user is a zombie and see how long they've been gone. No sign-in required." />
 
   <!-- Open Graph / Facebook -->
+  <!-- Deep links (?npub=…) get these tags string-replaced by
+       api/_lib/preview-html.js (via api/zombiecheck-preview.js) so shared
+       previews show the checked user's name and a per-user card. If you
+       change the title/description/og:image lines here, update the markers
+       there too — a mismatch makes the edge function fall back to this
+       generic card. -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://plebsvszombies.cc/zombiecheck">
   <meta property="og:title" content="Zombie Check | Is that Nostr user a zombie?">

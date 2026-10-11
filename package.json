@@ -30,6 +30,7 @@
   "dependencies": {
     "@nostr-dev-kit/ndk": "^2.18.1",
     "@vercel/analytics": "^1.6.1",
+    "@vercel/og": "^0.7.2",
     "chart.js": "^4.5.1",
     "date-fns": "^3.6.0",
     "html2canvas": "^1.4.1",
