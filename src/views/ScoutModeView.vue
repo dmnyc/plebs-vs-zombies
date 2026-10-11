@@ -247,6 +247,8 @@
               {{ copied ? 'Copied!' : 'Copy Share Message' }}
             </button>
           </div>
+
+          <p v-if="postError" class="mt-2 text-xs text-center text-red-400">{{ postError }}</p>
         </div>
 
         <!-- Export Controls -->
@@ -695,6 +697,7 @@ export default {
       copied: false,
       posting: false,
       posted: false,
+      postError: '',
       showPostModal: false,
       isMyReport: false,
       expandedSections: {
@@ -810,6 +813,7 @@ https://plebsvszombies.cc`;
       this.scanning = true;
       this.scoutComplete = false;
       this.scoutResults = null;
+      this.postError = '';
       
       this.scanProgress = {
         total: 0,
@@ -948,6 +952,7 @@ https://plebsvszombies.cc`;
         this.scoutComplete = false;
         this.scoutResults = null;
         this.posted = false;
+        this.postError = '';
         this.copied = false;
         this.isMyReport = false;
         this.showPostModal = false;
@@ -1045,8 +1050,9 @@ https://plebsvszombies.cc`;
     },
     async postToNostr() {
       if (!this.isLoggedIn) return;
-      
+
       this.posting = true;
+      this.postError = '';
       
       try {
         console.log('📡 Posting scout report to Nostr...');
@@ -1110,10 +1116,31 @@ https://plebsvszombies.cc`;
         
       } catch (error) {
         console.error('❌ Failed to post scout report:', error);
-        // Show user-friendly error message but don't throw
+        // Failures must reach the UI — a silent catch here reads as
+        // "nothing happened" when the user clicks Post.
+        this.postError = this.describePostError(error);
       } finally {
         this.posting = false;
       }
+    },
+    describePostError(error) {
+      const message = error?.message || String(error || '');
+      if (/approve the signing request|signing timeout/i.test(message)) {
+        return 'Signing timed out — approve the request in your extension, then try again.';
+      }
+      if (/connection timeout/i.test(message)) {
+        return "Couldn't reach your extension — make sure it's installed and unlocked, then try again.";
+      }
+      if (/failed to sign/i.test(message)) {
+        return "Couldn't sign the report — your signer rejected the request. Approve it or reconnect, then try again.";
+      }
+      if (/bunker|nip-?46/i.test(message)) {
+        return 'Remote signer not connected — reconnect your bunker, then try again.';
+      }
+      if (/any relays|publish/i.test(message)) {
+        return "Couldn't publish to any relays — check your connection, then try again.";
+      }
+      return message || 'Posting failed — please try again.';
     },
     /**
      * Get all zombies sorted by ranking (from most zombie to least zombie/most pleb)
