@@ -430,6 +430,20 @@ class NostrService {
   }
 
   /**
+   * Live relay-pool status for UI indicators (user menu): how many pool
+   * relays are currently connected/authenticated, out of how many the pool
+   * holds. Before initialize() the pool is empty, so total falls back to
+   * the configured default list with zero connected.
+   */
+  getRelayStatus() {
+    const poolRelays = Array.from(this.ndk?.pool?.relays?.values() || []);
+    return {
+      connected: poolRelays.filter((r) => isRelayConnected(r)).length,
+      total: poolRelays.length || this.relays.length,
+    };
+  }
+
+  /**
    * Restore signing method preference
    */
   restoreSigningMethod() {

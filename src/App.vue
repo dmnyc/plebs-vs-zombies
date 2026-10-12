@@ -143,7 +143,7 @@
               <!-- User Avatar and Dropdown -->
               <div v-if="isConnected && userProfile" class="relative">
                 <button
-                  @click="userDropdownOpen = !userDropdownOpen; moreDropdownOpen = false"
+                  @click="userDropdownOpen = !userDropdownOpen; moreDropdownOpen = false; refreshRelayStatus()"
                   class="hover:bg-gray-800 rounded-lg transition-colors xl:ml-4"
                 >
                   <img
@@ -158,41 +158,63 @@
               <Transition name="drop">
               <div
                 v-if="userDropdownOpen"
-                class="absolute right-0 mt-2 w-48 bg-zombie-dark/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 origin-top-right"
+                class="absolute right-0 mt-2 w-52 bg-zombie-dark/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 origin-top-right py-1.5"
               >
-                <div class="p-3 border-b border-white/10">
+                <div class="px-4 py-2 border-b border-white/10">
                   <div class="font-medium text-white">{{ userProfile?.display_name || userProfile?.name || 'Anonymous' }}</div>
                   <div class="text-sm text-gray-400 flex items-center">
                     <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
                     <CopyButton :pubkey="userProfile?.pubkey" />
                   </div>
-                  <div class="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
-                    {{ signerLabel }}
-                  </div>
                 </div>
-                <div class="p-1 border-t border-white/10">
+                <div class="py-1">
                   <button
-                    @click="toggleDarkerMode"
-                    :aria-pressed="darkerMode"
-                    class="w-full text-left px-3 py-2 rounded-lg flex items-center justify-between gap-2.5 text-sm text-gray-200 select-none transition-colors duration-150 hover:bg-white/5"
+                    @click="setActiveView('settings'); userDropdownOpen = false"
+                    class="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors text-left select-none"
                   >
-                    <span>Darker Mode</span>
-                    <span
-                      class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
-                      :class="darkerMode ? 'bg-zombie-green' : 'bg-gray-600'"
-                    >
-                      <span
-                        class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200"
-                        :class="darkerMode ? 'translate-x-[19px]' : 'translate-x-[3px]'"
-                      ></span>
-                    </span>
+                    <span class="w-4 text-center text-[13px]">⚙️</span>
+                    <span>Settings</span>
+                  </button>
+                </div>
+                <div class="border-t border-white/10 mt-1 pt-1.5">
+                  <div class="px-4 py-1.5 text-[11px] uppercase tracking-wide font-semibold text-gray-500">Theme</div>
+                  <button
+                    @click="setDarkerMode(false)"
+                    :aria-pressed="!darkerMode"
+                    class="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-left select-none"
+                    :class="!darkerMode ? 'text-zombie-green font-medium' : 'text-gray-300 hover:text-white hover:bg-white/5'"
+                  >
+                    <span class="w-4 text-center text-[13px]">🌘</span>
+                    <span>Dark Mode</span>
+                    <span v-if="!darkerMode" class="ml-auto text-zombie-green text-[13px]">✓</span>
                   </button>
                   <button
-                    @click="logout"
-                    class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98] mt-1"
+                    @click="setDarkerMode(true)"
+                    :aria-pressed="darkerMode"
+                    class="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-left select-none"
+                    :class="darkerMode ? 'text-zombie-green font-medium' : 'text-gray-300 hover:text-white hover:bg-white/5'"
                   >
-                    <span>🚪</span>
+                    <span class="w-4 text-center text-[13px]">🌑</span>
+                    <span>Darker Mode</span>
+                    <span v-if="darkerMode" class="ml-auto text-zombie-green text-[13px]">✓</span>
+                  </button>
+                </div>
+                <div class="border-t border-white/10 mt-1 pt-1.5 px-4 space-y-1.5">
+                  <div class="flex items-center gap-2.5 text-xs text-gray-400">
+                    <span class="w-1.5 h-1.5 rounded-full inline-block shrink-0" :class="relayStatus.connected > 0 ? 'bg-green-500' : 'bg-red-500'"></span>
+                    <span>{{ relayStatus.connected }}/{{ relayStatus.total }} relays connected</span>
+                  </div>
+                  <div class="flex items-center gap-2.5 text-xs text-gray-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block shrink-0"></span>
+                    <span>{{ signerLabel }}</span>
+                  </div>
+                </div>
+                <div class="px-2 pt-1.5 pb-0.5">
+                  <button
+                    @click="logout"
+                    class="w-full text-left px-2 py-2 rounded-lg flex items-center gap-3 text-sm text-red-300 select-none transition-colors duration-150 hover:bg-white/5 hover:text-red-200"
+                  >
+                    <span class="w-4 text-center text-[13px]">🚪</span>
                     <span>Logout</span>
                   </button>
                 </div>
@@ -203,7 +225,7 @@
               <!-- Mobile/Tablet Hamburger Button -->
               <button
                 v-if="isConnected"
-                @click="mobileMenuOpen = !mobileMenuOpen"
+                @click="mobileMenuOpen = !mobileMenuOpen; refreshRelayStatus()"
                 class="xl:hidden flex flex-col justify-center items-center w-8 h-8 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors ml-2"
                 :class="{'bg-gray-800': mobileMenuOpen}"
               >
@@ -236,31 +258,44 @@
                   <span class="truncate">{{ formatNpub(userProfile?.pubkey) }}</span>
                   <CopyButton :pubkey="userProfile?.pubkey" />
                 </div>
-                <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
-                  {{ signerLabel }}
+                <div class="text-xs text-gray-500 mt-2 space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block shrink-0"></span>
+                    {{ signerLabel }}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full inline-block shrink-0" :class="relayStatus.connected > 0 ? 'bg-green-500' : 'bg-red-500'"></span>
+                    {{ relayStatus.connected }}/{{ relayStatus.total }} relays connected
+                  </div>
                 </div>
               </div>
             </div>
-            <button
-              @click="toggleDarkerMode"
-              :aria-pressed="darkerMode"
-              class="w-full px-3 py-2 rounded-lg flex items-center justify-between gap-2.5 text-sm text-gray-200 select-none text-left transition-colors duration-150 hover:bg-white/5"
-            >
-              <span>Darker Mode</span>
-              <span
-                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
-                :class="darkerMode ? 'bg-zombie-green' : 'bg-gray-600'"
+            <div class="pt-1 border-t border-white/10">
+              <div class="px-3 py-1.5 text-[11px] uppercase tracking-wide font-semibold text-gray-500">Theme</div>
+              <button
+                @click="setDarkerMode(false)"
+                :aria-pressed="!darkerMode"
+                class="w-full px-3 py-2 rounded-lg flex items-center gap-3 text-sm transition-colors text-left select-none"
+                :class="!darkerMode ? 'text-zombie-green font-medium' : 'text-gray-300 hover:text-white hover:bg-white/5'"
               >
-                <span
-                  class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200"
-                  :class="darkerMode ? 'translate-x-[19px]' : 'translate-x-[3px]'"
-                ></span>
-              </span>
-            </button>
+                <span class="w-4 text-center text-[13px]">🌘</span>
+                <span>Dark Mode</span>
+                <span v-if="!darkerMode" class="ml-auto text-zombie-green text-[13px]">✓</span>
+              </button>
+              <button
+                @click="setDarkerMode(true)"
+                :aria-pressed="darkerMode"
+                class="w-full px-3 py-2 rounded-lg flex items-center gap-3 text-sm transition-colors text-left select-none"
+                :class="darkerMode ? 'text-zombie-green font-medium' : 'text-gray-300 hover:text-white hover:bg-white/5'"
+              >
+                <span class="w-4 text-center text-[13px]">🌑</span>
+                <span>Darker Mode</span>
+                <span v-if="darkerMode" class="ml-auto text-zombie-green text-[13px]">✓</span>
+              </button>
+            </div>
             <button
               @click="logout"
-              class="w-full px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none text-left transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98]"
+              class="w-full px-3 py-2.5 rounded-lg flex items-center gap-2.5 text-sm text-red-300 select-none text-left transition-colors duration-150 hover:bg-white/5 hover:text-red-200"
             >
               <span>🚪</span>
               <span>Logout</span>
@@ -996,6 +1031,8 @@ export default {
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
       darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
+      // Read fresh every time a user menu opens (avatar dropdown / mobile menu)
+      relayStatus: { connected: 0, total: 0 },
       eggToast: {
         show: false,
         message: '',
@@ -1502,6 +1539,11 @@ export default {
       }
     },
 
+    // Pool snapshot for the status rows shown when a user menu opens
+    refreshRelayStatus() {
+      this.relayStatus = nostrService.getRelayStatus();
+    },
+
     handleAvatarError(event) {
       event.target.src = '/default-avatar.svg';
     },
@@ -1559,10 +1601,11 @@ export default {
       else document.title = 'Plebs vs. Zombies';
     },
 
-    toggleDarkerMode() {
-      this.darkerMode = !this.darkerMode;
+    setDarkerMode(on) {
+      if (this.darkerMode === on) return;
+      this.darkerMode = on;
       try {
-        localStorage.setItem('pvs-darker-mode', this.darkerMode ? '1' : '0');
+        localStorage.setItem('pvs-darker-mode', on ? '1' : '0');
       } catch { /* storage unavailable — theme just won't persist */ }
     },
 
