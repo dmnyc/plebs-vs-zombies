@@ -721,6 +721,24 @@
 }
 
 /* ==========================================================================
+   DARKER MODE — B&W high-contrast theme, toggled from the user menu.
+   Signed-in only: logout() clears the flag and the class. The filter sits
+   on <html> — per the filter-effects spec, a filter creates a containing
+   block for fixed-position descendants UNLESS it's on the root element,
+   so the fixed header and modals stay viewport-anchored — and a root
+   grayscale catches every Tailwind utility, gradient, chart and avatar
+   with zero per-component overrides.
+   ========================================================================== */
+html {
+  /* On the un-filtered root too, so switching the theme off eases back
+     instead of snapping */
+  transition: filter 0.5s ease;
+}
+html.darker-mode {
+  filter: grayscale(1) contrast(1.2);
+}
+
+/* ==========================================================================
    Reduced motion — kill all non-essential animation globally
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {

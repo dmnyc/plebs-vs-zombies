@@ -171,10 +171,26 @@
                     {{ signerLabel }}
                   </div>
                 </div>
-                <div class="p-1">
+                <div class="p-1 border-t border-white/10">
+                  <button
+                    @click="toggleDarkerMode"
+                    :aria-pressed="darkerMode"
+                    class="w-full text-left px-3 py-2 rounded-lg flex items-center justify-between gap-2.5 text-sm text-gray-200 select-none transition-colors duration-150 hover:bg-white/5"
+                  >
+                    <span>Darker Mode</span>
+                    <span
+                      class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                      :class="darkerMode ? 'bg-zombie-green' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200"
+                        :class="darkerMode ? 'translate-x-[19px]' : 'translate-x-[3px]'"
+                      ></span>
+                    </span>
+                  </button>
                   <button
                     @click="logout"
-                    class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98]"
+                    class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98] mt-1"
                   >
                     <span>🚪</span>
                     <span>Logout</span>
@@ -226,6 +242,22 @@
                 </div>
               </div>
             </div>
+            <button
+              @click="toggleDarkerMode"
+              :aria-pressed="darkerMode"
+              class="w-full px-3 py-2 rounded-lg flex items-center justify-between gap-2.5 text-sm text-gray-200 select-none text-left transition-colors duration-150 hover:bg-white/5"
+            >
+              <span>Darker Mode</span>
+              <span
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                :class="darkerMode ? 'bg-zombie-green' : 'bg-gray-600'"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200"
+                  :class="darkerMode ? 'translate-x-[19px]' : 'translate-x-[3px]'"
+                ></span>
+              </span>
+            </button>
             <button
               @click="logout"
               class="w-full px-3 py-2.5 rounded-lg flex items-center gap-2.5 font-semibold text-red-300 bg-red-500/10 border border-red-500/20 select-none text-left transition-colors duration-150 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-200 active:scale-[0.98]"
@@ -881,6 +913,16 @@ import { nip19, finalizeEvent, getPublicKey } from 'nostr-tools';
 import { Analytics } from '@vercel/analytics/vue';
 import { baseVersion } from './utils/version';
 
+// Read before first render (data() initializer) so the theme class lands on
+// <html> synchronously at created() — no flash of color on reload
+function storedDarkerMode() {
+  try {
+    return localStorage.getItem('pvs-darker-mode') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default {
   name: 'App',
   components: {
@@ -953,6 +995,7 @@ export default {
       scoutInputError: '', // Error message for validation
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
+      darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
       eggToast: {
         show: false,
         message: '',
@@ -1052,10 +1095,18 @@ export default {
         this.activeView = viewName;
       }
     },
-    zombieMode(on) {
-      document.title = on
-        ? '🧟 BRAINZ! | Plebs vs. Zombies'
-        : 'Plebs vs. Zombies';
+    zombieMode() {
+      this.updateTitle();
+    },
+    darkerMode: {
+      handler(on) {
+        // The class lives on <html>, not the app root div: a filter on a
+        // non-root element becomes a containing block for position:fixed
+        // descendants, which would drag the fixed header and modals around
+        document.documentElement.classList.toggle('darker-mode', on);
+        this.updateTitle();
+      },
+      immediate: true
     },
     // :key="forceUpdateKey" on <header> destroys and recreates the header
     // DOM node on login/profile-load, so $refs.headerEl points at a
@@ -1425,6 +1476,11 @@ export default {
       this.userDropdownOpen = false;
       this.mobileMenuOpen = false;
 
+      // DARKER MODE is a signed-in-only theme — logging out turns the
+      // lights back on and forgets the preference
+      this.darkerMode = false;
+      try { localStorage.removeItem('pvs-darker-mode'); } catch { /* ignore */ }
+
       // Exit Scout Mode if active
       if (this.isScoutMode) {
         this.exitScoutMode();
@@ -1494,6 +1550,20 @@ export default {
       } else {
         this.showEggToast('💉 Vaccine administered. You\'re human again.');
       }
+    },
+
+    // One title for every combination; zombie mode outranks the theme
+    updateTitle() {
+      if (this.zombieMode) document.title = '🧟 BRAINZ! | Plebs vs. Zombies';
+      else if (this.darkerMode) document.title = '🕶️ DARKER MODE | Plebs vs. Zombies';
+      else document.title = 'Plebs vs. Zombies';
+    },
+
+    toggleDarkerMode() {
+      this.darkerMode = !this.darkerMode;
+      try {
+        localStorage.setItem('pvs-darker-mode', this.darkerMode ? '1' : '0');
+      } catch { /* storage unavailable — theme just won't persist */ }
     },
 
     handleKonamiKey(event) {
@@ -1758,6 +1828,13 @@ export default {
       // Session data exists but no signing method ready - clear it
       console.log('⚠️ Session data found but no signing method ready - clearing session');
       nostrService.logout();
+    }
+
+    // DARKER MODE only exists for signed-in users; a stale stored flag
+    // (e.g. from before a logout elsewhere) must not color the login page
+    if (!this.isConnected) {
+      this.darkerMode = false;
+      try { localStorage.removeItem('pvs-darker-mode'); } catch { /* ignore */ }
     }
 
     // Initialize services
