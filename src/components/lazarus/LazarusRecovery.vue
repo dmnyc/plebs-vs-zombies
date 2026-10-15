@@ -12,16 +12,24 @@
           backups, this needs no backup made in advance. Scans are read-only:
           nothing is published until you review the change and confirm.
         </p>
-        <p class="mt-1 text-xs text-gray-500">
-          Follows the
-          <a
-            href="https://github.com/dmnyc/lazarus"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="underline hover:text-gray-300"
-          >Lazarus</a>
-          recovery spec (0.6.2-draft).
-        </p>
+        <div class="mt-2 flex items-center justify-between gap-3">
+          <p class="text-sm text-gray-300">
+            Follows the
+            <a
+              href="https://github.com/dmnyc/lazarus"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-medium text-zombie-green underline hover:text-zombie-green-bright"
+            >Lazarus</a>
+            recovery spec (0.6.2-draft).
+          </p>
+          <img
+            src="/lazarus_letterforms_green.svg"
+            alt=""
+            class="h-4 w-auto flex-shrink-0 opacity-80"
+            loading="lazy"
+          />
+        </div>
 
         <!-- Dev only: stands in for a client that clobbers the follow list, so
              a scan and restore can be tried end to end. -->

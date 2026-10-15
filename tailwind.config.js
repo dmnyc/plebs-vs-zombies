@@ -8,6 +8,8 @@ export default {
     extend: {
       colors: {
         'zombie-green': '#5cdb5c',
+        // Matches the --zombie-green-bright variable in main.css.
+        'zombie-green-bright': '#7dff7d',
         // Desaturated green for labels that should read as secondary next to
         // zombie-green rather than compete with it.
         'zombie-moss': '#617f61',
