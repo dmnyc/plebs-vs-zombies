@@ -1184,6 +1184,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     // their header zombie face. Fetch it once as a data URL and keep it, so
     // the capture never depends on a second network round-trip.
     let logoDataUrl = null;
+    let heartDataUrl = null;
     async function sameOriginSvgDataUrl(path) {
       const svg = await (await fetch(path)).text();
       return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
@@ -1235,6 +1236,14 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       const proxied = picture ? await loadImageAsBase64(picture) : null;
       const avatarImg = clone.querySelector('img');
       if (avatarImg) avatarImg.src = proxied || DEFAULT_AVATAR_DATA_URL;
+      // Same re-fetch failure class as the logo: the verdict icon is an <img>
+      // (not a glyph) on systems lacking U+1FAC0, so inline it too.
+      for (const img of clone.querySelectorAll(`img[src="${HEART_FALLBACK_SRC}"]`)) {
+        try {
+          heartDataUrl = heartDataUrl || await sameOriginSvgDataUrl(HEART_FALLBACK_SRC);
+          img.src = heartDataUrl;
+        } catch (_) {}
+      }
       verdictSlot.appendChild(clone);
       // Let the avatar decode and layout settle before rasterizing.
       await new Promise((resolve) => setTimeout(resolve, 100));
