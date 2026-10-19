@@ -206,7 +206,7 @@
         style="border: 1px solid rgba(92, 219, 92, 0.22); background: radial-gradient(600px 420px at 12% 0%, rgba(92, 219, 92, 0.10), transparent 60%), radial-gradient(560px 400px at 100% 10%, rgba(142, 48, 235, 0.12), transparent 60%), linear-gradient(180deg, #0d1512 0%, #0a0f0c 100%);"
       >
         <div class="flex items-center justify-center gap-3 px-6 pt-8 pb-3">
-          <img ref="shareLogo" src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0" />
+          <img ref="shareLogo" src="/logo.svg" alt="" class="w-12 h-12 flex-shrink-0 object-contain" />
           <!-- top: -17px — html2canvas places Creepster text ~17px below the
                flex centerline (browser centers it correctly; measured from
                the captured PNG). The frame is capture-only, so correct it. -->
@@ -330,6 +330,23 @@ let logoDataUrl = null;
 async function sameOriginSvgDataUrl(path) {
   const svg = await (await fetch(path)).text();
   return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+// html2canvas draws SVG <img>s through its own loader and can still drop a
+// large one (the logo is a 754x828 clip-pathed SVG), so the header face
+// went missing in shared PNGs even with the data URL inlined. Rasterize it
+// with the browser's native SVG renderer and hand html2canvas a plain PNG
+// instead. (Mirrors svgToPngDataUrl in public/zombiecheck.html.)
+async function svgToPngDataUrl(svgDataUrl, height) {
+  const img = new Image();
+  img.src = svgDataUrl;
+  await img.decode();
+  const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+  const canvas = document.createElement('canvas');
+  canvas.height = height;
+  canvas.width = Math.round(height * ratio);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/png');
 }
 
 // 268-byte fallback avatar, inlined — same failure class as the logo, and
@@ -616,13 +633,20 @@ export default {
       if (!this.$refs.resultCard) {
         throw new Error('Result card is not rendered.');
       }
-      // Inline the header logo as a data URL (see sameOriginSvgDataUrl).
-      // Best-effort: if even this fetch fails, keep the original src.
+      // Rasterize the logo to PNG before capture (see svgToPngDataUrl).
+      // Best-effort: if even this fails, keep the original src.
       const frameLogo = this.$refs.shareLogo;
       if (frameLogo && !logoDataUrl) {
-        try { logoDataUrl = await sameOriginSvgDataUrl('/logo.svg'); } catch (_) {}
+        try {
+          const svgUrl = await sameOriginSvgDataUrl('/logo.svg');
+          try { logoDataUrl = await svgToPngDataUrl(svgUrl, 192); }
+          catch (_) { logoDataUrl = svgUrl; }
+        } catch (_) {}
       }
-      if (frameLogo && logoDataUrl) frameLogo.src = logoDataUrl;
+      if (frameLogo && logoDataUrl) {
+        frameLogo.src = logoDataUrl;
+        try { await frameLogo.decode(); } catch (_) {}
+      }
       const verdictSlot = this.$refs.shareVerdict;
       verdictSlot.innerHTML = '';
       const clone = this.prepareCardClone();
