@@ -86,8 +86,44 @@ class NostrService {
     this.userRelayList = null; // User's own relay preferences
     this.followsRelayLists = new Map(); // Map of pubkey -> relay list
 
+    // Cross-scan last-seen cache (liveness-positive only — see
+    // getProfilesActivity's prefilter). Loaded lazily per scan so a
+    // storage failure never breaks service construction.
+    this.LAST_SEEN_CACHE_KEY = "pvz_last_seen_cache_v1";
+
     // Restore signing method preference and connections
     this.restoreSigningMethod();
+  }
+
+  /**
+   * Cross-scan last-seen cache: pubkey → newest created_at this app has
+   * ever observed for that pubkey (relay evidence only). Read strictly to
+   * prove users ALIVE, never to prove absence — so a stale or corrupt
+   * entry can only cause extra relay queries, never a false zombie.
+   */
+  loadLastSeenCache() {
+    try {
+      const raw = localStorage.getItem(this.LAST_SEEN_CACHE_KEY);
+      if (!raw) return new Map();
+      const obj = JSON.parse(raw);
+      const map = new Map();
+      for (const [pk, ts] of Object.entries(obj)) {
+        if (typeof ts === "number" && ts > 0) map.set(pk, ts);
+      }
+      return map;
+    } catch (error) {
+      console.warn("⚠️ Last-seen cache unreadable, starting empty:", error.message);
+      return new Map();
+    }
+  }
+
+  saveLastSeenCache(map) {
+    try {
+      const obj = Object.fromEntries(map);
+      localStorage.setItem(this.LAST_SEEN_CACHE_KEY, JSON.stringify(obj));
+    } catch (error) {
+      console.warn("⚠️ Last-seen cache save failed (non-fatal):", error.message);
+    }
   }
 
   async initialize() {
@@ -1546,39 +1582,113 @@ class NostrService {
       `🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`,
     );
 
+    // Concurrent lanes: instead of one strictly sequential batch loop, run
+    // ACTIVITY_LANES lanes at once, each pulling batches from a shared
+    // cursor. Same filters, same batch size, same per-batch recheck and
+    // delay — identical queries, just overlapped, so per-relay load per
+    // lane is unchanged and wall time drops roughly by the lane count.
+    // Classification logic is untouched.
+    const ACTIVITY_LANES = 5;
+
     // Smaller batches ensure each user gets relay coverage
     // Larger batches cause prolific posters to crowd out quieter users in results
     const batchSize = 10;
     const totalBatches = Math.ceil(pubkeys.length / batchSize);
 
-    for (let i = 0; i < pubkeys.length; i += batchSize) {
+    let cursor = 0;
+    let completedBatches = 0;
+
+    // ---- Prefilter: skip relay queries for provably-alive users ----
+    // Two evidence sources, both LIVENESS-POSITIVE ONLY:
+    //
+    // 1. Cross-scan last-seen cache (localStorage): if this app's own
+    //    previous scan recorded activity newer than every configured
+    //    zombie threshold, the user cannot be a zombie by the app's own
+    //    definition — no queries needed at all.
+    // 2. Primal cache bulk lookup: a fresh cached profile event also proves
+    //    recent publish activity. Cache silence proves nothing and is
+    //    never used as zombie evidence.
+    //
+    // Skipped users get a synthetic single-event activity entry so every
+    // downstream stage (classification, retry ladder, UI) sees them as the
+    // active accounts the evidence says they are. Everyone NOT skipped
+    // goes through the exact relay pipeline as before — false positives
+    // are structurally impossible from this prefilter.
+    const lastSeenCache = this.loadLastSeenCache();
+    let cacheProvenAlive = 0;
+    let primalProvenAlive = 0;
+
+    let primalLastSeen = new Map();
+    try {
+      const notYetProven = pubkeys.filter((pk) => {
+        const seen = lastSeenCache.get(pk) || 0;
+        // Conservative: the cache only skips when the recorded activity is
+        // newer than the SHORTEST standard threshold (90d). Longer
+        // thresholds classify against a wider window and still need the
+        // user's real newest event for the "last active" display.
+        return seen < Math.floor(Date.now() / 1000) - 90 * 86400;
+      });
+
+      if (notYetProven.length > 0) {
+        console.log(
+          `⚡ Primal prefilter: ${notYetProven.length} users not already proven alive by scan cache`,
+        );
+        primalLastSeen = await primalCacheService.getBulkLastSeen(notYetProven);
+      }
+    } catch (error) {
+      console.warn("⚡ Primal prefilter unavailable, full relay scan:", error.message);
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    for (const pk of pubkeys) {
+      const scanCacheSeen = lastSeenCache.get(pk) || 0;
+      const primalSeen = primalLastSeen.get(pk) || 0;
+      const provenAliveAt = Math.max(scanCacheSeen, primalSeen);
+
+      if (provenAliveAt > nowSec - 90 * 86400) {
+        if (scanCacheSeen >= provenAliveAt) cacheProvenAlive++;
+        else primalProvenAlive++;
+        activityMap.set(pk, [
+          {
+            id: `lastseen-cache:${pk}`,
+            created_at: provenAliveAt,
+            content: "",
+            kind: 0, // synthetic liveness marker, not a real event
+          },
+        ]);
+      }
+    }
+    if (cacheProvenAlive + primalProvenAlive > 0) {
+      console.log(
+        `⚡ Prefilter: ${cacheProvenAlive} proven alive by scan cache, ${primalProvenAlive} by Primal — skipped relay queries for both`,
+      );
+    }
+
+    const runBatch = async (i, lane) => {
       const batch = pubkeys.slice(i, i + batchSize);
       const batchNum = Math.floor(i / batchSize) + 1;
 
       try {
         // No `kinds` — any signed event counts as liveness (see LIVENESS_KINDS).
         // Full year lookback to cover the whole zombie threshold range.
-        // Higher per-user limit to avoid prolific posters crowding out quiet users
+        // Higher per-user limit to avoid prolific posters crowding out quiet users.
+        // Users already proven alive by the prefilter are excluded — their
+        // synthetic entries stay untouched in activityMap.
+        const batchNeedingRelay = batch.filter(
+          (pk) => !activityMap.get(pk)?.length,
+        );
+        if (batchNeedingRelay.length === 0) {
+          return; // whole batch prefilter-proven; nothing to query
+        }
         const filter = {
-          authors: batch,
-          limit: 20 * batch.length, // 20 events per user to ensure coverage
+          authors: batchNeedingRelay,
+          limit: 20 * batchNeedingRelay.length, // 20 events per user to ensure coverage
           since: Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60, // 365 days - matches zombie thresholds
         };
 
         console.log(
           `📡 Batch ${batchNum}/${totalBatches}: Scanning ${batch.length} users (balanced approach)...`,
         );
-
-        // Report progress before attempting
-        if (progressCallback) {
-          const progressData = {
-            total: pubkeys.length,
-            processed: i,
-            stage: `Scanning batch ${batchNum}/${totalBatches}`,
-            currentNpub: batch[0].substring(0, 8) + "...",
-          };
-          progressCallback(progressData);
-        }
 
         // Balanced timeout approach
         let events = new Set();
@@ -1630,7 +1740,7 @@ class NostrService {
         const staleCutoff =
           Math.floor(Date.now() / 1000) - RECHECK_STALE_THRESHOLD_DAYS * 86400;
 
-        const usersToRecheck = batch.filter((pk) => {
+        const usersToRecheck = batchNeedingRelay.filter((pk) => {
           const events = activityMap.get(pk) || [];
           if (events.length === 0) return true; // (a) no events
           return events[0].created_at < staleCutoff; // (b) newest is stale
@@ -1672,7 +1782,6 @@ class NostrService {
           };
           progressCallback(completionData);
         }
-
         // Reasonable delay between batches
         if (i + batchSize < pubkeys.length) {
           await new Promise((resolve) => setTimeout(resolve, 300)); // 300ms delay
@@ -1692,6 +1801,68 @@ class NostrService {
 
         // Continue with next batch
       }
+    };
+
+    // Lane worker: pull the next unclaimed batch index until the cursor
+    // runs dry. Mutex-free because JS is single-threaded — the cursor
+    // read/increment is atomic across await points.
+    const laneWorker = async (lane) => {
+      while (cursor < pubkeys.length) {
+        const i = cursor;
+        cursor += batchSize;
+        await runBatch(i, lane);
+        completedBatches++;
+      }
+    };
+
+    // Progress reporter: lanes update out of order, so a monotonic
+    // processed count keeps the UI from jumping backwards. Reported from
+    // one interval ticker rather than per batch.
+    const progressTicker = progressCallback
+      ? setInterval(() => {
+          progressCallback({
+            total: pubkeys.length,
+            processed: Math.min(completedBatches * batchSize, pubkeys.length),
+            stage: `Scanning batch ${completedBatches}/${totalBatches} (${ACTIVITY_LANES} lanes)`,
+            currentNpub: "",
+          });
+        }, 1000)
+      : null;
+
+    try {
+      await Promise.all(
+        Array.from({ length: ACTIVITY_LANES }, (_, lane) => laneWorker(lane)),
+      );
+    } finally {
+      if (progressTicker) clearInterval(progressTicker);
+    }
+
+    // Record fresh liveness for the next scan's prefilter. Only real relay
+    // evidence updates the cache — synthetic prefilter entries are skipped
+    // so a wrong hint can never perpetuate itself. The cache is only ever
+    // read to prove users ALIVE, so a stale entry costs relay queries,
+    // never accuracy.
+    const updatedCache = this.loadLastSeenCache();
+    let cacheWrites = 0;
+    for (const pk of pubkeys) {
+      const events = activityMap.get(pk) || [];
+      if (
+        events.length > 0 &&
+        events[0].id !== `lastseen-cache:${pk}` &&
+        typeof events[0].created_at === "number"
+      ) {
+        const prev = updatedCache.get(pk) || 0;
+        if (events[0].created_at > prev) {
+          updatedCache.set(pk, events[0].created_at);
+          cacheWrites++;
+        }
+      }
+    }
+    this.saveLastSeenCache(updatedCache);
+    if (cacheWrites > 0) {
+      console.log(
+        `💾 Last-seen cache: ${cacheWrites} updates for future scans`,
+      );
     }
 
     const activeProfiles = Array.from(activityMap.values()).filter(
@@ -2947,16 +3118,80 @@ class NostrService {
     console.log(`🔍 Fetching relay lists for ${pubkeys.length} follows...`);
 
     const relayLists = new Map();
-    const batchSize = 20; // Process in batches to avoid overwhelming relays
 
-    for (let i = 0; i < pubkeys.length; i += batchSize) {
-      const batch = pubkeys.slice(i, i + batchSize);
+    // BULK FIRST: one authors:[...] filter per 400-pubkey chunk returns the
+    // same kind-10002 events a per-user REQ would, in a handful of round
+    // trips instead of one per user. Identical events, identical parse —
+    // only the request shape changes. Users missing from the bulk result
+    // (relay gaps, chunk stragglers) fall back to the per-user path below,
+    // so coverage matches the old behavior exactly.
+    const BULK_CHUNK = 400;
+    const bulkMissing = [];
+
+    for (let i = 0; i < pubkeys.length; i += BULK_CHUNK) {
+      const chunk = pubkeys.slice(i, i + BULK_CHUNK);
+      const chunkNum = Math.floor(i / BULK_CHUNK) + 1;
 
       if (progressCallback) {
         progressCallback({
-          stage: "Fetching relay lists...",
+          stage: `Fetching relay lists (bulk ${chunkNum})...`,
           processed: i,
           total: pubkeys.length,
+        });
+      }
+
+      try {
+        const events = await Promise.race([
+          this.ndk.fetchEvents(
+            { kinds: [10002], authors: chunk, limit: chunk.length },
+            {},
+            this.relaySetFor(),
+          ),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Bulk relay-list timeout")), 15000),
+          ),
+        ]);
+
+        let bulkFound = 0;
+        for (const event of events) {
+          // Keep each author's newest event only — same rule the per-user
+          // path applies.
+          const existing = relayLists.get(event.pubkey);
+          if (existing && existing.createdAt >= event.created_at) continue;
+          const relayList = this.parseRelayList(event);
+          if (relayList) {
+            relayList.createdAt = event.created_at;
+            relayLists.set(event.pubkey, relayList);
+            this.followsRelayLists.set(event.pubkey, relayList); // Cache it
+            bulkFound++;
+          }
+        }
+        console.log(
+          `📦 Bulk relay-list chunk ${chunkNum}: ${bulkFound}/${chunk.length} users`,
+        );
+      } catch (error) {
+        console.warn(
+          `⚠️ Bulk relay-list chunk ${chunkNum} failed: ${error.message}, falling back per-user`,
+        );
+      }
+
+      for (const pk of chunk) {
+        if (!relayLists.has(pk)) bulkMissing.push(pk);
+      }
+    }
+
+    // PER-USER FALLBACK for everyone the bulk pass missed — the original
+    // batches-of-20 path, unchanged. Normally a short list.
+    const batchSize = 20; // Process in batches to avoid overwhelming relays
+
+    for (let i = 0; i < bulkMissing.length; i += batchSize) {
+      const batch = bulkMissing.slice(i, i + batchSize);
+
+      if (progressCallback) {
+        progressCallback({
+          stage: `Fetching relay lists (${bulkMissing.length} need retry)...`,
+          processed: i,
+          total: bulkMissing.length,
         });
       }
 
@@ -2972,7 +3207,7 @@ class NostrService {
       await Promise.all(batchPromises);
 
       // Small delay between batches to be nice to relays
-      if (i + batchSize < pubkeys.length) {
+      if (i + batchSize < bulkMissing.length) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
