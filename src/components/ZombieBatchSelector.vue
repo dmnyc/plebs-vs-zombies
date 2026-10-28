@@ -74,8 +74,8 @@
             class="p-3 border border-gray-700 rounded-lg hover:bg-gray-800 hover:border-zombie-green/40 transition-all duration-200 animate-fade-up"
             :class="`stagger-${Math.min((index % 10) + 1, 8)}`"
           >
-            <!-- Top Row: Profile Picture + Info + Badge -->
-            <div class="flex items-center justify-between">
+            <!-- Top Row: Profile Picture + Name/Handle + Badge -->
+            <div class="flex items-start justify-between gap-2">
               <div class="flex items-center min-w-0 flex-grow">
                 <!-- Profile Picture -->
                 <img 
@@ -85,25 +85,20 @@
                   @error="$event.target.src = '/default-avatar.svg'"
                 />
                 
-                <div>
+                <div class="min-w-0">
                   <!-- Display Name -->
-                  <div class="font-medium text-gray-100">
+                  <div class="font-medium text-gray-100 truncate">
                     {{ getDisplayName(zombie) }}
                   </div>
                   <!-- Username -->
-                  <div class="text-sm text-gray-400" v-if="zombie.profile?.name && zombie.profile.name !== getDisplayName(zombie)">
+                  <div class="text-sm text-gray-400 truncate" v-if="zombie.profile?.name && zombie.profile.name !== getDisplayName(zombie)">
                     @{{ zombie.profile.name }}
-                  </div>
-                  <!-- Npub fallback -->
-                  <div class="font-mono text-xs text-gray-500 break-all flex items-center" :title="zombie.pubkey">
-                    {{ formatNpub(zombie.pubkey) }}
-                    <CopyButton :pubkey="zombie.pubkey" />
                   </div>
                 </div>
               </div>
               
               <!-- Zombie Type Badge -->
-              <div class="flex flex-col items-end gap-1 flex-shrink-0 self-start">
+              <div class="flex flex-col items-end gap-1 flex-shrink-0">
                 <span 
                   class="px-2 py-1 text-xs rounded-full whitespace-nowrap"
                   :class="{
@@ -116,6 +111,12 @@
                   {{ zombie.type === 'burned' ? '🔥 burned' : zombie.type }} zombie
                 </span>
               </div>
+            </div>
+            
+            <!-- Npub: full width, runs beneath the avatar -->
+            <div class="mt-1 font-mono text-xs text-gray-500 break-all flex items-center" :title="zombie.pubkey">
+              {{ formatNpub(zombie.pubkey) }}
+              <CopyButton :pubkey="zombie.pubkey" />
             </div>
             
             <!-- Bio/About Text (if available) -->
