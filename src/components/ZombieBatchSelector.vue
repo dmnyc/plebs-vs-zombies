@@ -103,9 +103,9 @@
               </div>
               
               <!-- Zombie Type Badge -->
-              <div class="flex flex-col items-end gap-1">
+              <div class="flex flex-col items-end gap-1 flex-shrink-0">
                 <span 
-                  class="px-2 py-1 text-xs rounded-full"
+                  class="px-2 py-1 text-xs rounded-full whitespace-nowrap"
                   :class="{
                     'bg-red-700 text-red-100': zombie.type === 'burned',
                     'bg-yellow-600 text-yellow-100': zombie.type === 'fresh',
