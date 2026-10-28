@@ -284,13 +284,13 @@ const CATEGORY_DISPLAY = {
     textClass: 'text-yellow-300',
   },
   fresh: {
-    emoji: '🧟',
+    emoji: '⚰️',
     label: 'Fresh Zombie',
     borderClass: 'border-yellow-600/50 bg-gradient-to-br from-yellow-900/40 to-zombie-dark',
     textClass: 'text-yellow-400',
   },
   rotting: {
-    emoji: '🧟‍♂️',
+    emoji: '🪦',
     label: 'Rotting Zombie',
     borderClass: 'border-orange-600/50 bg-gradient-to-br from-orange-900/40 to-zombie-dark',
     textClass: 'text-orange-400',

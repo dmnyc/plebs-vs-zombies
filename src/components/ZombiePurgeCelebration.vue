@@ -54,11 +54,11 @@
               <span class="font-bold text-lg">{{ purgeStats.ancient }}</span>
             </div>
             <div v-if="purgeStats.rotting > 0" class="flex justify-between items-center">
-              <span class="text-orange-500">🧟‍♂️ Rotting ({{ thresholds.rotting }}+ days):</span>
+              <span class="text-orange-500">🪦 Rotting ({{ thresholds.rotting }}+ days):</span>
               <span class="font-bold text-lg">{{ purgeStats.rotting }}</span>
             </div>
             <div v-if="purgeStats.fresh > 0" class="flex justify-between items-center">
-              <span class="text-yellow-400">🧟‍♀️ Fresh ({{ thresholds.fresh }}+ days):</span>
+              <span class="text-yellow-400">⚰️ Fresh ({{ thresholds.fresh }}+ days):</span>
               <span class="font-bold text-lg">{{ purgeStats.fresh }}</span>
             </div>
           </div>
@@ -357,8 +357,8 @@ export default {
       const lines = [];
       if (this.purgeStats.burned > 0) lines.push(`⚫ 🔥 Burned (deleted): ${this.purgeStats.burned}`);
       if (this.purgeStats.ancient > 0) lines.push(`🔴 💀 Ancient (${t.ancient}+ days): ${this.purgeStats.ancient}`);
-      if (this.purgeStats.rotting > 0) lines.push(`🟠 🧟‍♂️ Rotting (${t.rotting}+ days): ${this.purgeStats.rotting}`);
-      if (this.purgeStats.fresh > 0) lines.push(`🟡 🧟‍♀️ Fresh (${t.fresh}+ days): ${this.purgeStats.fresh}`);
+      if (this.purgeStats.rotting > 0) lines.push(`🟠 🪦 Rotting (${t.rotting}+ days): ${this.purgeStats.rotting}`);
+      if (this.purgeStats.fresh > 0) lines.push(`🟡 ⚰️ Fresh (${t.fresh}+ days): ${this.purgeStats.fresh}`);
       return lines;
     },
     breakdownText() {

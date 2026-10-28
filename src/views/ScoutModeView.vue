@@ -290,7 +290,7 @@
               @click="toggleSection('fresh')" 
               class="w-full flex justify-between items-center p-3 bg-yellow-800/20 rounded-lg hover:bg-yellow-800/30 transition-colors"
             >
-              <span class="text-yellow-400">🧟‍♀️ Fresh (120+ days inactive)</span>
+              <span class="text-yellow-400">⚰️ Fresh (120+ days inactive)</span>
               <div class="flex items-center gap-2">
                 <span class="font-bold text-lg">{{ scoutResults.breakdown.fresh }}</span>
                 <span class="text-sm">{{ expandedSections.fresh ? '▼' : '▶' }}</span>
@@ -349,7 +349,7 @@
               @click="toggleSection('rotting')" 
               class="w-full flex justify-between items-center p-3 bg-orange-800/20 rounded-lg hover:bg-orange-800/30 transition-colors"
             >
-              <span class="text-orange-400">🧟‍♂️ Rotting (180+ days inactive)</span>
+              <span class="text-orange-400">🪦 Rotting (180+ days inactive)</span>
               <div class="flex items-center gap-2">
                 <span class="font-bold text-lg">{{ scoutResults.breakdown.rotting }}</span>
                 <span class="text-sm">{{ expandedSections.rotting ? '▼' : '▶' }}</span>
@@ -729,8 +729,8 @@ export default {
       const zombieScore = this.scoutResults.zombieScore;
       const breakdown = this.scoutResults.breakdown;
       const breakdownLines = [
-        breakdown.fresh > 0 ? `🧟‍♀️ Fresh: ${breakdown.fresh}` : '',
-        breakdown.rotting > 0 ? `🧟‍♂️ Rotting: ${breakdown.rotting}` : '',
+        breakdown.fresh > 0 ? `⚰️ Fresh: ${breakdown.fresh}` : '',
+        breakdown.rotting > 0 ? `🪦 Rotting: ${breakdown.rotting}` : '',
         breakdown.ancient > 0 ? `💀 Ancient: ${breakdown.ancient}` : '',
         breakdown.burned > 0 ? `🔥 Burned: ${breakdown.burned}` : ''
       ].filter(Boolean).join('\n');
@@ -1243,7 +1243,7 @@ https://plebsvszombies.cc`;
       txtContent += `Zombie Score™: ${this.scoutResults.zombieScore}%\n`;
       txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
       txtContent += `\n`;
-      txtContent += `Legend: 🔥 burned | 💀 ancient | 🧟 rotting | 🌱 fresh\n`;
+      txtContent += `Legend: 🔥 burned | 💀 ancient | 🪦 rotting | ⚰️ fresh\n`;
       txtContent += `====================================\n\n`;
 
       sortedZombies.forEach((zombie, index) => {
@@ -1257,8 +1257,8 @@ https://plebsvszombies.cc`;
         const typeEmoji = {
           burned: '🔥',
           ancient: '💀',
-          rotting: '🧟',
-          fresh: '🌱'
+          rotting: '🪦',
+          fresh: '⚰️'
         }[zombie.type] || '❓';
 
         const displayName = this.getUserDisplayName(zombie);

@@ -546,11 +546,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           detail: `Quiet for ${formatGone(days)}. Has anyone done a wellness visit lately?` };
       }
       if (days < 180) {
-        return { key: 'fresh', emoji: '🧟', label: 'Fresh Zombie',
+        return { key: 'fresh', emoji: '⚰️', label: 'Fresh Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
       if (days < 365) {
-        return { key: 'rotting', emoji: '🧟‍♂️', label: 'Rotting Zombie',
+        return { key: 'rotting', emoji: '🪦', label: 'Rotting Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
       return { key: 'ancient', emoji: '💀', label: 'Ancient Zombie',

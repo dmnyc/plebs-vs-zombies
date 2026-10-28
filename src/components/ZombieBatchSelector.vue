@@ -148,37 +148,37 @@
               </div>
             </div>
             
-            <!-- Checkbox and Action Buttons Row: stacks on mobile, single row on larger screens -->
-            <div class="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div class="flex items-center">
+            <!-- Checkbox and Action Buttons Row: single line at all widths; button labels shorten on mobile -->
+            <div class="mt-2 flex items-center justify-between gap-2">
+              <div class="flex items-center min-w-0">
                 <!-- Checkbox aligned with avatar -->
                 <input 
                   type="checkbox" 
                   :id="zombie.pubkey" 
                   :value="zombie.pubkey" 
                   v-model="selectedZombies"
-                  class="h-5 w-5 rounded text-zombie-green focus:ring-zombie-green mr-3 flex-shrink-0"
+                  class="h-5 w-5 rounded text-zombie-green focus:ring-zombie-green mr-2 sm:mr-3 flex-shrink-0"
                 />
                 <!-- Label aligned with text above -->
-                <label :for="zombie.pubkey" class="text-sm text-gray-300 whitespace-nowrap">
+                <label :for="zombie.pubkey" class="text-xs sm:text-sm text-gray-300 whitespace-nowrap truncate">
                   Target for purging
                 </label>
               </div>
               
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-shrink-0">
                 <button 
                   @click="viewProfile(zombie)" 
-                  class="flex-1 sm:flex-initial text-xs px-3 py-2 sm:py-1 whitespace-nowrap text-center bg-pleb-blue hover:bg-blue-600 rounded transition-colors"
+                  class="text-xs px-2 py-2 sm:py-1 whitespace-nowrap bg-pleb-blue hover:bg-blue-600 rounded transition-colors"
                   title="View full profile"
                 >
-                  View Profile
+                  <span class="hidden sm:inline">View Profile</span><span class="sm:hidden">Profile</span>
                 </button>
                 <button 
                   @click="grantImmunity(zombie)" 
-                  class="flex-1 sm:flex-initial text-xs px-3 py-2 sm:py-1 whitespace-nowrap text-center bg-green-700 hover:bg-green-600 rounded transition-colors"
+                  class="text-xs px-2 py-2 sm:py-1 whitespace-nowrap bg-green-700 hover:bg-green-600 rounded transition-colors"
                   title="Grant zombie immunity (whitelist)"
                 >
-                  🛡️ Grant Immunity
+                  <span class="hidden sm:inline">🛡️ Grant Immunity</span><span class="sm:hidden">🛡️ Immunity</span>
                 </button>
               </div>
             </div>
@@ -721,7 +721,7 @@ export default {
       txtContent += `Total Zombies: ${sortedZombies.length}\n`;
       txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
       txtContent += `\n`;
-      txtContent += `Legend: 🔥 burned | 💀 ancient | 🧟 rotting | 🌱 fresh\n`;
+      txtContent += `Legend: 🔥 burned | 💀 ancient | 🪦 rotting | ⚰️ fresh\n`;
       txtContent += `==================\n\n`;
       
       sortedZombies.forEach((zombie, index) => {
@@ -735,8 +735,8 @@ export default {
         const typeEmoji = {
           burned: '🔥',
           ancient: '💀',
-          rotting: '🧟',
-          fresh: '🌱'
+          rotting: '🪦',
+          fresh: '⚰️'
         }[zombie.type] || '❓';
         
         const displayName = this.getDisplayName(zombie);
