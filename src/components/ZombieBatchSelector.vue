@@ -103,7 +103,7 @@
               </div>
               
               <!-- Zombie Type Badge -->
-              <div class="flex flex-col items-end gap-1 flex-shrink-0">
+              <div class="flex flex-col items-end gap-1 flex-shrink-0 self-start">
                 <span 
                   class="px-2 py-1 text-xs rounded-full whitespace-nowrap"
                   :class="{
