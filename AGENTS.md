@@ -14,6 +14,9 @@ Production (plebsvszombies.cc) deploys by merging a PR to `main` — Vercel's
 git integration rebuilds automatically. Never put anything on production
 without an explicit instruction to do so in the current conversation:
 
+- **Never push directly to `main`.** Every change ships as a branch + pull
+  request: branch from the latest `main`, push the branch, open a PR, and
+  merge that PR. `main` is only ever updated by PR merges.
 - "Test it" / "try it" / "let me check" means a preview deploy: `vercel`
   with no flags. Share the preview URL — the production alias is never
   touched.
