@@ -20,6 +20,24 @@ without an explicit instruction to do so in the current conversation:
   push the branch, open a PR, and merge that PR — a direct
   `git push origin main` is a rule violation regardless of intent.
   `main` is only ever updated by PR merges.
+
+### Ship checklist (every change, in this order)
+
+1. **Pre-flight confirmation.** Before pushing anything, present and get the
+   user's sign-off on: the branch name, the version number, the PR title and
+   full PR text, and the commit authorship on the branch
+   (`git log --format='%an <%ae>'`).
+2. **Branch + version.** Branch from the latest `main`; bump the version in
+   the same commit (patch for fixes/UI, minor for features — or the exact
+   number the user confirmed).
+3. **Push the branch and open the PR.** Share the PR URL. Branch pushes
+   create preview deployments automatically; run `vercel` (no flags) for a
+   preview of the exact working tree when asked. The production alias is
+   never touched.
+4. **Merge gate.** Merge only after the user has approved the preview(s)
+   and/or reviewed the PR AND given an explicit OK. Once that OK is given,
+   the agent may run the merge (e.g. `gh pr merge`); without it, stop after
+   sharing the PR and wait.
 - "Test it" / "try it" / "let me check" means a preview deploy: `vercel`
   with no flags. Share the preview URL — the production alias is never
   touched.
