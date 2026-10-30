@@ -295,6 +295,7 @@ import WelcomeModal from '../components/WelcomeModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import AnimatedNumber from '../components/AnimatedNumber.vue';
 import ProfileSearchInput from '../components/ProfileSearchInput.vue';
+import { nip19 } from 'nostr-tools';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
@@ -310,6 +311,7 @@ export default {
     AnimatedNumber,
     ProfileSearchInput
   },
+  emits: ['scout-user'],
   data() {
     return {
       loading: true,
@@ -669,10 +671,20 @@ export default {
       this.$router.push(q ? { path: '/zombiecheck', query: { q } } : '/zombiecheck');
     },
     goToScoutMode() {
-      const q = this.toolProfile
-        ? (this.toolProfile.npub || this.toolProfile.pubkey)
-        : this.toolSearch.trim();
-      // Scout's ?q= opens its new-user flow with the target prefilled.
+      // A dropdown pick starts Scout Mode properly through the app (which
+      // owns scoutTarget); raw text opens /scout's new-user flow prefilled.
+      if (this.toolProfile && (this.toolProfile.pubkey || this.toolProfile.npub)) {
+        const pubkey = this.toolProfile.pubkey;
+        this.$emit('scout-user', {
+          pubkey,
+          npub: this.toolProfile.npub || (pubkey ? nip19.npubEncode(pubkey) : null),
+          name: this.toolProfile.name || null,
+          display_name: this.toolProfile.display_name || null,
+          picture: this.toolProfile.picture || null
+        });
+        return;
+      }
+      const q = this.toolSearch.trim();
       this.$router.push(q ? { path: '/scout', query: { q } } : '/scout');
     },
     goToBackups() {

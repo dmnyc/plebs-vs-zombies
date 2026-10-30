@@ -698,7 +698,7 @@
       <div v-else>
         <router-view @logout="logout" v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <component :is="Component" :key="$route.path" ref="currentViewComponent" />
+            <component :is="Component" :key="$route.path" ref="currentViewComponent" @scout-user="onRouteScoutUser" />
           </Transition>
         </router-view>
       </div>
@@ -1303,6 +1303,19 @@ export default {
         await this.startScoutMode();
       }
     },
+    async onRouteScoutUser(profile) {
+      // Routed views (e.g. the dashboard's More Tools box) hand a resolved
+      // profile here to start Scout Mode the same way the landing does.
+      if (!profile || !(profile.pubkey || profile.npub)) {
+        this.$router.push('/scout');
+        return;
+      }
+      this.selectedScoutProfile = profile;
+      await this.startScoutMode();
+      if (this.isScoutMode) {
+        this.$router.push('/scout');
+      }
+    },
     async startScoutMode() {
       console.log('🔍 Start Scout Mode clicked!');
       this.scoutInputError = '';
@@ -1847,8 +1860,24 @@ export default {
     // Scout Mode search, matching the logged-in ScoutModeView behavior.
     const scoutDeepLink = String(this.$route?.query?.q || '').trim();
     if (this.$route?.path === '/scout' && scoutDeepLink) {
-      this.scoutInputValue = scoutDeepLink;
-      this.$nextTick(() => this.$refs.loginScoutInput?.setValue(scoutDeepLink));
+      // The landing's scout section can render after the app root (session
+      // restore flips connection state), so wait for the input to exist
+      // before prefilling — a single nextTick races its mount.
+      let tries = 0;
+      const prefillScoutInput = () => {
+        const comp = this.$refs.loginScoutInput;
+        if (!comp && tries++ < 40) {
+          setTimeout(prefillScoutInput, 100);
+          return;
+        }
+        if (comp) {
+          comp.setValue(scoutDeepLink);
+          // Run the search so the dropdown offers the profile (setValue alone
+          // leaves Start Scouting disabled).
+          comp.handleInput();
+        }
+      };
+      this.$nextTick(prefillScoutInput);
     }
 
     // Try to restore session from localStorage

@@ -15,13 +15,13 @@
             :class="{'opacity-50 cursor-not-allowed': scanning}"
             :disabled="scanning"
           >
-            Scout Different User
+            {{ hasScoutTarget ? 'Scout Different User' : 'Scout a User' }}
           </button>
         </div>
       </div>
       
-      <!-- User info section -->
-      <div class="flex items-center gap-3">
+      <!-- User info section (only once a target is set) -->
+      <div v-if="hasScoutTarget" class="flex items-center gap-3">
         <!-- Target User Avatar -->
         <div class="flex-shrink-0">
           <img 
@@ -708,9 +708,11 @@ export default {
     ProfileSearchInput
   },
   props: {
+    // Required for the in-app rendering (App.vue passes it); the routed
+    // /scout instance has no target and shows the new-user flow instead.
     scoutTarget: {
       type: Object,
-      required: true
+      default: null
     },
     isLoggedIn: {
       type: Boolean,
@@ -755,14 +757,19 @@ export default {
     }
   },
   computed: {
+    hasScoutTarget() {
+      return !!(this.scoutTarget && this.scoutTarget.pubkey);
+    },
     targetDisplay() {
       // Try to show a readable name if available, otherwise truncated npub
+      if (!this.scoutTarget) return '';
       return this.scoutTarget.name || 
              this.scoutTarget.display_name || 
-             (this.scoutTarget.npub.substring(0, 12) + '...');
+             ((this.scoutTarget.npub || '').substring(0, 12) + '...');
     },
     targetUsername() {
       // Return just the username (name or display_name) without falling back to npub
+      if (!this.scoutTarget) return '';
       return this.scoutTarget.name || this.scoutTarget.display_name;
     },
     shareMessage() {
@@ -1392,13 +1399,33 @@ https://plebsvszombies.cc`;
     }
   },
   async mounted() {
-    // Deep link first: /scout?q=<user> opens the new-user flow with the
-    // target prefilled immediately — don't wait on the auto-scan, which
-    // can take a while and must not delay the prefill.
-    const shared = String(this.$route?.query?.q || '').trim();
-    if (shared) {
+    // The routed /scout instance has no scoutTarget (App.vue passes it only
+    // for its own Scout Mode rendering) — nothing to auto-scan, so open the
+    // new-user flow, applying any ?q= deep link. The in-app instance has a
+    // target and auto-scans it as before.
+    if (!this.hasScoutTarget) {
+      const shared = String(this.$route?.query?.q || '').trim();
       this.showNewUserModal = true;
-      this.$nextTick(() => this.$refs.scoutInput?.setValue(shared));
+      if (shared) {
+        // Same bounded wait as the landing prefill — the modal body mounts a
+        // tick after the flag flips.
+        let tries = 0;
+        const prefill = () => {
+          const comp = this.$refs.scoutInput;
+          if (!comp && tries++ < 40) {
+            setTimeout(prefill, 100);
+            return;
+          }
+          if (comp) {
+            comp.setValue(shared);
+            // Run the search/validation so the dropdown offers the profile and
+            // Start Scouting can enable.
+            comp.handleInput();
+          }
+        };
+        this.$nextTick(prefill);
+      }
+      return;
     }
 
     // Auto-start scouting when component mounts
