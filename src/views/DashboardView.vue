@@ -146,7 +146,7 @@
         v-if="zombieStatsReady"
         title="Zombie Statistics"
         :stats="zombieStats"
-        class="animate-fade-up stagger-2"
+        class="animate-fade-up stagger-3"
       >
         <div class="mt-6">
           <button @click="goToZombieHunting" class="btn-danger w-full">
@@ -155,37 +155,7 @@
         </div>
       </ZombieStats>
 
-      <div class="card card-hover animate-fade-up stagger-3 lg:col-start-3">
-        <h3 class="section-title">More Tools</h3>
-        <div class="space-y-2">
-          <button
-            @click="goToZombieCheck"
-            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-zombie-green/40 transition-colors"
-          >
-            <div class="flex items-center gap-3">
-              <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
-              <div class="min-w-0">
-                <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
-                <div class="text-xs text-gray-400">Check whether any Nostr user is a zombie and see how long they've been gone.</div>
-              </div>
-            </div>
-          </button>
-          <button
-            @click="goToScoutMode"
-            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-yellow-500/40 transition-colors"
-          >
-            <div class="flex items-center gap-3">
-              <span class="text-2xl flex-shrink-0">👁️</span>
-              <div class="min-w-0">
-                <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
-                <div class="text-xs text-gray-400">Analyze any Nostr user's zombie follows without signing in.</div>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <div class="card card-hover animate-fade-up stagger-4">
+      <div class="card card-hover animate-fade-up stagger-2">
         <h3 class="section-title">Hunt Status</h3>
         <div class="space-y-4">
           <div class="flex justify-between items-center">
@@ -211,6 +181,36 @@
             :disabled="followStats.immune === 0"
           >
             Reset Immunity ({{ followStats.immune }})
+          </button>
+        </div>
+      </div>
+
+      <div class="card card-hover animate-fade-up stagger-4 lg:col-start-3">
+        <h3 class="section-title">More Tools</h3>
+        <div class="space-y-2">
+          <button
+            @click="goToZombieCheck"
+            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-zombie-green/40 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
+              <div class="min-w-0">
+                <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
+                <div class="text-xs text-gray-400">Check whether any Nostr user is a zombie and see how long they've been gone.</div>
+              </div>
+            </div>
+          </button>
+          <button
+            @click="goToScoutMode"
+            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-yellow-500/40 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-2xl flex-shrink-0">👁️</span>
+              <div class="min-w-0">
+                <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
+                <div class="text-xs text-gray-400">Analyze any Nostr user's zombie follows without signing in.</div>
+              </div>
+            </div>
           </button>
         </div>
       </div>
