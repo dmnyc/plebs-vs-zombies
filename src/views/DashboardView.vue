@@ -155,18 +155,28 @@
         </div>
       </ZombieStats>
 
-      <div class="card card-hover animate-fade-up stagger-3">
+      <div class="card card-hover animate-fade-up stagger-3 lg:col-start-3">
         <h3 class="section-title">More Tools</h3>
         <p class="text-sm text-gray-400 mb-4">
           Quick links to the tools that live outside the hunt:
         </p>
-        <div class="space-y-2">
-          <button @click="goToZombieCheck" class="btn-secondary w-full">
-            🧟‍♀️ Zombie Check
-          </button>
-          <button @click="goToScoutMode" class="btn-secondary w-full">
-            👁️ Scout Mode
-          </button>
+        <div class="space-y-4">
+          <div>
+            <button @click="goToZombieCheck" class="btn-secondary w-full">
+              🧟‍♀️ Zombie Check
+            </button>
+            <p class="text-xs text-gray-500 mt-1">
+              Look up a single account and see how dormant it really is.
+            </p>
+          </div>
+          <div>
+            <button @click="goToScoutMode" class="btn-secondary w-full">
+              👁️ Scout Mode
+            </button>
+            <p class="text-xs text-gray-500 mt-1">
+              Analyze any user's follows and publish a public zombie report.
+            </p>
+          </div>
         </div>
       </div>
 
