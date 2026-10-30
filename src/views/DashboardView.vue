@@ -156,6 +156,21 @@
       </ZombieStats>
 
       <div class="card card-hover animate-fade-up stagger-3">
+        <h3 class="section-title">More Tools</h3>
+        <p class="text-sm text-gray-400 mb-4">
+          Quick links to the tools that live outside the hunt:
+        </p>
+        <div class="space-y-2">
+          <button @click="goToZombieCheck" class="btn-secondary w-full">
+            🧟‍♀️ Zombie Check
+          </button>
+          <button @click="goToScoutMode" class="btn-secondary w-full">
+            👁️ Scout Mode
+          </button>
+        </div>
+      </div>
+
+      <div class="card card-hover animate-fade-up stagger-4">
         <h3 class="section-title">Hunt Status</h3>
         <div class="space-y-4">
           <div class="flex justify-between items-center">
@@ -172,12 +187,6 @@
           </div>
         </div>
         <div class="mt-6 space-y-2">
-          <button @click="goToZombieCheck" class="btn-secondary w-full">
-            🧟‍♀️ Zombie Check
-          </button>
-          <button @click="goToScoutMode" class="btn-secondary w-full">
-            👁️ Scout Mode
-          </button>
           <button @click="goToBackups" class="btn-secondary w-full">
             Manage Backups
           </button>
