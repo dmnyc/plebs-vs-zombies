@@ -187,6 +187,14 @@
 
       <div class="card card-hover animate-fade-up stagger-4 lg:col-start-3">
         <h3 class="section-title">More Tools</h3>
+        <input
+          v-model="toolSearch"
+          type="text"
+          aria-label="Optional user to apply to the tools below"
+          placeholder="Optional: name, npub1…, or hex"
+          class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:border-zombie-green/60 focus:outline-none mb-3"
+          @keydown.enter="goToZombieCheck"
+        />
         <div class="space-y-2">
           <button
             @click="goToZombieCheck"
@@ -213,28 +221,6 @@
             </div>
           </button>
         </div>
-
-        <form @submit.prevent="searchUserFromTools" class="mt-3 pt-3 border-t border-gray-700">
-          <label for="dashboard-user-search" class="block text-xs text-gray-500 mb-1.5">
-            Or check someone without leaving the dashboard:
-          </label>
-          <div class="flex gap-2">
-            <input
-              id="dashboard-user-search"
-              v-model="toolSearch"
-              type="text"
-              placeholder="name, npub1…, or hex pubkey"
-              class="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:border-zombie-green/60 focus:outline-none"
-            />
-            <button
-              type="submit"
-              class="btn-primary text-sm px-4 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="!toolSearch.trim()"
-            >
-              Check
-            </button>
-          </div>
-        </form>
       </div>
     </div>
     
@@ -662,17 +648,16 @@ export default {
       this.$router.push('/hunt');
     },
     goToZombieCheck() {
-      this.$router.push('/zombiecheck');
+      const q = this.toolSearch.trim();
+      // With a user typed, Zombie Check's ?q= deep link prefills and
+      // auto-runs the check.
+      this.$router.push(q ? { path: '/zombiecheck', query: { q } } : '/zombiecheck');
     },
     goToScoutMode() {
-      this.$router.push('/scout');
-    },
-    searchUserFromTools() {
       const q = this.toolSearch.trim();
-      if (!q) return;
-      // The Zombie Check view deep-links ?q= — it prefills its own search
-      // and auto-runs the check.
-      this.$router.push({ path: '/zombiecheck', query: { q } });
+      // Scout's ?q= deep link opens its new-user flow with the target
+      // prefilled.
+      this.$router.push(q ? { path: '/scout', query: { q } } : '/scout');
     },
     goToBackups() {
       this.$router.push('/backups');

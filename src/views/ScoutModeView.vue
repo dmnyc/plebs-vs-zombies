@@ -1394,6 +1394,16 @@ https://plebsvszombies.cc`;
   async mounted() {
     // Auto-start scouting when component mounts
     await this.startScout();
+
+    // Deep link: /scout?q=<user> opens the new-user flow with the target
+    // prefilled, so links (e.g. the dashboard More Tools box) land ready
+    // to scout.
+    const shared = String(this.$route?.query?.q || '').trim();
+    if (shared) {
+      this.showNewUserModal = true;
+      await this.$nextTick();
+      this.$refs.scoutInput?.setValue(shared);
+    }
   }
 }
 </script>
