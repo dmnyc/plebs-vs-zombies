@@ -157,26 +157,31 @@
 
       <div class="card card-hover animate-fade-up stagger-3 lg:col-start-3">
         <h3 class="section-title">More Tools</h3>
-        <p class="text-sm text-gray-400 mb-4">
-          Quick links to the tools that live outside the hunt:
-        </p>
-        <div class="space-y-4">
-          <div>
-            <button @click="goToZombieCheck" class="btn-secondary w-full">
-              🧟‍♀️ Zombie Check
-            </button>
-            <p class="text-xs text-gray-500 mt-1">
-              Look up a single account and see how dormant it really is.
-            </p>
-          </div>
-          <div>
-            <button @click="goToScoutMode" class="btn-secondary w-full">
-              👁️ Scout Mode
-            </button>
-            <p class="text-xs text-gray-500 mt-1">
-              Analyze any user's follows and publish a public zombie report.
-            </p>
-          </div>
+        <div class="space-y-2">
+          <button
+            @click="goToZombieCheck"
+            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-zombie-green/40 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
+              <div class="min-w-0">
+                <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
+                <div class="text-xs text-gray-400">Check whether any Nostr user is a zombie and see how long they've been gone.</div>
+              </div>
+            </div>
+          </button>
+          <button
+            @click="goToScoutMode"
+            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-yellow-500/40 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-2xl flex-shrink-0">👁️</span>
+              <div class="min-w-0">
+                <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
+                <div class="text-xs text-gray-400">Analyze any Nostr user's zombie follows without signing in.</div>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
 
