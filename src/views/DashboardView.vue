@@ -187,13 +187,12 @@
 
       <div class="card card-hover animate-fade-up stagger-4 lg:col-start-3">
         <h3 class="section-title">More Tools</h3>
-        <input
-          v-model="toolSearch"
-          type="text"
-          aria-label="Optional user to apply to the tools below"
+        <ProfileSearchInput
+          ref="toolsSearchInput"
           placeholder="Optional: name, npub1…, or hex"
-          class="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:border-zombie-green/60 focus:outline-none mb-3"
-          @keydown.enter="goToZombieCheck"
+          class="mb-3"
+          @profile-selected="handleToolProfileSelected"
+          @input-changed="handleToolInputChanged"
         />
         <div class="space-y-2">
           <button
@@ -295,6 +294,7 @@ import ZombieStats from '../components/ZombieStats.vue';
 import WelcomeModal from '../components/WelcomeModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import AnimatedNumber from '../components/AnimatedNumber.vue';
+import ProfileSearchInput from '../components/ProfileSearchInput.vue';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
@@ -307,7 +307,8 @@ export default {
     ZombieStats,
     WelcomeModal,
     ConfirmModal,
-    AnimatedNumber
+    AnimatedNumber,
+    ProfileSearchInput
   },
   data() {
     return {
@@ -315,6 +316,7 @@ export default {
       scanning: false,
       scanCancelled: false,
       toolSearch: '',
+      toolProfile: null,
       followStats: {
         total: 0,
         immune: 0,
@@ -647,16 +649,30 @@ export default {
     goToZombieHunting() {
       this.$router.push('/hunt');
     },
+    handleToolProfileSelected(profile) {
+      this.toolProfile = profile;
+      this.toolSearch = profile?.npub || profile?.pubkey || this.toolSearch;
+    },
+    handleToolInputChanged(value) {
+      this.toolSearch = value;
+      // Editing the text after a dropdown pick drops the picked profile.
+      if (this.toolProfile && value !== (this.toolProfile.display_name || this.toolProfile.name)) {
+        this.toolProfile = null;
+      }
+    },
     goToZombieCheck() {
-      const q = this.toolSearch.trim();
-      // With a user typed, Zombie Check's ?q= deep link prefills and
-      // auto-runs the check.
+      // A dropdown pick carries the resolved profile (npub auto-runs the
+      // check); raw text falls through to the ?q= name search.
+      const q = this.toolProfile
+        ? (this.toolProfile.npub || this.toolProfile.pubkey)
+        : this.toolSearch.trim();
       this.$router.push(q ? { path: '/zombiecheck', query: { q } } : '/zombiecheck');
     },
     goToScoutMode() {
-      const q = this.toolSearch.trim();
-      // Scout's ?q= deep link opens its new-user flow with the target
-      // prefilled.
+      const q = this.toolProfile
+        ? (this.toolProfile.npub || this.toolProfile.pubkey)
+        : this.toolSearch.trim();
+      // Scout's ?q= opens its new-user flow with the target prefilled.
       this.$router.push(q ? { path: '/scout', query: { q } } : '/scout');
     },
     goToBackups() {
