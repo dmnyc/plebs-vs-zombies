@@ -552,6 +552,43 @@
             </div>
           </div>
 
+          <div v-if="posted && postedNevent" class="pt-3 border-t border-gray-700">
+            <div class="text-xs text-gray-400 text-center mb-2">View your post on Nostr:</div>
+            <div class="flex items-center justify-center gap-4">
+              <a
+                v-for="client in nostrClients"
+                :key="client.name"
+                :href="client.url + postedNevent"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors"
+                :title="'Open in ' + client.name"
+              >
+                <img
+                  v-if="client.iconOk !== false"
+                  :src="client.icon"
+                  :alt="client.name"
+                  class="w-8 h-8 rounded object-contain"
+                  :class="client.iconBg"
+                  @error="client.iconOk = false"
+                />
+                <span
+                  v-else
+                  class="w-8 h-8 flex items-center justify-center rounded bg-purple-700 text-sm font-bold text-white"
+                >{{ client.name[0] }}</span>
+                <span class="text-[10px]">{{ client.name }}</span>
+              </a>
+              <button
+                @click="copyEventId"
+                class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors"
+                :title="'Copy event ID'"
+              >
+                <span class="w-8 h-8 flex items-center justify-center rounded bg-gray-700 text-lg">{{ copiedEventId ? '✅' : '🔗' }}</span>
+                <span class="text-[10px]">{{ copiedEventId ? 'Copied' : 'Copy ID' }}</span>
+              </button>
+            </div>
+          </div>
+
           <div class="flex justify-center">
             <button 
               @click="showPostModal = false" 
@@ -698,6 +735,13 @@ export default {
       posting: false,
       posted: false,
       postError: '',
+      postedNevent: null,
+      copiedEventId: false,
+      nostrClients: [
+        { name: 'Primal', url: 'https://primal.net/e/', icon: '/clients/primal.png', iconBg: 'bg-white', iconOk: true },
+        { name: 'Jumble', url: 'https://jumble.social/notes/', icon: '/clients/jumble.png', iconBg: 'bg-white', iconOk: true },
+        { name: 'Iris', url: 'https://iris.to/', icon: '/clients/iris.png', iconBg: 'bg-black', iconOk: true },
+      ],
       showPostModal: false,
       isMyReport: false,
       expandedSections: {
@@ -1053,6 +1097,8 @@ https://plebsvszombies.cc`;
 
       this.posting = true;
       this.postError = '';
+      this.postedNevent = null;
+      this.copiedEventId = false;
       
       try {
         console.log('📡 Posting scout report to Nostr...');
@@ -1108,6 +1154,28 @@ https://plebsvszombies.cc`;
         
         if (publishResults.successful > 0) {
           this.posted = true;
+          // Build an nevent (id + author + relay hints) so the note can be
+          // opened in any client. Prefer the relays that actually accepted it;
+          // fall back to the configured publish relays.
+          try {
+            const relayHints = (
+              publishResults.accepted && publishResults.accepted.length > 0
+                ? publishResults.accepted
+                : nostrService.getPublishRelays()
+            ).slice(0, 3);
+            this.postedNevent = nip19.neventEncode({
+              id: signedEvent.id,
+              author: signedEvent.pubkey,
+              relays: relayHints,
+            });
+          } catch (encodeError) {
+            console.warn('Could not build nevent, falling back to note id:', encodeError);
+            try {
+              this.postedNevent = nip19.noteEncode(signedEvent.id);
+            } catch (_) {
+              this.postedNevent = null;
+            }
+          }
           this.showPostModal = true;
           console.log(`✅ Scout report posted to ${publishResults.successful}/${nostrService.getPublishRelays().length} relays`);
         } else {
@@ -1141,6 +1209,26 @@ https://plebsvszombies.cc`;
         return "Couldn't publish to any relays — check your connection, then try again.";
       }
       return message || 'Posting failed — please try again.';
+    },
+    async copyEventId() {
+      if (!this.postedNevent) return;
+      try {
+        await navigator.clipboard.writeText(this.postedNevent);
+      } catch (error) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = this.postedNevent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (e) {
+          console.error('Unable to copy the event ID:', e);
+        }
+        document.body.removeChild(textArea);
+      }
+      this.copiedEventId = true;
+      setTimeout(() => { this.copiedEventId = false; }, 2000);
     },
     /**
      * Get all zombies sorted by ranking (from most zombie to least zombie/most pleb)
