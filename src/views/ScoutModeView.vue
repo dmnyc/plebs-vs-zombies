@@ -60,7 +60,7 @@
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="showNewUserModal = false"
     >
-      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 pb-10 max-w-md w-full mx-4" @click.stop>
         <h3 class="text-lg font-medium text-yellow-400 mb-4">🔍 Scout New User</h3>
         
         <div class="space-y-4">
