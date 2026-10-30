@@ -8,6 +8,7 @@ import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 import primalCacheService from "./primalCacheService.js";
 import * as nostrArchivesService from "./nostrArchivesService.js";
+import zombieClassificationSettings from "./settings/zombieClassificationSettings.js";
 import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
 // Liveness detection: any event a user signs proves their key is still in use.
@@ -1615,6 +1616,14 @@ class NostrService {
     // goes through the exact relay pipeline as before — false positives
     // are structurally impossible from this prefilter.
     const lastSeenCache = this.loadLastSeenCache();
+    // Thresholds are user-configurable and NIP-78-synced, so read them live
+    // at scan time — a hardcoded window would silently miss zombies for any
+    // account whose configured shortest threshold is below it (e.g. a
+    // 60-day "fresh" setting would want to flag 60–90-day-old accounts the
+    // 90-day window skips).
+    const { fresh, rotting, ancient } =
+      zombieClassificationSettings.getSettings();
+    const shortestThresholdDays = Math.min(fresh, rotting, ancient);
     let cacheProvenAlive = 0;
     let primalProvenAlive = 0;
 
@@ -1623,10 +1632,13 @@ class NostrService {
       const notYetProven = pubkeys.filter((pk) => {
         const seen = lastSeenCache.get(pk) || 0;
         // Conservative: the cache only skips when the recorded activity is
-        // newer than the SHORTEST standard threshold (90d). Longer
-        // thresholds classify against a wider window and still need the
-        // user's real newest event for the "last active" display.
-        return seen < Math.floor(Date.now() / 1000) - 90 * 86400;
+        // newer than the SHORTEST configured threshold. Longer thresholds
+        // classify against a wider window and still need the user's real
+        // newest event for the "last active" display.
+        return (
+          seen <
+          Math.floor(Date.now() / 1000) - shortestThresholdDays * 86400
+        );
       });
 
       if (notYetProven.length > 0) {
@@ -1645,7 +1657,7 @@ class NostrService {
       const primalSeen = primalLastSeen.get(pk) || 0;
       const provenAliveAt = Math.max(scanCacheSeen, primalSeen);
 
-      if (provenAliveAt > nowSec - 90 * 86400) {
+      if (provenAliveAt > nowSec - shortestThresholdDays * 86400) {
         if (scanCacheSeen >= provenAliveAt) cacheProvenAlive++;
         else primalProvenAlive++;
         activityMap.set(pk, [
