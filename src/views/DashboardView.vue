@@ -196,7 +196,7 @@
               <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
               <div class="min-w-0">
                 <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
-                <div class="text-xs text-gray-400">Check whether any Nostr user is a zombie and see how long they've been gone.</div>
+                <div class="text-xs text-gray-400">Look up any account's zombie status.</div>
               </div>
             </div>
           </button>
@@ -208,7 +208,7 @@
               <span class="text-2xl flex-shrink-0">👁️</span>
               <div class="min-w-0">
                 <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
-                <div class="text-xs text-gray-400">Analyze any Nostr user's zombie follows without signing in.</div>
+                <div class="text-xs text-gray-400">Analyze anyone's follows and publish a report.</div>
               </div>
             </div>
           </button>
