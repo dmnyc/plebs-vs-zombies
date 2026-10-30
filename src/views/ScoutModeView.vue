@@ -1392,18 +1392,17 @@ https://plebsvszombies.cc`;
     }
   },
   async mounted() {
-    // Auto-start scouting when component mounts
-    await this.startScout();
-
-    // Deep link: /scout?q=<user> opens the new-user flow with the target
-    // prefilled, so links (e.g. the dashboard More Tools box) land ready
-    // to scout.
+    // Deep link first: /scout?q=<user> opens the new-user flow with the
+    // target prefilled immediately — don't wait on the auto-scan, which
+    // can take a while and must not delay the prefill.
     const shared = String(this.$route?.query?.q || '').trim();
     if (shared) {
       this.showNewUserModal = true;
-      await this.$nextTick();
-      this.$refs.scoutInput?.setValue(shared);
+      this.$nextTick(() => this.$refs.scoutInput?.setValue(shared));
     }
+
+    // Auto-start scouting when component mounts
+    await this.startScout();
   }
 }
 </script>

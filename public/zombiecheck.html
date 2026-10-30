@@ -1121,12 +1121,28 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       else check();
     });
 
-    // Allow deep-linking a target: /zombiecheck?npub=npub1...
+    // Allow deep-linking a target: /zombiecheck?npub=npub1... (the ?q=
+    // form carries raw search text from the dashboard's More Tools box).
     const params = new URLSearchParams(location.search);
-    const preset = params.get('npub') || params.get('pubkey');
+    const preset = params.get('npub') || params.get('pubkey') || params.get('q');
     if (preset) {
       els.input.value = preset;
-      check();
+      if (looksLikeIdentifier(preset)) {
+        check();
+      } else {
+        // Raw search text (dashboard More Tools links): resolve to the top
+        // name match, then check that profile.
+        els.progress.textContent = 'Resolving name…';
+        searchUsers(preset, 1).then((events) => {
+          const profile = events[0] ? parseProfile(events[0]) : null;
+          if (profile) {
+            els.input.value = profile.display_name || profile.name || preset;
+            check(profile.pubkey);
+          } else {
+            check(); // surfaces the usual "enter a valid identifier" error
+          }
+        });
+      }
     }
 
     // =====================================================================

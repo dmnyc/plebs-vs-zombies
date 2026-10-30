@@ -229,6 +229,7 @@ import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 import { nip19 } from 'nostr-tools';
 import nostrService from '../services/nostrService';
+import profileSearchService from '../services/profileSearchService';
 import zombieService from '../services/zombieService';
 import {
   uploadImageToBlossom,
@@ -425,10 +426,22 @@ export default {
         if (!profile) {
           const res = await this.$refs.searchInput.validateAndFetch();
           if (!res.valid) {
-            this.error = res.error;
-            return;
+            // Plain username (the dashboard's More Tools box passes names
+            // through ?q=, which can't use the dropdown) — resolve the top
+            // profile-search match instead of bouncing the user.
+            const raw = this.inputValue.trim();
+            if (raw && !this.$refs.searchInput.looksLikeIdentifier(raw)) {
+              const results = await profileSearchService.debouncedSearch(raw, 15);
+              if (results.length > 0) {
+                profile = results[0];
+              }
+            }
+            if (!profile) {
+              this.error = res.error;
+              return;
+            }
           }
-          profile = res.profile;
+          profile = profile || res.profile;
         }
 
         const hex = profile.pubkey;

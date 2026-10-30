@@ -1843,6 +1843,14 @@ export default {
     }
   },
   async mounted() {
+    // Deep link: /scout?q=<user> on the logged-out landing prefills the
+    // Scout Mode search, matching the logged-in ScoutModeView behavior.
+    const scoutDeepLink = String(this.$route?.query?.q || '').trim();
+    if (this.$route?.path === '/scout' && scoutDeepLink) {
+      this.scoutInputValue = scoutDeepLink;
+      this.$nextTick(() => this.$refs.loginScoutInput?.setValue(scoutDeepLink));
+    }
+
     // Try to restore session from localStorage
     const sessionRestored = await nostrService.restoreSession();
     if (sessionRestored && (nostrService.isExtensionReady() || nostrService.isBunkerReady())) {
