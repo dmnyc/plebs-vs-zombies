@@ -172,6 +172,12 @@
           </div>
         </div>
         <div class="mt-6 space-y-2">
+          <button @click="goToZombieCheck" class="btn-secondary w-full">
+            🧟‍♀️ Zombie Check
+          </button>
+          <button @click="goToScoutMode" class="btn-secondary w-full">
+            👁️ Scout Mode
+          </button>
           <button @click="goToBackups" class="btn-secondary w-full">
             Manage Backups
           </button>
@@ -607,6 +613,12 @@ export default {
     },
     goToZombieHunting() {
       this.$router.push('/hunt');
+    },
+    goToZombieCheck() {
+      this.$router.push('/zombiecheck');
+    },
+    goToScoutMode() {
+      this.$router.push('/scout');
     },
     goToBackups() {
       this.$router.push('/backups');
