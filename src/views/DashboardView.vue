@@ -190,7 +190,7 @@
         <div class="space-y-2">
           <button
             @click="goToZombieCheck"
-            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-zombie-green/40 transition-colors"
+            class="w-full text-left p-3 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-zombie-green/60 transition-colors"
           >
             <div class="flex items-center gap-3">
               <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
@@ -202,7 +202,7 @@
           </button>
           <button
             @click="goToScoutMode"
-            class="w-full text-left p-3 rounded-lg bg-gray-800/60 border border-transparent hover:bg-gray-800 hover:border-yellow-500/40 transition-colors"
+            class="w-full text-left p-3 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-yellow-500/60 transition-colors"
           >
             <div class="flex items-center gap-3">
               <span class="text-2xl flex-shrink-0">👁️</span>
@@ -213,6 +213,28 @@
             </div>
           </button>
         </div>
+
+        <form @submit.prevent="searchUserFromTools" class="mt-3 pt-3 border-t border-gray-700">
+          <label for="dashboard-user-search" class="block text-xs text-gray-500 mb-1.5">
+            Or check someone without leaving the dashboard:
+          </label>
+          <div class="flex gap-2">
+            <input
+              id="dashboard-user-search"
+              v-model="toolSearch"
+              type="text"
+              placeholder="name, npub1…, or hex pubkey"
+              class="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:border-zombie-green/60 focus:outline-none"
+            />
+            <button
+              type="submit"
+              class="btn-primary text-sm px-4 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!toolSearch.trim()"
+            >
+              Check
+            </button>
+          </div>
+        </form>
       </div>
     </div>
     
@@ -306,6 +328,7 @@ export default {
       loading: true,
       scanning: false,
       scanCancelled: false,
+      toolSearch: '',
       followStats: {
         total: 0,
         immune: 0,
@@ -643,6 +666,13 @@ export default {
     },
     goToScoutMode() {
       this.$router.push('/scout');
+    },
+    searchUserFromTools() {
+      const q = this.toolSearch.trim();
+      if (!q) return;
+      // The Zombie Check view deep-links ?q= — it prefills its own search
+      // and auto-runs the check.
+      this.$router.push({ path: '/zombiecheck', query: { q } });
     },
     goToBackups() {
       this.$router.push('/backups');
