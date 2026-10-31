@@ -187,8 +187,10 @@
 
     </div>
 
-    <!-- More Tools: horizontal quick-access bar between the grid and Recent Activity -->
-    <div class="mt-8">
+    <!-- More Tools: horizontal quick-access bar between the grid and Recent Activity.
+         relative z-10 keeps the search dropdown above the sections that follow it
+         in the DOM (they would otherwise paint over the suggestions). -->
+    <div class="mt-8 relative z-10">
       <h3 class="section-title">More Tools</h3>
       <div class="card p-4 sm:p-5 animate-fade-up">
         <div class="flex flex-col lg:flex-row lg:items-center gap-4">
