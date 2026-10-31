@@ -193,7 +193,7 @@
     <div class="mt-8 relative z-10">
       <h3 class="section-title">More Tools</h3>
       <div class="card p-4 sm:p-5 animate-fade-up">
-        <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+        <div class="flex flex-col lg:flex-row lg:items-start gap-4">
           <div class="lg:w-72 flex-shrink-0">
             <ProfileSearchInput
               ref="toolsSearchInput"
