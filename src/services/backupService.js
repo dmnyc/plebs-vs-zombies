@@ -64,7 +64,7 @@ class BackupService {
     backups.push(backup);
     
     // Store the updated backups
-    await localforage.setItem('backups', backups);
+    await localforage.setItem(this.scopedKey('backups'), backups);
     
     // Update the cached backups
     this.backups = backups;
@@ -75,7 +75,7 @@ class BackupService {
    */
   async getBackups(forceReload = false) {
     if (this.backups.length === 0 || forceReload) {
-      const backups = await localforage.getItem('backups') || [];
+      const backups = await localforage.getItem(this.scopedKey('backups')) || [];
       this.backups = backups;
     }
     
@@ -97,7 +97,7 @@ class BackupService {
     const backups = await this.getBackups();
     const filteredBackups = backups.filter(backup => backup.id !== id);
     
-    await localforage.setItem('backups', filteredBackups);
+    await localforage.setItem(this.scopedKey('backups'), filteredBackups);
     this.backups = filteredBackups;
     
     return {
