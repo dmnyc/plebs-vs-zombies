@@ -185,44 +185,49 @@
         </div>
       </div>
 
-      <div class="card card-hover animate-fade-up stagger-4 lg:col-start-3">
-        <h3 class="section-title">More Tools</h3>
-        <ProfileSearchInput
-          ref="toolsSearchInput"
-          placeholder="Optional: name, npub1…, or hex"
-          class="mb-3"
-          @profile-selected="handleToolProfileSelected"
-          @input-changed="handleToolInputChanged"
-        />
-        <div class="space-y-2">
+    </div>
+
+    <!-- More Tools: horizontal quick-access bar between the grid and Recent Activity -->
+    <div class="mt-8 card p-4 sm:p-5 animate-fade-up">
+      <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+        <h3 class="section-title flex-shrink-0 !mb-0">More Tools</h3>
+        <div class="lg:w-72 flex-shrink-0">
+          <ProfileSearchInput
+            ref="toolsSearchInput"
+            placeholder="Optional: name, npub1…, or hex"
+            @profile-selected="handleToolProfileSelected"
+            @input-changed="handleToolInputChanged"
+          />
+        </div>
+        <div class="grid sm:grid-cols-2 gap-2 flex-1">
           <button
             @click="goToZombieCheck"
-            class="w-full text-left p-3 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-zombie-green/60 transition-colors"
+            class="w-full text-left px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-zombie-green/60 transition-colors"
           >
             <div class="flex items-center gap-3">
-              <span class="text-2xl flex-shrink-0">🧟‍♀️</span>
+              <span class="text-xl flex-shrink-0">🧟‍♀️</span>
               <div class="min-w-0">
                 <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
-                <div class="text-xs text-gray-400">Look up any account's zombie status.</div>
+                <div class="text-xs text-gray-400 truncate">Look up any account's zombie status.</div>
               </div>
             </div>
           </button>
           <button
             @click="goToScoutMode"
-            class="w-full text-left p-3 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-yellow-500/60 transition-colors"
+            class="w-full text-left px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-yellow-500/60 transition-colors"
           >
             <div class="flex items-center gap-3">
-              <span class="text-2xl flex-shrink-0">👁️</span>
+              <span class="text-xl flex-shrink-0">👁️</span>
               <div class="min-w-0">
                 <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
-                <div class="text-xs text-gray-400">Analyze anyone's follows and publish a report.</div>
+                <div class="text-xs text-gray-400 truncate">Analyze anyone's follows and publish a report.</div>
               </div>
             </div>
           </button>
         </div>
       </div>
     </div>
-    
+
     <div class="mt-8">
       <h3 class="section-title">Recent Activity</h3>
       <div class="card">
