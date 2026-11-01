@@ -1,6 +1,6 @@
 {
   "name": "plebs-vs-zombies",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "description": "A Nostr utility for managing dormant follows",
   "main": "index.js",
   "type": "module",
