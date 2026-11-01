@@ -22,7 +22,7 @@
               </h1>
               <p
                 v-if="!scrolled && (isLoginScreen || isScoutMode)"
-                class="mt-2 text-xs font-semibold uppercase tracking-widest text-zombie-moss text-center transition-opacity duration-300"
+                class="hidden lg:block mt-2 text-xs font-semibold uppercase tracking-widest text-zombie-moss text-center transition-opacity duration-300"
               >
                 Nostr Follow List Manager
               </p>
