@@ -20,12 +20,6 @@
               >
                 Plebs vs. Zombies
               </h1>
-              <p
-                v-if="!scrolled"
-                class="hidden lg:block mt-2 text-xs font-semibold uppercase tracking-widest text-zombie-moss text-center transition-opacity duration-300"
-              >
-                Nostr Follow List Manager
-              </p>
             </div>
           </div>
 
@@ -241,7 +235,16 @@
               </button>
             </div>
           </div>
-        </div>
+
+        <!-- Subtitle sits under the brand row; fullsize header only (the
+             compact header keeps just the logo + name). -->
+        <p
+          v-if="!scrolled && (isLoginScreen || isScoutMode)"
+          class="-mt-1 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss transition-opacity duration-300"
+        >
+          Nostr Follow List Manager
+        </p>
+      </div>
 
         <!-- Mobile/Tablet Navigation Menu -->
         <Transition name="collapse">
