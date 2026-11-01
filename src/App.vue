@@ -8,7 +8,7 @@
       <div class="app-bg-grain"></div>
     </div>
 
-    <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl transition-all duration-300" :key="forceUpdateKey">
+    <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 transition-all duration-300" :key="forceUpdateKey">
       <div class="container mx-auto px-4 transition-all duration-300" :class="headerPad">
         <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
           <div class="flex items-center gap-3 group" :class="isScoutMode ? '' : 'cursor-pointer'" @click="handleLogoClick">
@@ -20,6 +20,12 @@
               >
                 Plebs vs. Zombies
               </h1>
+              <p
+                v-if="!scrolled && (isLoginScreen || isScoutMode)"
+                class="mt-2 text-xs font-semibold uppercase tracking-widest text-zombie-moss text-center transition-opacity duration-300"
+              >
+                Nostr Follow List Manager
+              </p>
             </div>
           </div>
 
@@ -436,10 +442,8 @@
               <div class="absolute inset-0 -m-10 rounded-full bg-zombie-green/15 blur-3xl" aria-hidden="true"></div>
               <div class="relative text-7xl drop-shadow-[0_0_24px_rgba(92,219,92,0.5)]">🧟‍♂️</div>
             </div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-zombie-moss mb-2">Nostr Follow List Manager</p>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
-            <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
-            <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
+            <p class="text-gray-300">Connect with a browser extension or remote signer to get started.</p>
           </div>
 
           <div class="space-y-3 mb-6">
@@ -470,8 +474,8 @@
                 </div>
                 <p class="text-sm text-gray-400 mt-0.5">
                   <template v-if="isConnecting && connectingMethod === 'nip07'">Approve the request in your extension…</template>
-                  <template v-else-if="hasNip07">One click — Sidecar, Alby or any NIP-07 extension</template>
-                  <template v-else>Click for install options — Sidecar, Alby or any NIP-07 extension</template>
+                  <template v-else-if="hasNip07">One click to connect</template>
+                  <template v-else>Sidecar, Alby, or any NIP-07 extension</template>
                 </p>
               </div>
             </button>
@@ -501,7 +505,7 @@
               </div>
               <div class="flex-grow min-w-0">
                 <span class="text-lg font-semibold text-gray-100">Remote Signer</span>
-                <p class="text-sm text-gray-400 mt-0.5">Scan a QR or paste a bunker URL — Amber, Clave &amp; co.</p>
+                <p class="text-sm text-gray-400 mt-0.5">Scan a QR or paste a bunker URL</p>
               </div>
             </button>
 
@@ -548,25 +552,18 @@
           </div>
 
 
-          <!-- Zombie Check Section -->
-          <div class="mt-10 pt-6 border-t border-gray-700/50">
-            <ZombieCheck />
-          </div>
-
-          <!-- Scout Mode Section -->
+          <!-- Zombie Tools: one search box feeding both no-sign-in tools -->
           <div class="mt-10 pt-6 border-t border-gray-700/50">
             <div class="text-center mb-6">
-              <div class="text-4xl mb-3">👁️🔍</div>
-              <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
-              <p class="text-gray-400 text-sm">
-                Analyze any Nostr user's zombie follows without signing in
-              </p>
+              <div class="text-4xl mb-3">🧟‍♀️👁️</div>
+              <h3 class="text-xl mb-2 text-zombie-green">Zombie Tools</h3>
+              <p class="text-gray-400 text-sm">Check any account or analyze their follows — no sign-in needed.</p>
             </div>
 
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                  Search for a user to scout:
+                  Search for a user to check or scout:
                 </label>
                 <ProfileSearchInput
                   ref="loginScoutInput"
@@ -576,32 +573,38 @@
                 />
               </div>
 
-              <button
-                @click="startScoutMode"
-                :disabled="!scoutInputValue || scoutModeLoading"
-                class="btn-secondary w-full flex items-center justify-center gap-2"
-                :class="{'opacity-50 cursor-not-allowed': !scoutInputValue || scoutModeLoading}"
-              >
-                <span v-if="scoutModeLoading">🔍</span>
-                <span v-else>🏹</span>
-                {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
-              </button>
-              <div v-if="scoutInputError" class="text-red-400 text-xs mt-1">
+              <div class="grid sm:grid-cols-2 gap-2">
+                <button
+                  @click="runLandingZombieCheck"
+                  :disabled="!scoutInputValue || landingCheckRunning || scoutModeLoading"
+                  class="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span v-if="landingCheckRunning" class="spinner-sm inline-block"></span>
+                  <span v-else>🧟‍♀️</span>
+                  {{ landingCheckRunning ? 'Checking…' : 'Check for Zombie' }}
+                </button>
+                <button
+                  @click="startScoutMode"
+                  :disabled="!scoutInputValue || scoutModeLoading || landingCheckRunning"
+                  class="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span v-if="scoutModeLoading">🔍</span>
+                  <span v-else>🏹</span>
+                  {{ scoutModeLoading ? 'Starting…' : 'Scout Their Follows' }}
+                </button>
+              </div>
+              <div v-if="scoutInputError" class="text-red-400 text-xs">
                 {{ scoutInputError }}
               </div>
             </div>
 
-            <div class="mt-4 p-3 bg-gray-800 rounded-lg">
-              <div class="flex items-start gap-2">
-                <span class="text-yellow-400 text-sm">⚠️</span>
-                <div class="text-xs text-gray-400">
-                  <strong class="text-yellow-400">Scout Mode features:</strong><br>
-                  • Read-only analysis of any user's follows<br>
-                  • Zombie count and score calculation<br>
-                  • Social sharing capabilities<br>
-                  • No account creation or purging abilities
-                </div>
-              </div>
+            <!-- Inline result for the zombie check -->
+            <div v-if="showLandingZombieCheck" class="mt-6">
+              <ZombieCheck ref="landingZombieCheck" :hide-input="true" />
+            </div>
+
+            <div class="mt-4 text-center text-xs text-gray-500">
+              Scouting is read-only — no purging, no account needed.
             </div>
           </div>
 
@@ -1028,6 +1031,8 @@ export default {
       selectedScoutProfile: null, // Stores selected profile from ProfileSearchInput
       scoutInputValue: '', // Tracks input value for button enable/disable
       scoutInputError: '', // Error message for validation
+      landingCheckRunning: false, // Landing zombie-check in flight
+      showLandingZombieCheck: false, // Inline zombie-check result on the landing
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
       darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
@@ -1074,15 +1079,14 @@ export default {
     },
     headerGlass() {
       if (!this.isLoginScreen) {
-        return 'bg-black/85 border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
+        return 'bg-black/85 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
       }
-      // Landing: transparent at the top, glass as soon as you scroll at all
-      // (headerSolid, not scrolled — see its comment in data()). Mostly-
-      // opaque fill (not just backdrop-blur) so the header still reliably
-      // hides page content if a browser's compositor doesn't keep the blur
-      // in sync with fast/momentum scrolling (seen on iOS Safari).
+      // Landing: fully transparent with NO blur behind the fullsize logo at
+      // the top of the page; once scrolled the header becomes
+      // semi-translucent with a blur so content slides underneath it
+      // readably.
       return this.headerSolid
-        ? 'bg-black/85 border-b border-white/10'
+        ? 'bg-black/60 backdrop-blur-xl border-b border-white/10'
         : 'bg-transparent border-b border-transparent';
     },
     brandSize() {
@@ -1315,6 +1319,29 @@ export default {
       if (this.isScoutMode) {
         this.$router.push('/scout');
       }
+    },
+    async runLandingZombieCheck() {
+      // A dropdown pick carries the resolved profile; raw text (name or
+      // npub) is handed to the embedded ZombieCheck, whose check() resolves
+      // names via profile search exactly like its own input does.
+      const profile = this.selectedScoutProfile;
+      const value = this.scoutInputValue.trim();
+      if (!profile && !value) return;
+      this.scoutInputError = '';
+      this.showLandingZombieCheck = true;
+      this.$nextTick(async () => {
+        this.landingCheckRunning = true;
+        try {
+          if (profile) {
+            await this.$refs.landingZombieCheck.runCheckOn(profile);
+          } else {
+            await this.$refs.landingZombieCheck.runCheckOnValue(value);
+          }
+          this.scoutInputError = this.$refs.landingZombieCheck.error || '';
+        } finally {
+          this.landingCheckRunning = false;
+        }
+      });
     },
     async startScoutMode() {
       console.log('🔍 Start Scout Mode clicked!');
