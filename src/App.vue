@@ -21,7 +21,7 @@
                 Plebs vs. Zombies
               </h1>
               <p
-                v-if="!scrolled && (isLoginScreen || isScoutMode)"
+                v-if="!scrolled"
                 class="hidden lg:block mt-2 text-xs font-semibold uppercase tracking-widest text-zombie-moss text-center transition-opacity duration-300"
               >
                 Nostr Follow List Manager
