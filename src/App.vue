@@ -529,13 +529,22 @@
             <div v-if="showNsecLogin">
               <div class="flex items-center gap-2 mb-3">
                 <span class="text-yellow-400">⚠️</span>
-                <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere.</p>
+                <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere. Password-encrypted keys (NIP-49) are decrypted locally too.</p>
               </div>
+              <input
+                v-if="nsecInput.startsWith('ncryptsec1')"
+                v-model="ncryptsecPassword"
+                type="password"
+                placeholder="Decryption password for this ncryptsec key"
+                class="input w-full font-mono text-sm mb-2"
+                :disabled="isConnecting"
+                @keyup.enter="connectWithNsec"
+              />
               <div class="flex gap-2">
                 <input
                   v-model="nsecInput"
                   type="password"
-                  placeholder="nsec1..."
+                  placeholder="nsec1… or ncryptsec1…"
                   class="input flex-1 font-mono text-sm"
                   :disabled="isConnecting"
                   @keyup.enter="connectWithNsec"
@@ -966,6 +975,7 @@ import backupService from './services/backupService';
 import immunityService from './services/immunityService';
 import scoutService from './services/scoutService';
 import { nip19, finalizeEvent, getPublicKey } from 'nostr-tools';
+import { decrypt as nip49Decrypt } from 'nostr-tools/nip49';
 import { Analytics } from '@vercel/analytics/vue';
 import { baseVersion } from './utils/version';
 
@@ -1050,6 +1060,7 @@ export default {
       selectedScoutProfile: null, // Stores selected profile from ProfileSearchInput
       scoutInputValue: '', // Tracks input value for button enable/disable
       scoutInputError: '', // Error message for validation
+      ncryptsecPassword: '', // NIP-49 decryption password for ncryptsec logins
       landingCheckRunning: false, // Landing zombie-check in flight
       showLandingZombieCheck: false, // Inline zombie-check result on the landing
       showScoutExitConfirm: false, // Logo-click confirm while a scout job runs
@@ -1517,13 +1528,23 @@ export default {
 
       this.isConnecting = true;
       try {
-        // Decode nsec
-        const decoded = nip19.decode(input);
-        if (decoded.type !== 'nsec') {
-          throw new Error('Invalid nsec key. Must start with nsec1...');
+        // Accept both plain (nsec1…) and password-encrypted (ncryptsec1…,
+        // NIP-49) secret keys.
+        let secretKey;
+        if (input.startsWith('ncryptsec1')) {
+          if (!this.ncryptsecPassword) {
+            throw new Error('This key is password-encrypted (NIP-49). Enter its decryption password below.');
+          }
+          // Throws on a wrong password — surfaced by the catch below.
+          secretKey = nip49Decrypt(input, this.ncryptsecPassword);
+        } else {
+          const decoded = nip19.decode(input);
+          if (decoded.type !== 'nsec') {
+            throw new Error('Invalid key. Must start with nsec1… or ncryptsec1…');
+          }
+          secretKey = decoded.data;
         }
 
-        const secretKey = decoded.data;
         const pubkey = getPublicKey(secretKey);
 
         // Set up nostrService with nsec signing
@@ -1547,8 +1568,9 @@ export default {
           picture: '/default-avatar.svg'
         };
 
-        // Clear nsec from UI after setup
+        // Clear key material from UI after setup
         this.nsecInput = '';
+        this.ncryptsecPassword = '';
 
         backupService.init();
         await immunityService.init();
