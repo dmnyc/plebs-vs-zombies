@@ -530,8 +530,8 @@
             </button>
             <Transition name="collapse">
             <div v-if="showNsecLogin">
-              <div class="flex items-center gap-2 mb-3">
-                <span class="text-yellow-400">⚠️</span>
+              <div class="text-center mb-3">
+                <div class="text-2xl text-yellow-400 mb-2" aria-hidden="true">⚠️</div>
                 <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere. Password-encrypted keys (NIP-49) are decrypted locally too.</p>
               </div>
               <input
