@@ -256,6 +256,89 @@ class PrimalCacheService {
   }
 
   /**
+   * Send one cache filter, collect EVENT payloads until EOSE.
+   * @private
+   */
+  _cacheRequest(cacheFilter, timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+      const requestId = this.generateRequestId();
+
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(new Error('Primal cache timeout'));
+      }, timeoutMs);
+
+      this.pendingRequests.set(requestId, {
+        resolve,
+        reject,
+        timeout,
+        results: []
+      });
+
+      this.send(["REQ", requestId, { cache: cacheFilter }]);
+    });
+  }
+
+  /**
+   * Bulk liveness hints: last-known activity for many pubkeys in ONE cache
+   * call per chunk. Uses Primal's user_infos cache filter, which answers
+   * with each pubkey's latest cached profile event (kind 0).
+   *
+   * LIVENESS-POSITIVE ONLY: a profile event created_at inside the caller's
+   * zombie threshold proves the account published SOMETHING recently (the
+   * cache refreshes profiles from relay traffic), so the caller can skip
+   * that user's relay queries. Cache silence proves nothing and is never
+   * used as zombie evidence — the relays still arbitrate everyone the
+   * cache can't vouch for. A stale or wrong cache can therefore only
+   * cause extra relay queries, never a false zombie.
+   *
+   * @param {string[]} pubkeys - hex pubkeys to look up
+   * @returns {Promise<Map<string, number>>} pubkey → newest known created_at
+   */
+  async getBulkLastSeen(pubkeys, timeoutMs = 8000) {
+    const lastSeen = new Map();
+    if (!Array.isArray(pubkeys) || pubkeys.length === 0) {
+      return lastSeen;
+    }
+
+    let connected;
+    try {
+      connected = await this.connect();
+    } catch (_) {
+      connected = false;
+    }
+    if (!connected) {
+      return lastSeen; // empty: caller falls through to relay path for all
+    }
+
+    // user_infos accepts a pubkey list; chunk to keep messages reasonable
+    const CHUNK = 400;
+    for (let i = 0; i < pubkeys.length; i += CHUNK) {
+      const chunk = pubkeys.slice(i, i + CHUNK);
+      try {
+        const profiles = await this._cacheRequest(
+          ["user_infos", { pubkeys: chunk }],
+          timeoutMs,
+        );
+
+        for (const event of profiles) {
+          if (event?.pubkey && typeof event.created_at === "number") {
+            const prev = lastSeen.get(event.pubkey) || 0;
+            if (event.created_at > prev) {
+              lastSeen.set(event.pubkey, event.created_at);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Primal bulk last-seen chunk failed:', error.message);
+        // Continue with whatever earlier chunks returned
+      }
+    }
+
+    return lastSeen;
+  }
+
+  /**
    * Parse profile event into profile object
    * @param {Object} event - Nostr event (kind 0)
    * @returns {Object|null} - Parsed profile or null
