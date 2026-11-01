@@ -13,21 +13,13 @@
         <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
           <div class="flex items-center gap-3 group cursor-pointer" @click="handleLogoClick">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-[0_0_14px_rgba(92,219,92,0.55)]" :class="[logoSize, { 'animate-lurch': zombieMode }]" />
-            <div class="flex flex-col relative">
+            <div class="flex flex-col">
               <h1
                 class="transition-all duration-300 animate-flicker text-gradient"
                 :class="brandSize"
               >
                 Plebs vs. Zombies
               </h1>
-              <!-- Centered on the brand row, tucked under the logo lockup:
-                   absolute so it never shifts the head/wordmark alignment. -->
-              <p
-                v-if="!scrolled && (isLoginScreen || isScoutMode)"
-                class="absolute inset-x-0 top-full -mt-0.5 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss transition-opacity duration-300"
-              >
-                Nostr Follow List Manager
-              </p>
             </div>
           </div>
 
@@ -243,6 +235,15 @@
               </button>
             </div>
           </div>
+
+        <!-- The subhead gets a row of its own, fully clear of the logo lockup;
+             the compact header keeps just the logo + name. -->
+        <p
+          v-if="!scrolled && (isLoginScreen || isScoutMode)"
+          class="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss transition-opacity duration-300"
+        >
+          Nostr Follow List Manager
+        </p>
       </div>
 
         <!-- Mobile/Tablet Navigation Menu -->
