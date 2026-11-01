@@ -5,7 +5,7 @@
       <!-- Header row with title and buttons -->
       <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-4">
-          <div class="text-3xl flex-shrink-0 animate-wobble-hover">🔍</div>
+          <div class="text-3xl flex-shrink-0 animate-wobble-hover">👁️</div>
           <h2 class="page-title text-yellow-400 !mb-0">Scout Mode</h2>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
@@ -61,7 +61,7 @@
       @click="showNewUserModal = false"
     >
       <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 pb-10 max-w-md w-full mx-4" @click.stop>
-        <h3 class="text-lg font-medium text-yellow-400 mb-4">🔍 Scout New User</h3>
+        <h3 class="text-lg font-medium text-yellow-400 mb-4">👁️ Scout New User</h3>
         
         <div class="space-y-4">
           <div>
@@ -102,7 +102,7 @@
     <div v-if="scanning" class="card mb-6 p-6 animate-fade-up">
       <div class="flex flex-col">
         <h3 class="text-xl mb-4 text-center text-yellow-400 flex items-center justify-center gap-2">
-          <span class="animate-lurch">🔍</span>
+          <span class="animate-lurch">👁️</span>
           <span>Scouting {{ targetDisplay }}...</span>
         </h3>
 
@@ -489,13 +489,13 @@
 
     <!-- Initial State -->
     <div v-else-if="!scanning && !scoutComplete" class="card p-8 text-center">
-      <div class="text-6xl mb-4">🔍</div>
+      <div class="text-6xl mb-4">👁️</div>
       <h3 class="section-title">Ready to Scout</h3>
       <p class="text-gray-400 mb-6">
         Scout mode will analyze {{ targetDisplay }}'s zombie follows.
       </p>
       <button @click="startScout" class="btn-scout">
-        🏹 Begin Scouting
+        👁️ Begin Scouting
       </button>
     </div>
 
