@@ -8,7 +8,10 @@
       </p>
     </div>
 
-    <div class="space-y-4">
+    <!-- Kept mounted even when hideInput: check() resolves names through
+         this component's search machinery, it's just visually replaced by
+         the host's own input. -->
+    <div v-show="!hideInput" class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">
           Search for a user or paste an npub/hex pubkey:
@@ -356,6 +359,14 @@ function writeClipboardWhenReady(textPromise) {
 export default {
   name: 'ZombieCheck',
   components: { ProfileSearchInput },
+  props: {
+    // When embedded (landing "Zombie Tools" block) the host owns the search
+    // input; the component then only renders the Check button's outcome.
+    hideInput: {
+      type: Boolean,
+      default: false
+    }
+  },
   data() {
     return {
       inputValue: '',
@@ -406,6 +417,16 @@ export default {
   methods: {
     onInputChanged(value) {
       this.inputValue = value;
+    },
+    // Programmatic entry point for embedded use (landing Zombie Tools):
+    // resolves via the host-selected profile and runs the full check.
+    async runCheckOn(profile) {
+      this.selectedProfile = profile;
+      await this.check(profile);
+    },
+    async runCheckOnValue(value) {
+      this.$refs.searchInput?.setValue(value);
+      await this.check();
     },
     onProfileSelected(profile) {
       this.selectedProfile = profile;

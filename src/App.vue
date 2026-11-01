@@ -8,10 +8,10 @@
       <div class="app-bg-grain"></div>
     </div>
 
-    <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl transition-all duration-300" :key="forceUpdateKey">
+    <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 transition-all duration-300" :key="forceUpdateKey">
       <div class="container mx-auto px-4 transition-all duration-300" :class="headerPad">
         <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
-          <div class="flex items-center gap-3 group" :class="isScoutMode ? '' : 'cursor-pointer'" @click="handleLogoClick">
+          <div class="flex items-center gap-3 group cursor-pointer" @click="handleLogoClick">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-[0_0_14px_rgba(92,219,92,0.55)]" :class="[logoSize, { 'animate-lurch': zombieMode }]" />
             <div class="flex flex-col">
               <h1
@@ -237,6 +237,13 @@
           </div>
         </div>
 
+        <!-- Subhead: its own centered line below the whole brand row, in the
+             fullsize landing/scout header only. Must stay a direct child of
+             the container (outside the flex row) or it renders beside the logo. -->
+        <p v-if="!scrolled && (isLoginScreen || isScoutMode)" class="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss">
+          Nostr Follow List Manager
+        </p>
+
         <!-- Mobile/Tablet Navigation Menu -->
         <Transition name="collapse">
         <nav
@@ -436,10 +443,10 @@
               <div class="absolute inset-0 -m-10 rounded-full bg-zombie-green/15 blur-3xl" aria-hidden="true"></div>
               <div class="relative text-7xl drop-shadow-[0_0_24px_rgba(92,219,92,0.5)]">🧟‍♂️</div>
             </div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-zombie-moss mb-2">Nostr Follow List Manager</p>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
-            <p class="text-gray-300">Connect with a browser extension or remote signer to manage your dormant follows.</p>
-            <p class="text-sm text-gray-400 mt-2">A desktop browser is recommended for best results.</p>
+            <p class="text-gray-300">Connect with a browser extension or remote signer to get started.</p>
+            <p class="text-xs text-zombie-moss mt-3">Not a game — a Nostr utility for cleaning up your real follow list.</p>
+            <p class="text-xs text-gray-500 mt-1.5">A desktop browser is recommended for best results.</p>
           </div>
 
           <div class="space-y-3 mb-6">
@@ -470,8 +477,8 @@
                 </div>
                 <p class="text-sm text-gray-400 mt-0.5">
                   <template v-if="isConnecting && connectingMethod === 'nip07'">Approve the request in your extension…</template>
-                  <template v-else-if="hasNip07">One click — Sidecar, Alby or any NIP-07 extension</template>
-                  <template v-else>Click for install options — Sidecar, Alby or any NIP-07 extension</template>
+                  <template v-else-if="hasNip07">One click to connect</template>
+                  <template v-else>Sidecar, Alby, or any NIP-07 extension</template>
                 </p>
               </div>
             </button>
@@ -501,7 +508,7 @@
               </div>
               <div class="flex-grow min-w-0">
                 <span class="text-lg font-semibold text-gray-100">Remote Signer</span>
-                <p class="text-sm text-gray-400 mt-0.5">Scan a QR or paste a bunker URL — Amber, Clave &amp; co.</p>
+                <p class="text-sm text-gray-400 mt-0.5">Scan a QR or paste a bunker URL</p>
               </div>
             </button>
 
@@ -521,15 +528,24 @@
             </button>
             <Transition name="collapse">
             <div v-if="showNsecLogin">
-              <div class="flex items-center gap-2 mb-3">
-                <span class="text-yellow-400">⚠️</span>
-                <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere.</p>
+              <div class="text-center mb-3">
+                <div class="text-2xl text-yellow-400 mb-2" aria-hidden="true">⚠️</div>
+                <p class="text-sm text-yellow-300/80">Your key is only used locally to sign events and is never stored or sent anywhere. Password-encrypted keys (NIP-49) are decrypted locally too.</p>
               </div>
+              <input
+                v-if="nsecInput.startsWith('ncryptsec1')"
+                v-model="ncryptsecPassword"
+                type="password"
+                placeholder="Decryption password for this ncryptsec key"
+                class="input w-full font-mono text-sm mb-2"
+                :disabled="isConnecting"
+                @keyup.enter="connectWithNsec"
+              />
               <div class="flex gap-2">
                 <input
                   v-model="nsecInput"
                   type="password"
-                  placeholder="nsec1..."
+                  placeholder="nsec1… or ncryptsec1…"
                   class="input flex-1 font-mono text-sm"
                   :disabled="isConnecting"
                   @keyup.enter="connectWithNsec"
@@ -548,25 +564,20 @@
           </div>
 
 
-          <!-- Zombie Check Section -->
-          <div class="mt-10 pt-6 border-t border-gray-700/50">
-            <ZombieCheck />
-          </div>
-
-          <!-- Scout Mode Section -->
+          <!-- Zombie Tools: one search box feeding both no-sign-in tools -->
           <div class="mt-10 pt-6 border-t border-gray-700/50">
             <div class="text-center mb-6">
-              <div class="text-4xl mb-3">👁️🔍</div>
-              <h3 class="text-xl mb-2 text-yellow-400">Scout Mode</h3>
-              <p class="text-gray-400 text-sm">
-                Analyze any Nostr user's zombie follows without signing in
-              </p>
+              <div class="flex items-center justify-center gap-5 text-4xl mb-3">
+                <span>🧟‍♀️</span><span>☑️</span><span>👁️</span>
+              </div>
+              <h3 class="text-xl mb-2 text-zombie-green">Zombie Detection Tools</h3>
+              <p class="text-gray-400 text-sm">Check any account or analyze their follows — no sign-in needed.</p>
             </div>
 
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">
-                  Search for a user to scout:
+                  Search for a user to check or scout:
                 </label>
                 <ProfileSearchInput
                   ref="loginScoutInput"
@@ -576,32 +587,38 @@
                 />
               </div>
 
-              <button
-                @click="startScoutMode"
-                :disabled="!scoutInputValue || scoutModeLoading"
-                class="btn-secondary w-full flex items-center justify-center gap-2"
-                :class="{'opacity-50 cursor-not-allowed': !scoutInputValue || scoutModeLoading}"
-              >
-                <span v-if="scoutModeLoading">🔍</span>
-                <span v-else>🏹</span>
-                {{ scoutModeLoading ? 'Starting Scout Mode...' : 'Start Scouting' }}
-              </button>
-              <div v-if="scoutInputError" class="text-red-400 text-xs mt-1">
+              <div class="grid sm:grid-cols-2 gap-2">
+                <button
+                  @click="runLandingZombieCheck"
+                  :disabled="!scoutInputValue || landingCheckRunning || scoutModeLoading"
+                  class="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span v-if="landingCheckRunning" class="spinner-sm inline-block"></span>
+                  <span v-else>☑️</span>
+                  {{ landingCheckRunning ? 'Checking…' : 'Check for Zombie' }}
+                </button>
+                <button
+                  @click="startScoutMode"
+                  :disabled="!scoutInputValue || scoutModeLoading || landingCheckRunning"
+                  class="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span v-if="scoutModeLoading">🔍</span>
+                  <span v-else>👁️</span>
+                  {{ scoutModeLoading ? 'Starting…' : 'Scout Their Follows' }}
+                </button>
+              </div>
+              <div v-if="scoutInputError" class="text-red-400 text-xs">
                 {{ scoutInputError }}
               </div>
             </div>
 
-            <div class="mt-4 p-3 bg-gray-800 rounded-lg">
-              <div class="flex items-start gap-2">
-                <span class="text-yellow-400 text-sm">⚠️</span>
-                <div class="text-xs text-gray-400">
-                  <strong class="text-yellow-400">Scout Mode features:</strong><br>
-                  • Read-only analysis of any user's follows<br>
-                  • Zombie count and score calculation<br>
-                  • Social sharing capabilities<br>
-                  • No account creation or purging abilities
-                </div>
-              </div>
+            <!-- Inline result for the zombie check -->
+            <div v-if="showLandingZombieCheck" class="mt-6">
+              <ZombieCheck ref="landingZombieCheck" :hide-input="true" />
+            </div>
+
+            <div class="mt-4 text-center text-xs text-gray-500">
+              Scouting is read-only — no purging, no account needed.
             </div>
           </div>
 
@@ -703,6 +720,19 @@
         </router-view>
       </div>
     </main>
+
+    <!-- Scout exit confirmation: the logo leaves Scout Mode, but an
+         in-flight scout job gets a say first. -->
+    <ConfirmModal
+      :show="showScoutExitConfirm"
+      title="Quit Scout Mode?"
+      message="A scout job is running. Leaving now will stop the scan."
+      type="warning"
+      confirm-text="Quit Scout Mode"
+      cancel-text="Keep Scanning"
+      @confirm="confirmScoutExit"
+      @cancel="showScoutExitConfirm = false"
+    />
 
     <!-- NIP-46 Setup Modal -->
     <Transition name="modal">
@@ -939,12 +969,14 @@ import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import ProfileSearchInput from './components/ProfileSearchInput.vue';
 import ZombieCheck from './components/ZombieCheck.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
 import ZombieRain from './components/ZombieRain.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
 import immunityService from './services/immunityService';
 import scoutService from './services/scoutService';
 import { nip19, finalizeEvent, getPublicKey } from 'nostr-tools';
+import { decrypt as nip49Decrypt } from 'nostr-tools/nip49';
 import { Analytics } from '@vercel/analytics/vue';
 import { baseVersion } from './utils/version';
 
@@ -971,6 +1003,7 @@ export default {
     CopyButton,
     Analytics,
     Nip46Connection,
+    ConfirmModal,
     ClientAuthorizationModal,
     ProfileSearchInput,
     ZombieCheck,
@@ -1028,6 +1061,10 @@ export default {
       selectedScoutProfile: null, // Stores selected profile from ProfileSearchInput
       scoutInputValue: '', // Tracks input value for button enable/disable
       scoutInputError: '', // Error message for validation
+      ncryptsecPassword: '', // NIP-49 decryption password for ncryptsec logins
+      landingCheckRunning: false, // Landing zombie-check in flight
+      showLandingZombieCheck: false, // Inline zombie-check result on the landing
+      showScoutExitConfirm: false, // Logo-click confirm while a scout job runs
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
       darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
@@ -1074,15 +1111,14 @@ export default {
     },
     headerGlass() {
       if (!this.isLoginScreen) {
-        return 'bg-black/85 border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
+        return 'bg-black/85 backdrop-blur-xl border-b border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.35)]';
       }
-      // Landing: transparent at the top, glass as soon as you scroll at all
-      // (headerSolid, not scrolled — see its comment in data()). Mostly-
-      // opaque fill (not just backdrop-blur) so the header still reliably
-      // hides page content if a browser's compositor doesn't keep the blur
-      // in sync with fast/momentum scrolling (seen on iOS Safari).
+      // Landing: fully transparent with NO blur behind the fullsize logo at
+      // the top of the page; once scrolled the header becomes
+      // semi-translucent with a blur so content slides underneath it
+      // readably.
       return this.headerSolid
-        ? 'bg-black/85 border-b border-white/10'
+        ? 'bg-black/60 backdrop-blur-xl border-b border-white/10'
         : 'bg-transparent border-b border-transparent';
     },
     brandSize() {
@@ -1316,6 +1352,29 @@ export default {
         this.$router.push('/scout');
       }
     },
+    async runLandingZombieCheck() {
+      // A dropdown pick carries the resolved profile; raw text (name or
+      // npub) is handed to the embedded ZombieCheck, whose check() resolves
+      // names via profile search exactly like its own input does.
+      const profile = this.selectedScoutProfile;
+      const value = this.scoutInputValue.trim();
+      if (!profile && !value) return;
+      this.scoutInputError = '';
+      this.showLandingZombieCheck = true;
+      this.$nextTick(async () => {
+        this.landingCheckRunning = true;
+        try {
+          if (profile) {
+            await this.$refs.landingZombieCheck.runCheckOn(profile);
+          } else {
+            await this.$refs.landingZombieCheck.runCheckOnValue(value);
+          }
+          this.scoutInputError = this.$refs.landingZombieCheck.error || '';
+        } finally {
+          this.landingCheckRunning = false;
+        }
+      });
+    },
     async startScoutMode() {
       console.log('🔍 Start Scout Mode clicked!');
       this.scoutInputError = '';
@@ -1375,6 +1434,14 @@ export default {
       this.$refs.modalScoutInput?.clear();
 
       this.activeView = 'dashboard';
+    },
+    async leaveScoutMode() {
+      await this.exitScoutMode();
+      this.$router.push('/');
+    },
+    confirmScoutExit() {
+      this.showScoutExitConfirm = false;
+      this.leaveScoutMode();
     },
     updateScoutTarget(newTarget) {
       this.scoutTarget = newTarget;
@@ -1462,13 +1529,23 @@ export default {
 
       this.isConnecting = true;
       try {
-        // Decode nsec
-        const decoded = nip19.decode(input);
-        if (decoded.type !== 'nsec') {
-          throw new Error('Invalid nsec key. Must start with nsec1...');
+        // Accept both plain (nsec1…) and password-encrypted (ncryptsec1…,
+        // NIP-49) secret keys.
+        let secretKey;
+        if (input.startsWith('ncryptsec1')) {
+          if (!this.ncryptsecPassword) {
+            throw new Error('This key is password-encrypted (NIP-49). Enter its decryption password below.');
+          }
+          // Throws on a wrong password — surfaced by the catch below.
+          secretKey = nip49Decrypt(input, this.ncryptsecPassword);
+        } else {
+          const decoded = nip19.decode(input);
+          if (decoded.type !== 'nsec') {
+            throw new Error('Invalid key. Must start with nsec1… or ncryptsec1…');
+          }
+          secretKey = decoded.data;
         }
 
-        const secretKey = decoded.data;
         const pubkey = getPublicKey(secretKey);
 
         // Set up nostrService with nsec signing
@@ -1492,8 +1569,9 @@ export default {
           picture: '/default-avatar.svg'
         };
 
-        // Clear nsec from UI after setup
+        // Clear key material from UI after setup
         this.nsecInput = '';
+        this.ncryptsecPassword = '';
 
         backupService.init();
         await immunityService.init();
@@ -1575,9 +1653,18 @@ export default {
     // Logo: normal click navigates to the dashboard; five rapid clicks
     // wake up the horde.
     handleLogoClick() {
-      if (!this.isScoutMode) {
-        this.setActiveView('dashboard');
+      if (this.isScoutMode) {
+        // The logo now leaves Scout Mode — but an in-flight scout job gets
+        // a confirm first, since leaving stops the scan.
+        if (this.$refs.scoutModeComponent?.scanning) {
+          this.showScoutExitConfirm = true;
+          return;
+        }
+        this.leaveScoutMode();
+        return;
       }
+
+      this.setActiveView('dashboard');
 
       this.logoClicks += 1;
       clearTimeout(this.logoClickTimer);
