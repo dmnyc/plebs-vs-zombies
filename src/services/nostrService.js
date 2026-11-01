@@ -85,6 +85,7 @@ class NostrService {
     // NIP-65 relay lists
     this.userRelayList = null; // User's own relay preferences
     this.followsRelayLists = new Map(); // Map of pubkey -> relay list
+    this.followListConflict = null; // Split-brain detection from the last getFollowList()
 
     // Restore signing method preference and connections
     this.restoreSigningMethod();
@@ -1113,45 +1114,86 @@ class NostrService {
     }
     const eventArray = Array.from(events || []);
 
+    // Detect split-brain: when several distinct follow-list versions exist
+    // across relays, a client holding a stale copy can republish it and
+    // clobber the newest version (seen live with dueling 867/1093 lists).
+    // Surface the disagreement so views can warn before the user acts on
+    // the list.
+    const versions = eventArray.map((e) => ({
+      id: e.id,
+      createdAt: e.created_at,
+      count: (e.tags || []).filter((t) => t[0] === "p" && t[1]).length,
+    }));
+    this.followListConflict = null;
+    if (versions.length >= 2) {
+      const sortedVersions = [...versions].sort(
+        (a, b) => b.createdAt - a.createdAt,
+      );
+      const newest = sortedVersions[0];
+      const conflicting = sortedVersions
+        .slice(1)
+        .filter(
+          (v) =>
+            Math.abs(v.count - newest.count) >= 25 ||
+            (newest.count > 0 &&
+              Math.abs(v.count - newest.count) / newest.count >= 0.1),
+        );
+      if (conflicting.length > 0) {
+        this.followListConflict = {
+          newest: { count: newest.count, createdAt: newest.createdAt },
+          conflicting: conflicting.map((v) => ({
+            count: v.count,
+            createdAt: v.createdAt,
+          })),
+        };
+        console.warn(
+          `⚠️ Follow list conflict across relays: newest has ${newest.count} follows, but ${conflicting.length} differing version(s) exist (${conflicting.map((v) => v.count).join(", ")})`,
+        );
+      }
+    }
+
     console.log(
       `Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`,
     );
 
-    // Extract and validate follow list - only include valid 64-character hex pubkeys
+    // Extract and validate follow list - only include valid 64-character hex pubkeys,
+    // and dedupe (clients can accumulate duplicate p entries over time).
     const rawFollowList = mostRecentEvent.tags
       .filter((tag) => tag[0] === "p" && tag[1]) // Ensure tag[1] exists
       .map((tag) => tag[1]);
 
     console.log(`Raw follow list contains ${rawFollowList.length} entries`);
 
-    // Validate each entry is a proper 64-character hex pubkey
-    const validFollowList = rawFollowList.filter((pubkey) => {
+    const validFollowSet = new Set();
+    for (const pubkey of rawFollowList) {
       if (!pubkey || typeof pubkey !== "string") {
         console.warn(
           `Filtering out non-string follow entry: ${typeof pubkey} "${pubkey}"`,
         );
-        return false;
+        continue;
       }
 
       if (pubkey.length !== 64) {
         console.warn(
           `Filtering out invalid length pubkey: "${pubkey}" (length: ${pubkey.length})`,
         );
-        return false;
+        continue;
       }
 
       if (!/^[0-9a-fA-F]+$/.test(pubkey)) {
         console.warn(`Filtering out non-hex pubkey: "${pubkey}"`);
-        return false;
+        continue;
       }
 
-      return true;
-    });
+      validFollowSet.add(pubkey);
+    }
+
+    const validFollowList = [...validFollowSet];
 
     const filteredCount = rawFollowList.length - validFollowList.length;
     if (filteredCount > 0) {
       console.warn(
-        `⚠️ Filtered out ${filteredCount} invalid entries from follow list`,
+        `⚠️ Filtered out ${filteredCount} invalid/duplicate entries from follow list`,
       );
     }
 
