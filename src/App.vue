@@ -557,7 +557,9 @@
           <!-- Zombie Tools: one search box feeding both no-sign-in tools -->
           <div class="mt-10 pt-6 border-t border-gray-700/50">
             <div class="text-center mb-6">
-              <div class="text-4xl mb-3">🧟‍♀️☑️👁️</div>
+              <div class="flex items-center justify-center gap-5 text-4xl mb-3">
+                <span>🧟‍♀️</span><span>☑️</span><span>👁️</span>
+              </div>
               <h3 class="text-xl mb-2 text-zombie-green">Zombie Detection Tools</h3>
               <p class="text-gray-400 text-sm">Check any account or analyze their follows — no sign-in needed.</p>
             </div>
