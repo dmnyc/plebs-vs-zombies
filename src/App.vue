@@ -10,7 +10,7 @@
 
     <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 transition-all duration-300" :key="forceUpdateKey">
       <div class="container mx-auto px-4 transition-all duration-300" :class="headerPad">
-        <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
+        <div class="flex items-center flex-wrap" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
           <div class="flex items-center gap-3 group cursor-pointer" @click="handleLogoClick">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-[0_0_14px_rgba(92,219,92,0.55)]" :class="[logoSize, { 'animate-lurch': zombieMode }]" />
             <div class="flex flex-col">
@@ -234,16 +234,16 @@
                 <span class="w-5 h-0.5 bg-white mt-1 transition-all" :class="mobileMenuOpen ? '-rotate-45 -translate-y-1' : ''"></span>
               </button>
             </div>
-          </div>
 
-        <!-- The subhead gets a row of its own, fully clear of the logo lockup;
-             the compact header keeps just the logo + name. -->
-        <p
-          v-if="!scrolled && (isLoginScreen || isScoutMode)"
-          class="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss transition-opacity duration-300"
-        >
-          Nostr Follow List Manager
-        </p>
+          <!-- The subhead rides as the row's last w-full child: flex-wrap
+               forces it onto its own centered line below the lockup, in the
+               fullsize header only. -->
+          <div v-if="!scrolled && (isLoginScreen || isScoutMode)" class="w-full mt-3">
+            <p class="text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss">
+              Nostr Follow List Manager
+            </p>
+          </div>
+        </div>
       </div>
 
         <!-- Mobile/Tablet Navigation Menu -->
