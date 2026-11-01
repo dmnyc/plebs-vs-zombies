@@ -11,7 +11,7 @@
     <header ref="headerEl" :class="headerGlass" class="fixed top-0 left-0 right-0 z-40 transition-all duration-300" :key="forceUpdateKey">
       <div class="container mx-auto px-4 transition-all duration-300" :class="headerPad">
         <div class="flex items-center" :class="isLoginScreen ? 'justify-center' : 'justify-between'">
-          <div class="flex items-center gap-3 group" :class="isScoutMode ? '' : 'cursor-pointer'" @click="handleLogoClick">
+          <div class="flex items-center gap-3 group cursor-pointer" @click="handleLogoClick">
             <img src="/logo.svg" alt="Plebs vs Zombies" class="transition-all duration-300 group-hover:scale-110 group-hover:rotate-6 drop-shadow-[0_0_14px_rgba(92,219,92,0.55)]" :class="[logoSize, { 'animate-lurch': zombieMode }]" />
             <div class="flex flex-col">
               <h1
@@ -711,6 +711,19 @@
       </div>
     </main>
 
+    <!-- Scout exit confirmation: the logo leaves Scout Mode, but an
+         in-flight scout job gets a say first. -->
+    <ConfirmModal
+      :show="showScoutExitConfirm"
+      title="Quit Scout Mode?"
+      message="A scout job is running. Leaving now will stop the scan."
+      type="warning"
+      confirm-text="Quit Scout Mode"
+      cancel-text="Keep Scanning"
+      @confirm="confirmScoutExit"
+      @cancel="showScoutExitConfirm = false"
+    />
+
     <!-- NIP-46 Setup Modal -->
     <Transition name="modal">
     <div
@@ -946,6 +959,7 @@ import Nip46Connection from './components/Nip46Connection.vue';
 import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue';
 import ProfileSearchInput from './components/ProfileSearchInput.vue';
 import ZombieCheck from './components/ZombieCheck.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
 import ZombieRain from './components/ZombieRain.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
@@ -978,6 +992,7 @@ export default {
     CopyButton,
     Analytics,
     Nip46Connection,
+    ConfirmModal,
     ClientAuthorizationModal,
     ProfileSearchInput,
     ZombieCheck,
@@ -1037,6 +1052,7 @@ export default {
       scoutInputError: '', // Error message for validation
       landingCheckRunning: false, // Landing zombie-check in flight
       showLandingZombieCheck: false, // Inline zombie-check result on the landing
+      showScoutExitConfirm: false, // Logo-click confirm while a scout job runs
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
       darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
@@ -1407,6 +1423,14 @@ export default {
 
       this.activeView = 'dashboard';
     },
+    async leaveScoutMode() {
+      await this.exitScoutMode();
+      this.$router.push('/');
+    },
+    confirmScoutExit() {
+      this.showScoutExitConfirm = false;
+      this.leaveScoutMode();
+    },
     updateScoutTarget(newTarget) {
       this.scoutTarget = newTarget;
       console.log('🔄 Updated scout target:', newTarget);
@@ -1606,9 +1630,18 @@ export default {
     // Logo: normal click navigates to the dashboard; five rapid clicks
     // wake up the horde.
     handleLogoClick() {
-      if (!this.isScoutMode) {
-        this.setActiveView('dashboard');
+      if (this.isScoutMode) {
+        // The logo now leaves Scout Mode — but an in-flight scout job gets
+        // a confirm first, since leaving stops the scan.
+        if (this.$refs.scoutModeComponent?.scanning) {
+          this.showScoutExitConfirm = true;
+          return;
+        }
+        this.leaveScoutMode();
+        return;
       }
+
+      this.setActiveView('dashboard');
 
       this.logoClicks += 1;
       clearTimeout(this.logoClickTimer);
