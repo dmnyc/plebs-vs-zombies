@@ -444,7 +444,8 @@
             </div>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
             <p class="text-gray-300">Connect with a browser extension or remote signer to get started.</p>
-            <p class="text-xs text-zombie-moss mt-3">Not a game — the zombies are a metaphor, but the unfollows are real.</p>
+            <p class="text-xs text-zombie-moss mt-3">Not a game — a Nostr utility for cleaning up your real follow list.</p>
+            <p class="text-xs text-gray-500 mt-1.5">A desktop browser is recommended for best results.</p>
           </div>
 
           <div class="space-y-3 mb-6">
@@ -581,7 +582,7 @@
                   class="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <span v-if="landingCheckRunning" class="spinner-sm inline-block"></span>
-                  <span v-else>🧟‍♀️</span>
+                  <span v-else>☑️</span>
                   {{ landingCheckRunning ? 'Checking…' : 'Check for Zombie' }}
                 </button>
                 <button
@@ -590,7 +591,7 @@
                   class="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <span v-if="scoutModeLoading">🔍</span>
-                  <span v-else>🏹</span>
+                  <span v-else>👁️</span>
                   {{ scoutModeLoading ? 'Starting…' : 'Scout Their Follows' }}
                 </button>
               </div>
