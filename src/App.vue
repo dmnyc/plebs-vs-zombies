@@ -444,6 +444,7 @@
             </div>
             <h2 class="text-3xl sm:text-4xl mb-4 text-gradient">Connect to start hunting zombies!</h2>
             <p class="text-gray-300">Connect with a browser extension or remote signer to get started.</p>
+            <p class="text-xs text-zombie-moss mt-3">Not a game — the zombies are a metaphor, but the unfollows are real.</p>
           </div>
 
           <div class="space-y-3 mb-6">
