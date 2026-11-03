@@ -721,17 +721,72 @@
       </div>
     </main>
 
-    <!-- Scout exit confirmation: the logo leaves Scout Mode, but an
-         in-flight scout job gets a say first. -->
+    <!-- Background scan: a thin progress line under the header plus a
+         collapsed pill, shown whenever the scan's own view isn't on screen. -->
+    <div
+      v-if="scanDockVisible && scan.status === 'running'"
+      class="fixed left-0 right-0 z-40 h-0.5 bg-white/10 pointer-events-none"
+      :style="{ top: headerHeight + 'px' }"
+      aria-hidden="true"
+    >
+      <div
+        class="h-full bg-zombie-green shadow-[0_0_8px_rgba(92,219,92,0.8)] transition-all duration-300"
+        :style="{ width: scanPercent + '%' }"
+      ></div>
+    </div>
+
+    <Transition name="drop">
+      <div
+        v-if="scanDockVisible"
+        class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-80 z-40 bg-zombie-dark/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden"
+        role="status"
+      >
+        <div class="flex items-center gap-3 px-3 py-2.5">
+          <button
+            class="flex-1 min-w-0 flex items-center gap-2.5 text-left group"
+            :title="scan.status === 'running' ? 'Show scan progress' : 'Show results'"
+            @click="openScan"
+          >
+            <span class="text-xl shrink-0" :class="{ 'animate-lurch': scan.status === 'running' }">{{ scanDockIcon }}</span>
+            <span class="min-w-0">
+              <span class="block text-sm font-medium text-white truncate group-hover:text-zombie-green transition-colors">{{ scanDockTitle }}</span>
+              <span class="block text-xs text-gray-400 truncate">{{ scanDockDetail }}</span>
+            </span>
+          </button>
+          <button
+            v-if="scan.status === 'running'"
+            class="shrink-0 text-xs px-2.5 py-1 rounded-lg text-red-300 hover:text-red-200 hover:bg-white/5 transition-colors"
+            title="Stop scan"
+            @click="stopBackgroundScan"
+          >
+            Stop
+          </button>
+          <button
+            v-else
+            class="shrink-0 w-7 h-7 grid place-items-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            title="Dismiss"
+            aria-label="Dismiss"
+            @click="scan.status === 'failed' ? dismissScan() : markScanSeen()"
+          >
+            ✕
+          </button>
+        </div>
+        <div v-if="scan.status === 'running'" class="h-1 bg-white/10">
+          <div class="h-full bg-zombie-green transition-all duration-300" :style="{ width: scanPercent + '%' }"></div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- One scan at a time: starting another asks before stopping this one. -->
     <ConfirmModal
-      :show="showScoutExitConfirm"
-      title="Quit Scout Mode?"
-      message="A scout job is running. Leaving now will stop the scan."
+      :show="!!scan.prompt"
+      title="Scan Already Running"
+      :message="scan.prompt?.message || ''"
       type="warning"
-      confirm-text="Quit Scout Mode"
-      cancel-text="Keep Scanning"
-      @confirm="confirmScoutExit"
-      @cancel="showScoutExitConfirm = false"
+      confirm-text="Stop & Start New"
+      cancel-text="Keep Current Scan"
+      @confirm="scan.prompt?.resolve(true)"
+      @cancel="scan.prompt?.resolve(false)"
     />
 
     <!-- NIP-46 Setup Modal -->
@@ -970,6 +1025,7 @@ import ClientAuthorizationModal from './components/ClientAuthorizationModal.vue'
 import ProfileSearchInput from './components/ProfileSearchInput.vue';
 import ZombieCheck from './components/ZombieCheck.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import scanManager, { scanState } from './services/scanManager';
 import ZombieRain from './components/ZombieRain.vue';
 import nostrService from './services/nostrService';
 import backupService from './services/backupService';
@@ -1064,7 +1120,6 @@ export default {
       ncryptsecPassword: '', // NIP-49 decryption password for ncryptsec logins
       landingCheckRunning: false, // Landing zombie-check in flight
       showLandingZombieCheck: false, // Inline zombie-check result on the landing
-      showScoutExitConfirm: false, // Logo-click confirm while a scout job runs
       // Easter eggs
       zombieMode: false, // Konami code toggles screen-wide zombie apocalypse mode
       darkerMode: storedDarkerMode(), // User-menu toggle: whole-site B&W high-contrast theme
@@ -1100,6 +1155,50 @@ export default {
   computed: {
     currentView() {
       return this.views[this.activeView];
+    },
+    // Background scan (services/scanManager.js)
+    scan() {
+      return scanState;
+    },
+    scanPercent() {
+      const { processed = 0, total = 0 } = scanState.progress;
+      return total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+    },
+    // Is the scan's own view (with its full progress card) on screen?
+    scanOnScreen() {
+      if (scanState.kind === 'scout') {
+        return this.isScoutMode && this.scoutTarget?.pubkey === scanState.target?.pubkey;
+      }
+      if (scanState.kind === 'hunt') {
+        return this.isConnected && !this.isScoutMode && ['/', '/hunt'].includes(this.$route.path);
+      }
+      return false;
+    },
+    scanDockVisible() {
+      if (scanState.status === 'idle' || this.scanOnScreen) return false;
+      return scanState.status === 'running' || !scanState.seen;
+    },
+    scanDockIcon() {
+      if (scanState.status === 'failed') return '⚠️';
+      if (scanState.status === 'done') return '✅';
+      return scanState.kind === 'scout' ? '👁️' : '🧟';
+    },
+    scanDockTitle() {
+      const t = scanState.target || {};
+      const who = t.display_name || t.name || 'user';
+      if (scanState.status === 'failed') return scanState.kind === 'scout' ? `Scout of ${who} failed` : 'Zombie scan failed';
+      if (scanState.status === 'done') return scanState.kind === 'scout' ? `Scout of ${who} complete` : 'Zombie scan complete';
+      return scanState.kind === 'scout' ? `Scouting ${who}…` : 'Scanning for zombies…';
+    },
+    scanDockDetail() {
+      const r = scanState.result || {};
+      if (scanState.status === 'failed') return 'Tap to see details';
+      if (scanState.status === 'done') {
+        const n = scanState.kind === 'scout' ? r.totalZombies : r.zombieCount;
+        return n != null ? `${n.toLocaleString()} zombie${n === 1 ? '' : 's'} found · View results` : 'View results';
+      }
+      const { processed = 0, total = 0 } = scanState.progress;
+      return total > 0 ? `${processed.toLocaleString()} / ${total.toLocaleString()} · ${this.scanPercent}%` : 'Starting…';
     },
     // Header compacts once the page is scrolled (landing and in-app alike)
     headerPad() {
@@ -1283,6 +1382,12 @@ export default {
       this.showScoutModal = false;
       this.scoutInputError = '';
 
+      // One scan at a time: a different running scan is stopped (after a
+      // confirm) before this one starts.
+      const go = await scanManager.requestStart('scout', this.selectedScoutProfile);
+      if (go === false) return;
+      if (go === 'attach' && this.isScoutMode) return;
+
       // Mirror startScoutFromModal: force a remount when already in Scout Mode
       if (this.isScoutMode) {
         await scoutService.forceShutdown();
@@ -1316,6 +1421,12 @@ export default {
       // Store the profile for startScoutMode to use
       this.selectedScoutProfile = profile;
       this.showScoutModal = false;
+
+      // One scan at a time: a different running scan is stopped (after a
+      // confirm) before this one starts.
+      const go = await scanManager.requestStart('scout', profile);
+      if (go === false) return;
+      if (go === 'attach' && this.isScoutMode) return;
 
       // If already in Scout Mode, force a complete reset by exiting and re-entering
       if (this.isScoutMode) {
@@ -1398,6 +1509,10 @@ export default {
 
         console.log('✅ Profile to scout:', profile);
 
+        // One scan at a time (no-op when the caller already asked)
+        const go = await scanManager.requestStart('scout', profile);
+        if (go === false) return;
+
         // Use the profile data
         this.scoutTarget = {
           npub: profile.npub,
@@ -1420,8 +1535,11 @@ export default {
       }
     },
     async exitScoutMode() {
-      // Force shutdown all scout activity and connections
-      await scoutService.forceShutdown();
+      // A running scout keeps going in the background (the progress pill
+      // brings it back); otherwise shut scout activity and connections down.
+      if (!(scanState.kind === 'scout' && scanState.status === 'running')) {
+        await scoutService.forceShutdown();
+      }
 
       this.isScoutMode = false;
       this.scoutTarget = null;
@@ -1439,9 +1557,35 @@ export default {
       await this.exitScoutMode();
       this.$router.push('/');
     },
-    confirmScoutExit() {
-      this.showScoutExitConfirm = false;
-      this.leaveScoutMode();
+    // ------------------------------------------------------------------
+    // Background scan (one at a time — see services/scanManager.js)
+    // ------------------------------------------------------------------
+
+    // Back to wherever the running/finished scan is shown.
+    async openScan() {
+      if (scanState.kind === 'hunt') {
+        this.setActiveView('hunting');
+      } else if (scanState.kind === 'scout' && scanState.target) {
+        this.scoutTarget = { ...scanState.target };
+        this.isScoutMode = true;
+        if (this.$route.path !== '/scout') this.$router.push('/scout');
+      }
+    },
+    stopBackgroundScan() {
+      scanManager.cancel();
+    },
+    dismissScan() {
+      scanManager.clear();
+    },
+    markScanSeen() {
+      scanManager.markSeen();
+    },
+    onBeforeUnload(e) {
+      // A reload or tab close would end the scan — let the browser ask.
+      if (scanState.status === 'running') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
     },
     updateScoutTarget(newTarget) {
       this.scoutTarget = newTarget;
@@ -1598,6 +1742,8 @@ export default {
     },
 
     logout() {
+      // Scans belong to the session — stop and forget them on the way out.
+      scanManager.cancel();
       nostrService.logout();
       this.isConnected = false;
       this.userProfile = null;
@@ -1654,12 +1800,8 @@ export default {
     // wake up the horde.
     handleLogoClick() {
       if (this.isScoutMode) {
-        // The logo now leaves Scout Mode — but an in-flight scout job gets
-        // a confirm first, since leaving stops the scan.
-        if (this.$refs.scoutModeComponent?.scanning) {
-          this.showScoutExitConfirm = true;
-          return;
-        }
+        // The logo leaves Scout Mode; a running scout keeps going in the
+        // background (see exitScoutMode).
         this.leaveScoutMode();
         return;
       }
@@ -2046,6 +2188,7 @@ export default {
     this.refreshExtensionDetection();
     this.onWindowFocus = () => this.refreshExtensionDetection();
     window.addEventListener('focus', this.onWindowFocus);
+    window.addEventListener('beforeunload', this.onBeforeUnload);
 
     // Easter eggs: Konami code + console message
     window.addEventListener('keydown', this.handleKonamiKey);
@@ -2086,6 +2229,7 @@ export default {
     window.removeEventListener('keydown', this.handleKonamiKey);
     window.removeEventListener('scroll', this.onScroll);
     window.removeEventListener('focus', this.onWindowFocus);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
     if (this.headerResizeObserver) this.headerResizeObserver.disconnect();
     clearTimeout(this.eggToast.timer);
     clearTimeout(this.logoClickTimer);

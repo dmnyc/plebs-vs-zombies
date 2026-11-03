@@ -698,6 +698,7 @@
 
 <script>
 import scoutService from '../services/scoutService';
+import scanManager, { scanState, isScoutJobFor } from '../services/scanManager';
 import nostrService from '../services/nostrService';
 import ProfileSearchInput from '../components/ProfileSearchInput.vue';
 import { nip19 } from 'nostr-tools';
@@ -721,15 +722,8 @@ export default {
   },
   data() {
     return {
-      scanning: false,
       scoutComplete: false,
       scoutResults: null,
-      scanProgress: {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'initializing'
-      },
       showNewUserModal: false,
       selectedProfile: null,
       processingNewUser: false,
@@ -757,6 +751,20 @@ export default {
     }
   },
   computed: {
+    // The scan itself lives in scanManager, so it keeps running (and can be
+    // picked back up here) while the user is elsewhere in the app.
+    scoutJob() {
+      return isScoutJobFor(this.scoutTarget?.pubkey);
+    },
+    scanning() {
+      return this.scoutJob && scanState.status === 'running';
+    },
+    scanProgress() {
+      return this.scoutJob ? scanState.progress : { total: 0, processed: 0, currentNpub: '', stage: '' };
+    },
+    scoutStatus() {
+      return this.scoutJob ? scanState.status : 'idle';
+    },
     hasScoutTarget() {
       return !!(this.scoutTarget && this.scoutTarget.pubkey);
     },
@@ -860,66 +868,29 @@ https://plebsvszombies.cc`;
     }
   },
   methods: {
-    async startScout() {
-      this.scanning = true;
+    startScout() {
       this.scoutComplete = false;
       this.scoutResults = null;
       this.postError = '';
-      
-      this.scanProgress = {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'Starting scout analysis...'
-      };
-      
-      try {
-        console.log('🔍 Starting scout for:', this.scoutTarget);
-        
-        const results = await scoutService.scoutUser(this.scoutTarget.pubkey, (progress) => {
-          this.scanProgress = {
-            ...this.scanProgress,
-            ...progress
-          };
-        });
-        
-        // Check if scan was cancelled - if so, don't show results
-        if (!scoutService.cancelled) {
-          if (results.success) {
-            this.scoutResults = results;
-            this.scoutComplete = true;
-            console.log('✅ Scout completed successfully:', results);
-          } else {
-            console.error('❌ Scout failed:', results.message);
-            this.scoutComplete = true;
-            this.scoutResults = null;
-          }
-        } else {
-          console.log('🛑 Scan was cancelled, not showing results');
-          // Ensure we stay in initial state
-          this.scoutComplete = false;
-          this.scoutResults = null;
-        }
-        
-      } catch (error) {
-        console.error('❌ Scout error:', error);
-        // Only set error state if not cancelled
-        if (!scoutService.cancelled) {
-          this.scoutComplete = true;
-          this.scoutResults = null;
-        } else {
-          // Stay in initial state if cancelled
-          this.scoutComplete = false;
-          this.scoutResults = null;
-        }
-      } finally {
-        this.scanning = false;
+      console.log('🔍 Starting scout for:', this.scoutTarget);
+      // App.vue (or scoutNewUser) has already cleared any other running scan.
+      scanManager.startScout(this.scoutTarget);
+    },
+    applyScoutStatus(status) {
+      if (status === 'done') {
+        this.scoutResults = scanState.result;
+        this.scoutComplete = true;
+        scanManager.markSeen();
+        console.log('✅ Scout completed successfully:', scanState.result);
+      } else if (status === 'failed') {
+        console.error('❌ Scout failed:', scanState.error);
+        this.scoutResults = null;
+        this.scoutComplete = true;
+        scanManager.markSeen();
       }
     },
     async stopScan() {
-      // Force shutdown all scout activity
-      await scoutService.forceShutdown();
-      this.scanning = false;
+      await scanManager.cancel();
       // Reset to initial state - don't show incomplete results
       this.scoutComplete = false;
       this.scoutResults = null;
@@ -950,8 +921,15 @@ https://plebsvszombies.cc`;
         console.log('⚠️ scoutNewUser already processing, ignoring duplicate call');
         return;
       }
+      // Replacing this view's own scout is the point of this flow; any other
+      // running scan (e.g. a Hunt) gets the one-at-a-time confirm first.
+      if (!this.scoutJob && scanState.status === 'running') {
+        const ok = await scanManager.requestStart('scout', this.selectedProfile);
+        if (ok === false) return;
+      }
+
       this.processingNewUser = true;
-      
+
       try {
         console.log('🔄 Starting new user scout process...');
         
@@ -1398,6 +1376,11 @@ https://plebsvszombies.cc`;
       URL.revokeObjectURL(url);
     }
   },
+  watch: {
+    scoutStatus(status) {
+      this.applyScoutStatus(status);
+    }
+  },
   async mounted() {
     // The routed /scout instance has no scoutTarget (App.vue passes it only
     // for its own Scout Mode rendering) — nothing to auto-scan, so open the
@@ -1428,8 +1411,17 @@ https://plebsvszombies.cc`;
       return;
     }
 
+    // Coming back to a scout that ran (or is still running) in the
+    // background: pick it up instead of starting over.
+    if (this.scoutJob) {
+      this.applyScoutStatus(scanState.status);
+      return;
+    }
+
     // Auto-start scouting when component mounts
-    await this.startScout();
+    const ok = await scanManager.requestStart('scout', this.scoutTarget);
+    if (ok === true) this.startScout();
+    else if (ok === false) this.exitScoutMode();
   }
 }
 </script>
