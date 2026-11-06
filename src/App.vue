@@ -729,11 +729,11 @@
       </div>
     </main>
 
-    <!-- Background scan: a thin progress line under the header plus a
+    <!-- Background scan: a progress line under the header plus a
          collapsed pill, shown whenever the scan's own view isn't on screen. -->
     <div
       v-if="scanDockVisible && scan.status === 'running'"
-      class="fixed left-0 right-0 z-40 h-0.5 bg-white/10 pointer-events-none"
+      class="fixed left-0 right-0 z-40 h-1 bg-white/10 pointer-events-none"
       :style="{ top: headerHeight + 'px' }"
       aria-hidden="true"
     >
@@ -746,24 +746,24 @@
     <Transition name="drop">
       <div
         v-if="scanDockVisible"
-        class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-80 z-40 bg-zombie-dark/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden"
+        class="fixed bottom-5 right-5 left-4 sm:left-auto sm:w-[26rem] z-40 bg-zombie-dark/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden"
         role="status"
       >
-        <div class="flex items-center gap-3 px-3 py-2.5">
+        <div class="flex items-center gap-3 px-4 py-3.5">
           <button
-            class="flex-1 min-w-0 flex items-center gap-2.5 text-left group"
+            class="flex-1 min-w-0 flex items-center gap-3 text-left group"
             :title="scan.status === 'running' ? 'Show scan progress' : 'Show results'"
             @click="openScan"
           >
-            <span class="text-xl shrink-0" :class="{ 'animate-lurch': scan.status === 'running' }">{{ scanDockIcon }}</span>
+            <span class="text-2xl shrink-0" :class="{ 'animate-lurch': scan.status === 'running' }">{{ scanDockIcon }}</span>
             <span class="min-w-0">
-              <span class="block text-sm font-medium text-white truncate group-hover:text-zombie-green transition-colors">{{ scanDockTitle }}</span>
-              <span class="block text-xs text-gray-400 truncate">{{ scanDockDetail }}</span>
+              <span class="block text-base font-medium text-white truncate group-hover:text-zombie-green transition-colors">{{ scanDockTitle }}</span>
+              <span class="block text-sm text-gray-300 truncate">{{ scanDockDetail }}</span>
             </span>
           </button>
           <button
             v-if="scan.status === 'running'"
-            class="shrink-0 text-xs px-2.5 py-1 rounded-lg text-red-300 hover:text-red-200 hover:bg-white/5 transition-colors"
+            class="shrink-0 text-sm px-3 py-1.5 rounded-lg text-red-300 hover:text-red-200 hover:bg-white/5 transition-colors"
             title="Stop scan"
             @click="stopBackgroundScan"
           >
@@ -771,7 +771,7 @@
           </button>
           <button
             v-else
-            class="shrink-0 w-7 h-7 grid place-items-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            class="shrink-0 w-8 h-8 grid place-items-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
             title="Dismiss"
             aria-label="Dismiss"
             @click="scan.status === 'failed' ? dismissScan() : markScanSeen()"
@@ -779,7 +779,7 @@
             ✕
           </button>
         </div>
-        <div v-if="scan.status === 'running'" class="h-1 bg-white/10">
+        <div v-if="scan.status === 'running'" class="h-1.5 bg-white/10">
           <div class="h-full bg-zombie-green transition-all duration-300" :style="{ width: scanPercent + '%' }"></div>
         </div>
       </div>
