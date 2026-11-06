@@ -767,7 +767,7 @@
           </button>
           <button
             v-if="scan.status === 'running'"
-            class="shrink-0 text-base px-3.5 py-2 sm:text-lg sm:px-4 sm:py-2.5 rounded-lg text-red-300 hover:text-red-200 hover:bg-white/5 transition-colors"
+            class="shrink-0 text-base sm:text-lg font-medium px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-500 active:scale-95 transition shadow-lg shadow-red-600/30"
             title="Stop scan"
             @click="stopBackgroundScan"
           >
