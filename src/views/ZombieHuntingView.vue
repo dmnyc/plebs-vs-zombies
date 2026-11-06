@@ -344,6 +344,7 @@ import immunityService from '../services/immunityService';
 import backupService from '../services/backupService';
 import easterEggData from '../data/easterEggs.js';
 import { nip19 } from 'nostr-tools';
+import scanManager, { scanState } from '../services/scanManager';
 
 export default {
   name: 'ZombieHuntingView',
@@ -357,7 +358,6 @@ export default {
   data() {
     return {
       loading: true,
-      scanning: false,
       scanComplete: false,
       purging: false,
       purgeSuccess: false,
@@ -370,13 +370,6 @@ export default {
       lastPurgeResult: null,
       prePurgeStats: null,
       purgeTypeBreakdown: null,
-      scanCancelled: false,
-      scanProgress: {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'initializing'
-      },
       stats: {
         totalFollows: 0,
         totalZombies: 0,
@@ -417,6 +410,19 @@ export default {
     };
   },
   computed: {
+    // The scan itself lives in scanManager so it survives leaving this page.
+    huntJob() {
+      return scanState.kind === 'hunt';
+    },
+    scanning() {
+      return this.huntJob && scanState.status === 'running';
+    },
+    scanProgress() {
+      return this.huntJob ? scanState.progress : { total: 0, processed: 0, currentNpub: '', stage: '' };
+    },
+    huntStatus() {
+      return this.huntJob ? scanState.status : 'idle';
+    },
     zombieStatsReady() {
       return this.zombieStats.total > 0;
     },
@@ -667,86 +673,37 @@ export default {
       }
     },
     async scanForZombies() {
-      this.scanning = true;
+      // Only one scan at a time — a running Scout scan has to be stopped first.
+      const ok = await scanManager.requestStart('hunt');
+      if (ok !== true) return;
+
       this.scanComplete = false;
-      this.scanCancelled = false;
       this.currentEasterEgg = '';
-      
-      // Reset progress
-      this.scanProgress = {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'Initializing scan...'
+      zombieService.setBatchSize(this.batchSize);
+      scanManager.startHunt();
+    },
+    applyScanResult(result) {
+      this.zombieData = result.zombieData;
+      this.scanComplete = true;
+
+      this.zombieStats = {
+        total: result.totalFollows,
+        active: result.zombieData.active.length,
+        burned: result.zombieData.burned?.length || 0,
+        fresh: result.zombieData.fresh.length,
+        rotting: result.zombieData.rotting.length,
+        ancient: result.zombieData.ancient.length
       };
-      
-      try {
-        // Update batch size in the service
-        zombieService.setBatchSize(this.batchSize);
-        
-        // Get settings from localStorage
-        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
-        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
-        
-        const enhancedScanningSetting = localStorage.getItem('useEnhancedScanning');
-        const useEnhancedScanning = enhancedScanningSetting !== null ? JSON.parse(enhancedScanningSetting) : false;
-        
-        // Choose scanning method based on user preference
-        const scanMethod = useEnhancedScanning ? 'scanForZombiesEnhanced' : 'scanForZombies';
-        console.log(`🔍 Using ${useEnhancedScanning ? 'Enhanced' : 'Standard'} zombie scanning method`);
-        
-        // Perform the scan with progress callback
-        const result = await zombieService[scanMethod](true, (progress) => {
-          // Check if scan was cancelled
-          if (this.scanCancelled) {
-            throw new Error('Scan cancelled by user');
-          }
-          
-          this.scanProgress = {
-            ...this.scanProgress,
-            ...progress
-          };
-          
-          // Update easter egg
-          this.updateEasterEgg();
-        }, shouldCreateBackup);
-        
-        if (result.success && !this.scanCancelled) {
-          this.zombieData = result.zombieData;
-          this.scanComplete = true;
-          
-          this.zombieStats = {
-            total: result.totalFollows,
-            active: result.zombieData.active.length,
-            burned: result.zombieData.burned?.length || 0,
-            fresh: result.zombieData.fresh.length,
-            rotting: result.zombieData.rotting.length,
-            ancient: result.zombieData.ancient.length
-          };
-          
-          this.stats.totalFollows = result.totalFollows;
-          this.stats.totalZombies = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
-          this.stats.immuneUsers = result.immuneCount || 0;
-        } else if (!this.scanCancelled) {
-          this.showAlert('Scan Failed', `Failed to scan for zombies: ${result.message}`, 'error');
-        }
-      } catch (error) {
-        if (error.message === 'Scan cancelled by user') {
-          console.log('Scan cancelled by user');
-        } else {
-          console.error('Failed to scan for zombies:', error);
-          this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
-        }
-      } finally {
-        this.currentEasterEgg = '';
-        this.scanning = false;
-      }
+
+      this.stats.totalFollows = result.totalFollows;
+      this.stats.totalZombies = this.zombieStats.burned + this.zombieStats.fresh + this.zombieStats.rotting + this.zombieStats.ancient;
+      this.stats.immuneUsers = result.immuneCount || 0;
     },
     stopScan() {
-      this.scanCancelled = true;
-      this.scanning = false;
-      this.resetEasterEggs();
-      console.log('Zombie scan stopped by user');
+      scanManager.cancel();
+      this.currentEasterEgg = '';
+      // Fall back to whatever the last completed scan stored
+      this.loadInitialData();
     },
     getScanProgressLabel() {
       const stage = this.scanProgress.stage || '';
@@ -1111,7 +1068,28 @@ export default {
       }
     }
   },
+  watch: {
+    scanProgress() {
+      if (this.scanning) this.updateEasterEgg();
+    },
+    huntStatus(status) {
+      if (status === 'done') {
+        this.currentEasterEgg = '';
+        this.applyScanResult(scanState.result);
+        scanManager.markSeen();
+      } else if (status === 'failed') {
+        this.currentEasterEgg = '';
+        scanManager.markSeen();
+        this.showAlert('Scan Failed', `Failed to scan for zombies: ${scanState.error}`, 'error');
+        scanManager.clear();
+      }
+    }
+  },
   mounted() {
+    // A scan that finished while the user was elsewhere is on screen now
+    if (this.huntJob && scanState.status !== 'running') scanManager.markSeen();
+    if (this.huntJob && scanState.status === 'failed') scanManager.clear();
+
     // Load easter egg messages from external file
     this.firstPassEasterEggs = easterEggData.firstPass;
     this.phase2EasterEggs = easterEggData.phase2;
