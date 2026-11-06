@@ -238,9 +238,10 @@
         </div>
 
         <!-- Subhead: its own centered line below the whole brand row, in the
-             fullsize landing/scout header only. Must stay a direct child of
-             the container (outside the flex row) or it renders beside the logo. -->
-        <p v-if="!scrolled && (isLoginScreen || isScoutMode)" class="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss">
+             fullsize sign-in header only (Scout Mode has its own nav and
+             doesn't get it). Must stay a direct child of the container
+             (outside the flex row) or it renders beside the logo. -->
+        <p v-if="!scrolled && isLoginScreen" class="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-zombie-moss">
           Nostr Follow List Manager
         </p>
 
