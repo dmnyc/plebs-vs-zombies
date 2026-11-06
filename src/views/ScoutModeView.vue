@@ -911,8 +911,8 @@ https://plebsvszombies.cc`;
       });
     },
     async scoutNewUser() {
-      if (!this.selectedProfile) {
-        console.log('❌ No profile selected, returning');
+      if (!this.selectedProfile?.pubkey) {
+        console.log('❌ No usable profile selected, returning');
         return;
       }
 
@@ -971,7 +971,7 @@ https://plebsvszombies.cc`;
           picture: this.selectedProfile.picture
         };
 
-        console.log('🔄 Switching scout target from', this.scoutTarget.pubkey.substring(0, 8), 'to', newTarget.pubkey.substring(0, 8));
+        console.log('🔄 Switching scout target from', this.scoutTarget?.pubkey?.substring(0, 8) ?? '(none)', 'to', newTarget.pubkey.substring(0, 8));
         
         // Update the target and close modal
         this.$emit('update-target', newTarget);
@@ -995,7 +995,7 @@ https://plebsvszombies.cc`;
         
         // Wait for next tick to ensure the target is updated
         await this.$nextTick();
-        console.log('✅ Target updated, starting scout for:', this.scoutTarget.pubkey.substring(0, 8));
+        console.log('✅ Target updated, starting scout for:', this.scoutTarget?.pubkey?.substring(0, 8));
         await this.startScout();
         
       } catch (error) {

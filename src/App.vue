@@ -716,7 +716,14 @@
       <div v-else>
         <router-view @logout="logout" v-slot="{ Component }">
           <Transition name="page" mode="out-in">
-            <component :is="Component" :key="$route.path" ref="currentViewComponent" @scout-user="onRouteScoutUser" />
+            <component
+              :is="Component"
+              :key="$route.path"
+              ref="currentViewComponent"
+              v-bind="$route.path === '/scout' ? { scoutTarget } : {}"
+              @update-target="updateScoutTarget"
+              @scout-user="onRouteScoutUser"
+            />
           </Transition>
         </router-view>
       </div>
