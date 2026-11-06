@@ -758,6 +758,10 @@
             <span class="text-3xl sm:text-4xl shrink-0" :class="{ 'animate-lurch': scan.status === 'running' }">{{ scanDockIcon }}</span>
             <span class="min-w-0">
               <span class="block text-lg sm:text-xl font-medium text-white truncate group-hover:text-zombie-green transition-colors">{{ scanDockTitle }}</span>
+              <span
+                v-if="scan.status === 'running' && scan.progress?.stage"
+                class="block text-sm sm:text-base text-gray-400 truncate"
+              >{{ scan.progress.stage }}</span>
               <span class="block text-base sm:text-lg text-gray-300 truncate">{{ scanDockDetail }}</span>
             </span>
           </button>
@@ -1205,12 +1209,8 @@ export default {
         const n = scanState.kind === 'scout' ? r.totalZombies : r.zombieCount;
         return n != null ? `${n.toLocaleString()} zombie${n === 1 ? '' : 's'} found · View results` : 'View results';
       }
-      // The stage leads so a pass change — batch scan reaching 100% and
-      // the retry pass restarting at a smaller total — explains itself
-      // instead of reading as the progress bar glitching.
-      const { processed = 0, total = 0, stage = '' } = scanState.progress;
-      const counts = total > 0 ? `${processed.toLocaleString()} / ${total.toLocaleString()} · ${this.scanPercent}%` : 'Starting…';
-      return stage ? `${stage} · ${counts}` : counts;
+      const { processed = 0, total = 0 } = scanState.progress;
+      return total > 0 ? `${processed.toLocaleString()} / ${total.toLocaleString()} · ${this.scanPercent}%` : 'Starting…';
     },
     // Header compacts once the page is scrolled (landing and in-app alike)
     headerPad() {
