@@ -1205,8 +1205,12 @@ export default {
         const n = scanState.kind === 'scout' ? r.totalZombies : r.zombieCount;
         return n != null ? `${n.toLocaleString()} zombie${n === 1 ? '' : 's'} found · View results` : 'View results';
       }
-      const { processed = 0, total = 0 } = scanState.progress;
-      return total > 0 ? `${processed.toLocaleString()} / ${total.toLocaleString()} · ${this.scanPercent}%` : 'Starting…';
+      // The stage leads so a pass change — batch scan reaching 100% and
+      // the retry pass restarting at a smaller total — explains itself
+      // instead of reading as the progress bar glitching.
+      const { processed = 0, total = 0, stage = '' } = scanState.progress;
+      const counts = total > 0 ? `${processed.toLocaleString()} / ${total.toLocaleString()} · ${this.scanPercent}%` : 'Starting…';
+      return stage ? `${stage} · ${counts}` : counts;
     },
     // Header compacts once the page is scrolled (landing and in-app alike)
     headerPad() {
