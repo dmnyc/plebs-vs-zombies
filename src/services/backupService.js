@@ -14,6 +14,14 @@ class BackupService {
     this.backups = [];
   }
 
+  // Backups are per-account: they hold one login's follow list, so two
+  // logins on one browser must not see each other's backups.
+  scopedKey(base) {
+    return nostrService.pubkey
+      ? `${base}:${nostrService.pubkey}`
+      : `${base}:anonymous`;
+  }
+
   /**
    * Create a new backup of the user's follow list
    */
@@ -75,10 +83,36 @@ class BackupService {
    */
   async getBackups(forceReload = false) {
     if (this.backups.length === 0 || forceReload) {
-      const backups = await localforage.getItem(this.scopedKey('backups')) || [];
-      this.backups = backups;
+      let backups = await localforage.getItem(this.scopedKey('backups'));
+
+      // The per-account scoping (#78) skipped this service's method, so
+      // every backup read and write threw until the method was added:
+      // nothing was ever persisted under the scoped key. Pre-#78 backups
+      // sit under the unscoped key — adopt the ones this account owns,
+      // once, so they are not orphaned by the fix. Entries belonging to
+      // other accounts stay there until their owner reads backups.
+      if (!Array.isArray(backups) || backups.length === 0) {
+        const legacy = await localforage.getItem('backups');
+        if (Array.isArray(legacy) && legacy.length > 0 && nostrService.pubkey) {
+          const owned = legacy.filter((backup) => backup && backup.pubkey === nostrService.pubkey);
+          if (owned.length > 0) {
+            await localforage.setItem(this.scopedKey('backups'), owned);
+            backups = owned;
+          }
+          // Adopted entries leave the legacy pool; entries owned by other
+          // accounts stay there until their owner reads backups.
+          const rest = legacy.filter((backup) => !owned.includes(backup));
+          if (rest.length > 0) {
+            await localforage.setItem('backups', rest);
+          } else {
+            await localforage.removeItem('backups');
+          }
+        }
+      }
+
+      this.backups = backups || [];
     }
-    
+
     return this.backups;
   }
 
