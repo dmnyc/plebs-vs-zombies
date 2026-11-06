@@ -99,22 +99,22 @@
     </Transition>
 
     <!-- Scanning Progress -->
-    <div v-if="scanning" class="card mb-6 p-6 animate-fade-up">
+    <div v-if="scanning" class="card mb-6 p-8 animate-fade-up">
       <div class="flex flex-col">
-        <h3 class="text-xl mb-4 text-center text-yellow-400 flex items-center justify-center gap-2">
+        <h3 class="text-2xl sm:text-3xl mb-5 text-center text-yellow-400 flex items-center justify-center gap-2">
           <span class="animate-lurch">👁️</span>
           <span>Scouting {{ targetDisplay }}...</span>
         </h3>
 
         <!-- Progress Bar -->
         <div class="mb-6">
-          <div class="flex justify-between items-center text-sm text-gray-400 mb-2 gap-2">
+          <div class="flex justify-between items-center text-base sm:text-lg text-gray-200 mb-3 gap-2">
             <span class="truncate flex-1 min-w-0">{{ scanProgress.stage || 'Initializing scout...' }}</span>
-            <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
+            <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}<span v-if="scanProgress.total > 0">&nbsp;·&nbsp;{{ Math.round((scanProgress.processed || 0) / scanProgress.total * 100) }}%</span></span>
           </div>
-          <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div class="w-full bg-gray-700 rounded-full h-5 overflow-hidden">
             <div
-              class="bg-yellow-400 h-3 rounded-full transition-all duration-300 progress-animated"
+              class="bg-yellow-400 h-5 rounded-full transition-all duration-300 progress-animated shadow-[0_0_10px_rgba(250,204,21,0.45)]"
               :style="{ width: scanProgress.total > 0 ? Math.min(100, (scanProgress.processed / scanProgress.total * 100)) + '%' : '0%' }"
             ></div>
           </div>
