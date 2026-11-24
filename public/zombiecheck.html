@@ -660,29 +660,45 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
     }
 
-    // Global username search from the archive — merged into the dropdown's
-    // results to widen discovery (same third-party note as
-    // fetchArchivesProfile above).
-    async function fetchArchivesSuggest(query, limit = 8) {
-      if (Date.now() < naCooldownUntil) return [];
+    // Global username search from Brainstorm's web-of-trust index — merged
+    // into the dropdown's results to widen discovery. It returns pubkeys
+    // ranked by GrapeRank with no names or pictures, so profiles are
+    // resolved from the relays afterwards; anything that resolves to no
+    // identifiable profile is dropped. The queried text goes to one more
+    // third-party observer, like the Primal cache above.
+    let bsCooldownUntil = 0; // epoch ms; a 429 backs us off until then
+    async function fetchBrainstormSuggest(query, limit = 8, excludePubkeys = []) {
+      if (Date.now() < bsCooldownUntil) return [];
       try {
-        const resp = await fetch(
-          NA_BASE + '/v1/search/suggest?q=' + encodeURIComponent(query) + '&limit=' + limit,
-          { signal: AbortSignal.timeout(5000) },
-        );
+        const resp = await fetch('https://api.brainstorm.world/search/pubkeys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, limit }),
+          signal: AbortSignal.timeout(5000),
+        });
         if (resp.status === 429) {
           const secs = Math.min(3600, Math.max(30, Number(resp.headers.get('retry-after')) || 60));
-          naCooldownUntil = Date.now() + secs * 1000;
+          bsCooldownUntil = Date.now() + secs * 1000;
           return [];
         }
         if (!resp.ok) return [];
         const data = await resp.json();
-        return (data.suggestions || [])
-          .filter((s) => s && typeof s.pubkey === 'string' && /^[0-9a-f]{64}$/i.test(s.pubkey))
-          .map((s) => {
-            const name = s.display_name || s.preferred_name || s.name || null;
-            return { pubkey: s.pubkey.toLowerCase(), name, display_name: name, picture: s.picture || null, nip05: null };
-          });
+        const pubkeys = (data.results || [])
+          .map((r) => (r && typeof r.pubkey === 'string' ? r.pubkey.toLowerCase() : null))
+          .filter((pk) => pk && /^[0-9a-f]{64}$/.test(pk) && !excludePubkeys.includes(pk));
+        if (!pubkeys.length) return [];
+        const pool = new SimplePool();
+        const events = await pool.querySync(
+          RELAYS,
+          { kinds: [0], authors: pubkeys, limit: pubkeys.length * 2 },
+          { maxWait: PROFILE_TIMEOUT },
+        );
+        const byPubkey = new Map();
+        for (const e of events) {
+          const p = parseProfile(e);
+          if (p && !(p.nip05 && p.nip05.includes('mostr.pub'))) byPubkey.set(p.pubkey, p);
+        }
+        return pubkeys.map((pk) => byPubkey.get(pk)).filter(Boolean);
       } catch (_) {
         return [];
       }
@@ -869,10 +885,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           const profiles = events
             .map(parseProfile)
             .filter((p) => p && !(p.nip05 && p.nip05.includes('mostr.pub')));
-          // Widen discovery with the Nostr Archives name index, deduping by
-          // pubkey — Primal results win.
-          const archived = await fetchArchivesSuggest(value, 8);
-          for (const s of archived) {
+          // Widen discovery with Brainstorm's web-of-trust search,
+          // deduping by pubkey — Primal results win.
+          const augmented = await fetchBrainstormSuggest(
+            value, 8, profiles.map((p) => p.pubkey));
+          for (const s of augmented) {
             if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
           }
           if (seq !== searchSeq) return; // re-check after the archive round-trip
