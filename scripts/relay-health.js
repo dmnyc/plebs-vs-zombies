@@ -51,11 +51,15 @@ const LISTS = {
     "wss://atlas.nostr.land",
     "wss://relay.ditto.pub",
   ],
+  "profile-fallback rung (vertexRelayService / zombiecheck fetchVertexProfile)": [
+    "wss://relay.vertexlab.io",
+  ],
   "candidates (not currently shipped)": [
     "wss://nostr.fmt.wiz.biz",
     "wss://relay.nostr.band",
     "wss://e.nos.lol",
     "wss://nostr.mother.net",
+    "wss://relay.vertexlab.io",
   ],
 };
 
