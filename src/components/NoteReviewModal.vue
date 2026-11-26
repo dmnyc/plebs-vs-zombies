@@ -120,6 +120,9 @@ export default {
     // back to a shortened key.
     subjectNpub: { type: String, default: '' },
     subjectName: { type: String, default: '' },
+    // Names for nostr:npub mentions found in the content; unknown ones fall
+    // back to a shortened key.
+    mentionNames: { type: Object, default: () => ({}) },
     authorName: { type: String, default: 'You' },
     authorPicture: { type: String, default: '' },
     // Local preview of the note's attached image; the real upload happens
@@ -146,9 +149,9 @@ export default {
         if (token.startsWith('nostr:')) {
           const ref = token.slice(6);
           const label =
-            ref === this.subjectNpub && this.subjectName
-              ? this.subjectName
-              : `${ref.slice(0, 10)}…${ref.slice(-4)}`;
+            this.mentionNames[ref] ||
+            (ref === this.subjectNpub && this.subjectName) ||
+            `${ref.slice(0, 10)}…${ref.slice(-4)}`;
           parts.push({ type: 'mention', value: `@${label}` });
         } else if (token.startsWith('#')) {
           parts.push({ type: 'hashtag', value: token });

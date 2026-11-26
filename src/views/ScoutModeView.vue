@@ -700,6 +700,7 @@
       :show="noteReview.show"
       :content="shareMessage"
       :tags="noteReview.tags"
+      :mention-names="noteMentionNames"
       :author-name="noteReviewAuthorName"
       :author-picture="noteReviewAuthorPicture"
       :posting="posting"
@@ -781,6 +782,18 @@ export default {
     },
     noteReviewAuthorPicture() {
       return nostrService.userProfile?.picture || '';
+    },
+    // Names for the two nostr: mentions inside the report — the scouted
+    // user and the app account — so the preview renders them the way a
+    // client will instead of raw truncated npubs.
+    noteMentionNames() {
+      const names = {
+        npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h: 'plebsvszombies',
+      };
+      if (this.scoutTarget?.npub && this.targetUsername) {
+        names[this.scoutTarget.npub] = this.targetUsername;
+      }
+      return names;
     },
     // The scan itself lives in scanManager, so it keeps running (and can be
     // picked back up here) while the user is elsewhere in the app.
