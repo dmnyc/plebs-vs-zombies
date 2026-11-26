@@ -28,13 +28,14 @@ export function canonicalNpub(hex) {
   return nip19.npubEncode(hex);
 }
 
-// Name + picture lookup over plain HTTP. Relays and the Primal cache are
-// WebSocket-only, which the edge runtime can't dial outbound, so the Nostr
-// Archives name index — the same third-party source the zombiecheck page
-// itself falls back to — is the one server-side source. Best-effort by
-// design: any failure means "no identity", and callers fall back to the
-// generic static card.
-const ARCHIVES_ENDPOINT = 'https://api.nostrarchives.com/v1/profiles/metadata';
+// Name + picture lookup. Relays and the Primal cache are WebSocket-only,
+// which the edge runtime can't dial outbound — so resolution goes through
+// this deployment's Node-runtime /api/profile-resolve endpoint, which dials
+// the Vertex relay (wss://relay.vertexlab.io) on their behalf. That relay
+// retains kind-0 profiles the regular relays prune — the accounts zombiecheck
+// is asked about. Best-effort by design: any failure means "no identity",
+// and callers fall back to the generic static card.
+const RESOLVE_PATH = '/api/profile-resolve?pubkey=';
 
 const PROFILE_TTL_MS = 6 * 60 * 60 * 1000;      // found profiles: 6h
 const NEGATIVE_TTL_MS = 30 * 60 * 1000;         // not-found / errors: 30min
@@ -61,28 +62,25 @@ function cacheSet(hex, profile) {
 }
 
 // Resolves to { name, display_name, picture } or null. Never rejects.
-export async function fetchArchivesProfile(hex) {
+// `origin` is the deployment origin the caller serves on (so the internal
+// Node-runtime endpoint is hit, not a third party).
+export async function fetchSharedProfile(hex, origin) {
   const cached = cacheGet(hex);
   if (cached !== undefined) return cached;
   let profile = null;
   try {
-    const resp = await fetch(ARCHIVES_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pubkeys: [hex] }),
-      signal: AbortSignal.timeout(5000),
+    const resp = await fetch(`${origin}${RESOLVE_PATH}${encodeURIComponent(hex)}`, {
+      signal: AbortSignal.timeout(8000),
     });
     if (resp.ok) {
       const data = await resp.json();
-      const p = (data.profiles || []).find(
-        (p) => p && typeof p.pubkey === 'string' && p.pubkey.toLowerCase() === hex,
-      );
-      if (p) {
-        const name = p.display_name || p.preferred_name || p.name || null;
-        // known-but-empty entries aren't a find (same rule as the page)
-        if (name || p.picture) {
-          profile = { name, display_name: p.display_name || name, picture: p.picture || null };
-        }
+      const p = data && data.profile;
+      if (p && (p.name || p.picture)) {
+        profile = {
+          name: p.name || null,
+          display_name: p.display_name || p.name || null,
+          picture: p.picture || null,
+        };
       }
     }
   } catch (_) {
