@@ -404,6 +404,10 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     // hold. Relays prune inactive accounts' events, and inactive accounts are
     // exactly what this page checks, so profiles routinely live in few places.
     const PROFILE_TIMEOUT = 6000;
+    // Autocomplete must never wait on relay EOSE — dead relays in the list
+    // never send one, so a querySync bound to PROFILE_TIMEOUT would stall
+    // the dropdown for its full window every keystroke.
+    const AUGMENT_TIMEOUT = 2500;
 
     // High-retention relays: scanned only when the verdict is still unsettled
     // (stale or missing). They keep events long after the defaults have
@@ -673,7 +677,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         const events = await pool.querySync(
           RELAYS,
           { kinds: [0], authors: pubkeys, limit: pubkeys.length * 2 },
-          { maxWait: PROFILE_TIMEOUT },
+          { maxWait: AUGMENT_TIMEOUT },
         );
         const byPubkey = new Map();
         for (const e of events) {
@@ -819,9 +823,17 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     }
 
     let searchSeq = 0;
-    function renderSearchResults(profiles) {
+    let renderProfiles = []; // rows currently shown in the dropdown
+    function spinnerRow() {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2 px-3 py-2 text-gray-400 text-sm';
+      row.innerHTML = '<span class="spinner"></span>Searching…';
+      return row;
+    }
+    function renderSearchResults(profiles, { loading = false } = {}) {
+      renderProfiles = profiles;
       els.results.innerHTML = '';
-      if (!profiles.length) { els.results.classList.add('hidden'); return; }
+      if (!profiles.length && !loading) { els.results.classList.add('hidden'); return; }
       profiles.forEach((p) => {
         const row = document.createElement('button');
         row.type = 'button';
@@ -841,10 +853,12 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         });
         els.results.appendChild(row);
       });
+      if (loading) els.results.appendChild(spinnerRow());
       els.results.classList.remove('hidden');
     }
 
     function hideResults() {
+      renderProfiles = [];
       els.results.classList.add('hidden');
       els.results.innerHTML = '';
     }
@@ -860,6 +874,9 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       if (debounceId) clearTimeout(debounceId);
       if (value.length < 2 || looksLikeIdentifier(value)) { hideResults(); return; }
       const seq = ++searchSeq;
+      // Match the app's search: the spinner shows on the keystroke, keeps
+      // spinning under results while the augmentation resolves.
+      renderSearchResults(renderProfiles, { loading: true });
       debounceId = setTimeout(async () => {
         try {
           const events = await searchUsers(value, 8);
@@ -867,15 +884,30 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           const profiles = events
             .map(parseProfile)
             .filter((p) => p && !(p.nip05 && p.nip05.includes('mostr.pub')));
+          // Render Primal's results immediately — same progressive feel as
+          // the app's search. The Brainstorm augmentation appends below when
+          // it lands; its relay resolution can take seconds, and the
+          // dropdown must never wait on it.
+          renderSearchResults(profiles, { loading: true });
           // Widen discovery with Brainstorm's web-of-trust search,
           // deduping by pubkey — Primal results win.
-          const augmented = await fetchBrainstormSuggest(
-            value, 8, profiles.map((p) => p.pubkey));
-          for (const s of augmented) {
-            if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
-          }
-          if (seq !== searchSeq) return; // re-check after the archive round-trip
-          renderSearchResults(profiles);
+          fetchBrainstormSuggest(value, 8, profiles.map((p) => p.pubkey))
+            .then((augmented) => {
+              // A newer keystroke superseded this, or the user moved on
+              // (clicked elsewhere / picked a result) — don't pop the
+              // dropdown back open for stale rows.
+              if (seq !== searchSeq || document.activeElement !== els.input) return;
+              for (const s of augmented) {
+                if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
+              }
+              renderSearchResults(profiles); // clears the spinner either way
+            })
+            .catch(() => {
+              // Augmentation failed — just stop the spinner.
+              if (seq === searchSeq && document.activeElement === els.input) {
+                renderSearchResults(profiles);
+              }
+            });
         } catch (_) { hideResults(); }
       }, 400);
     });
