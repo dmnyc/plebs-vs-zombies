@@ -1180,7 +1180,15 @@ export default {
     // Is the scan's own view (with its full progress card) on screen?
     scanOnScreen() {
       if (scanState.kind === 'scout') {
-        return this.isScoutMode && this.scoutTarget?.pubkey === scanState.target?.pubkey;
+        const targetMatches =
+          this.scoutTarget?.pubkey === scanState.target?.pubkey;
+        // The full progress card lives in both scout surfaces: the legacy
+        // scout-mode feature and the routed /scout view. A /scout reload
+        // leaves isScoutMode false, so the route has to count too —
+        // otherwise the dock duplicates the on-page counter.
+        const scoutViewMounted =
+          this.isScoutMode || this.$route.path === '/scout';
+        return targetMatches && scoutViewMounted;
       }
       if (scanState.kind === 'hunt') {
         return this.isConnected && !this.isScoutMode && ['/', '/hunt'].includes(this.$route.path);
