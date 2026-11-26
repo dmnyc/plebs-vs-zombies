@@ -167,7 +167,7 @@ export default {
     },
     footnotes() {
       const lines = [];
-      if (this.tags.some((t) => t[0] === 'p')) lines.push('Notifies the checked user.');
+      if (this.tags.some((t) => t[0] === 'p')) lines.push('Notifies anyone mentioned.');
       if (this.footnote) lines.push(this.footnote);
       return lines;
     },

@@ -222,7 +222,7 @@
             <!-- Post to Nostr button (only for authenticated users) -->
             <button 
               v-if="isLoggedIn"
-              @click="postToNostr"
+              @click="reviewNote"
               :disabled="posting || posted"
               :class="posted ? 'btn-success' : 'btn-primary'"
               class="flex-1 flex items-center justify-center gap-2"
@@ -693,6 +693,21 @@
       </div>
     </div>
     </Transition>
+
+    <!-- Mutable-style review gate: the exact scout report, previewed before
+         it can be signed or published. -->
+    <NoteReviewModal
+      :show="noteReview.show"
+      :content="shareMessage"
+      :tags="noteReview.tags"
+      :author-name="noteReviewAuthorName"
+      :author-picture="noteReviewAuthorPicture"
+      :posting="posting"
+      posting-label="Publishing…"
+      :error="noteReview.error || ''"
+      @back="noteReview.show = false"
+      @confirm="confirmNoteReview"
+    />
   </div>
 </template>
 
@@ -701,12 +716,14 @@ import scoutService from '../services/scoutService';
 import scanManager, { scanState, isScoutJobFor } from '../services/scanManager';
 import nostrService from '../services/nostrService';
 import ProfileSearchInput from '../components/ProfileSearchInput.vue';
+import NoteReviewModal from '../components/NoteReviewModal.vue';
 import { nip19 } from 'nostr-tools';
 
 export default {
   name: 'ScoutModeView',
   components: {
-    ProfileSearchInput
+    ProfileSearchInput,
+    NoteReviewModal
   },
   props: {
     // Required for the in-app rendering (App.vue passes it); the routed
@@ -733,6 +750,13 @@ export default {
       postError: '',
       postedNevent: null,
       copiedEventId: false,
+      // Mutable-style review gate: the exact report is previewed and
+      // nothing is signed until the user confirms in the modal.
+      noteReview: {
+        show: false,
+        tags: [],
+        error: null,
+      },
       nostrClients: [
         { name: 'Primal', url: 'https://primal.net/e/', icon: '/clients/primal.png', iconBg: 'bg-white', iconOk: true },
         { name: 'Jumble', url: 'https://jumble.social/notes/', icon: '/clients/jumble.png', iconBg: 'bg-white', iconOk: true },
@@ -751,6 +775,13 @@ export default {
     }
   },
   computed: {
+    noteReviewAuthorName() {
+      const p = nostrService.userProfile;
+      return p?.display_name || p?.name || 'You';
+    },
+    noteReviewAuthorPicture() {
+      return nostrService.userProfile?.picture || '';
+    },
     // The scan itself lives in scanManager, so it keeps running (and can be
     // picked back up here) while the user is elsewhere in the app.
     scoutJob() {
@@ -1077,6 +1108,31 @@ https://plebsvszombies.cc`;
         document.body.removeChild(textArea);
       }
     },
+    scoutNoteTags() {
+      // Tags that ride with the report; also summarized in the review step
+      // (NoteReviewModal).
+      return [
+        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+        ['t', 'PlebsVsZombies']
+      ];
+    },
+    reviewNote() {
+      // Mutable-style preview step: nothing is signed or published until
+      // the user confirms in the modal.
+      if (!this.isLoggedIn || this.posting || this.posted) return;
+      this.noteReview = { show: true, tags: this.scoutNoteTags(), error: null };
+    },
+    async confirmNoteReview() {
+      if (!this.noteReview.show || this.noteReview.posting) return;
+      this.noteReview.error = null;
+      try {
+        await this.postToNostr();
+        if (this.posted) this.noteReview.show = false;
+        else this.noteReview.error = this.postError || 'Failed to publish';
+      } finally {
+        this.noteReview.posting = false;
+      }
+    },
     async postToNostr() {
       if (!this.isLoggedIn) return;
 
@@ -1092,10 +1148,7 @@ https://plebsvszombies.cc`;
         const event = {
           kind: 1, // Text note
           created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
-            ['t', 'PlebsVsZombies']
-          ],
+          tags: this.scoutNoteTags(),
           content: this.shareMessage
         };
         
