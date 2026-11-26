@@ -1023,6 +1023,7 @@
 
 <script>
 import { markRaw } from 'vue';
+import { installModalScrollLock } from './utils/modalScrollLock';
 import DashboardView from './views/DashboardView.vue';
 import ZombieHuntingView from './views/ZombieHuntingView.vue';
 import BackupsView from './views/BackupsView.vue';
@@ -2097,6 +2098,9 @@ export default {
     }
   },
   async mounted() {
+    // Mutable-style app-wide scroll lock: while any modal backdrop
+    // (.fixed.inset-0) is in the DOM, the page behind it can't scroll.
+    this._uninstallScrollLock = installModalScrollLock();
     // Deep link: /scout?q=<user> on the logged-out landing prefills the
     // Scout Mode search, matching the logged-in ScoutModeView behavior.
     const scoutDeepLink = String(this.$route?.query?.q || '').trim();
