@@ -13,7 +13,7 @@
 import {
   resolveHex,
   canonicalNpub,
-  fetchArchivesProfile,
+  fetchSharedProfile,
 } from './_lib/nostr-profile.js';
 import { injectPreviewTags } from './_lib/preview-html.js';
 
@@ -58,7 +58,7 @@ export default async function handler(request) {
     const hex = resolveHex(raw);
     if (!hex) return serveStatic(request);
 
-    const profile = await fetchArchivesProfile(hex);
+    const profile = await fetchSharedProfile(hex, new URL(request.url).origin);
 
     let html;
     try {

@@ -1,6 +1,10 @@
 {
   "name": "plebs-vs-zombies",
-  "version": "1.11.3",
+<<<<<<< HEAD
+  "version": "1.11.1",
+=======
+  "version": "1.11.4",
+>>>>>>> main
   "description": "A Nostr utility for managing dormant follows",
   "main": "index.js",
   "type": "module",
