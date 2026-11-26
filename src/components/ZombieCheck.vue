@@ -194,6 +194,25 @@
       </button>
     </div>
 
+    <!-- Mutable-style review gate: the exact note, previewed before it can
+         be signed or published. -->
+    <NoteReviewModal
+      :show="noteReview.show"
+      :content="noteReview.content"
+      :tags="noteReview.tags"
+      :subject-npub="noteReview.subjectNpub"
+      :subject-name="noteReview.subjectName"
+      :author-name="noteReviewAuthorName"
+      :author-picture="noteReviewAuthorPicture"
+      :preview-image-url="noteReview.previewImageUrl || ''"
+      :posting="noteReview.posting"
+      posting-label="Publishing…"
+      :footnote="shareIncludeImage ? 'The image uploads when you post.' : ''"
+      :error="noteReview.error || ''"
+      @back="closeNoteReview"
+      @confirm="confirmShareNote"
+    />
+
     <!-- Off-screen share frame: the PVZ-branded outer shell that only exists
          for the shared PNG (html2canvas can't capture display:none elements,
          so it parks at -10000px). The visible result card above stays as-is;
@@ -241,6 +260,7 @@ import {
 } from '../services/imageUpload';
 import { buildShareNote } from '../lib/sharing/noteText';
 import ProfileSearchInput from './ProfileSearchInput.vue';
+import NoteReviewModal from './NoteReviewModal.vue';
 
 // U+1FAC0 (anatomical heart) arrived in Emoji 13.0 (2020). Every other emoji
 // here predates 2017, so on a platform whose emoji font stopped before 13.0 —
@@ -358,7 +378,7 @@ function writeClipboardWhenReady(textPromise) {
 
 export default {
   name: 'ZombieCheck',
-  components: { ProfileSearchInput },
+  components: { ProfileSearchInput, NoteReviewModal },
   props: {
     // When embedded (landing "Zombie Tools" block) the host owns the search
     // input; the component then only renders the Check button's outcome.
@@ -381,6 +401,18 @@ export default {
       shareStatus: '',
       shareStatusKind: null, // 'success' | 'error' | null
       shareIncludeImage: true,
+      // Mutable-style review step: the exact note is previewed and nothing
+      // is signed until the user confirms in the modal.
+      noteReview: {
+        show: false,
+        posting: false,
+        error: null,
+        content: '',
+        tags: [],
+        previewImageUrl: null,
+        subjectNpub: '',
+        subjectName: '',
+      },
       copiedNoteText: false,
       copiedDirectLink: false,
       uploadedImageUrl: null,
@@ -401,6 +433,13 @@ export default {
     directLink() {
       const npub = this.result?.profile?.npub;
       return `https://plebsvszombies.cc/zombiecheck${npub ? `?npub=${npub}` : ''}`;
+    },
+    noteReviewAuthorName() {
+      const p = nostrService.userProfile;
+      return p?.display_name || p?.name || 'You';
+    },
+    noteReviewAuthorPicture() {
+      return nostrService.userProfile?.picture || '';
     },
   },
   mounted() {
@@ -698,15 +737,58 @@ export default {
       // Publishing is signed-in territory; unsigned visitors have the hint
       // and the Copy Note Text button instead.
       if (!this.canPublishNotes) return;
+      // Mutable-style review step: render the local card for the preview and
+      // open the modal. Nothing is signed here — the image upload and the
+      // publish happen only when the user confirms.
       this.shareBusy = true;
-      this.shareStatus = 'Rendering image…';
+      this.shareStatus = 'Rendering preview…';
       this.shareStatusKind = null;
       this.publishedNoteId = null;
+      try {
+        const blob = await this.captureResultCard();
+        const { content, tags } = buildShareNote(this.result, { imageUrl: null });
+        this.noteReview = {
+          show: true,
+          posting: false,
+          error: null,
+          content,
+          tags,
+          previewImageUrl: URL.createObjectURL(blob),
+          subjectNpub: this.result.profile?.npub || '',
+          subjectName: this.result.displayName || this.result.profile?.name || 'Anonymous',
+        };
+        this.shareStatus = '';
+      } catch (e) {
+        console.error('Note preview failed:', e);
+        this.shareStatusKind = 'error';
+        this.shareStatus = e?.message || 'Could not render the preview. Try again.';
+      } finally {
+        this.shareBusy = false;
+      }
+    },
+    closeNoteReview() {
+      if (this.noteReview.previewImageUrl) {
+        URL.revokeObjectURL(this.noteReview.previewImageUrl);
+      }
+      this.noteReview = {
+        show: false,
+        posting: false,
+        error: null,
+        content: '',
+        tags: [],
+        previewImageUrl: null,
+        subjectNpub: '',
+        subjectName: '',
+      };
+    },
+    async confirmShareNote() {
+      if (!this.noteReview.show || this.noteReview.posting) return;
+      this.noteReview.posting = true;
+      this.noteReview.error = null;
       try {
         const imageUrl = this.shareIncludeImage ? await this.ensureShareImage() : null;
         const { content, tags } = buildShareNote(this.result, { imageUrl });
 
-        this.shareStatus = 'Publishing note…';
         const res = await nostrService.publishTextNote(content, tags);
         if (!res.success) {
           throw new Error('Failed to publish to any relays. Try again.');
@@ -714,12 +796,12 @@ export default {
         this.publishedNoteId = nip19.noteEncode(res.eventId);
         this.shareStatusKind = 'success';
         this.shareStatus = `Note published to ${res.publishedToRelays} relay${res.publishedToRelays === 1 ? '' : 's'}!`;
+        this.closeNoteReview();
       } catch (e) {
         console.error('Share as note failed:', e);
-        this.shareStatusKind = 'error';
-        this.shareStatus = e?.message || 'Sharing failed. Try again.';
-      } finally {
-        this.shareBusy = false;
+        // Stay in the modal with the reason; Back/Post remain available.
+        this.noteReview.posting = false;
+        this.noteReview.error = e?.message || 'Sharing failed. Try again.';
       }
     },
     async copyNoteText() {

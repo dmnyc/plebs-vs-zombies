@@ -340,6 +340,25 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     </div>
   </main>
 
+  <!-- Note review (Mutable-style): preview the exact note — mentions,
+       hashtags, URL and attached card — before it can be signed or
+       published. Nothing posts until the user confirms. -->
+  <div id="note-review" class="hidden fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+    <div class="w-full max-w-md bg-zombie-dark border border-gray-700 rounded-lg p-6 max-h-[85vh] overflow-y-auto">
+      <p class="text-xs text-gray-500 mb-3">Nothing posts until you confirm.</p>
+      <div id="note-review-preview" class="rounded-xl border border-gray-700 bg-gray-800 p-4 text-left"></div>
+      <div id="note-review-tags" class="mt-3"></div>
+      <p id="note-review-error" class="hidden mt-3 p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300"></p>
+      <div class="flex gap-3 mt-4">
+        <button id="note-review-back" class="flex-1 rounded-lg px-4 py-2 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors text-sm font-semibold disabled:opacity-50">← Back</button>
+        <button id="note-review-post" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm font-semibold">
+          <span id="note-review-spinner" class="spinner hidden"></span>
+          <span id="note-review-post-label">Post to Nostr</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Off-screen share frame: the PVZ-branded outer shell that only exists
        for the shared PNG (html2canvas can't capture display:none elements,
        so it parks at -10000px). The visible result card above stays as-is;
@@ -1531,29 +1550,165 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       ]);
     }
 
-    async function shareAsNote() {
+    // ----- Mutable-style note review: preview before publish -----
+    // Nothing is signed here. The button renders the local card, shows the
+    // exact note the way a client will (mentions, hashtags, URL, image), and
+    // only the explicit "Post to Nostr" reaches publishNote().
+    let noteReviewState = { open: false, posting: false, content: '', tags: [], imageUrl: null };
+    const reviewEls = {
+      overlay: document.getElementById('note-review'),
+      preview: document.getElementById('note-review-preview'),
+      tags: document.getElementById('note-review-tags'),
+      error: document.getElementById('note-review-error'),
+      back: document.getElementById('note-review-back'),
+      post: document.getElementById('note-review-post'),
+      postLabel: document.getElementById('note-review-post-label'),
+      postSpinner: document.getElementById('note-review-spinner'),
+    };
+
+    function segmentNote(content) {
+      // Same segmentation as the app's NoteReviewModal: mentions, hashtags
+      // and URLs get client-style treatment; text runs stay plain.
+      const parts = [];
+      const re = /(nostr:[a-zA-Z0-9]+|https?:\/\/[^\s]+|#[A-Za-z0-9_]+)/g;
+      let last = 0, m;
+      while ((m = re.exec(content)) !== null) {
+        if (m.index > last) parts.push({ type: 'text', value: content.slice(last, m.index) });
+        const token = m[0];
+        if (token.startsWith('nostr:')) {
+          const ref = token.slice(6);
+          const known = lastResult && ref === lastResult.npub;
+          const name = known
+            ? (lastResult.profile.display_name || lastResult.profile.name || 'Anonymous')
+            : null;
+          parts.push({ type: 'mention', value: '@' + (name || ref.slice(0, 10) + '…' + ref.slice(-4)) });
+        } else if (token.startsWith('#')) {
+          parts.push({ type: 'hashtag', value: token });
+        } else {
+          parts.push({ type: 'url', value: token });
+        }
+        last = m.index + token.length;
+      }
+      if (last < content.length) parts.push({ type: 'text', value: content.slice(last) });
+      return parts;
+    }
+
+    function renderNoteReview() {
+      const frag = document.createElement('div');
+      const head = document.createElement('div');
+      head.className = 'flex items-center gap-2.5 mb-2.5';
+      head.innerHTML = `
+        <img src="/default-avatar.svg" alt="" class="w-8 h-8 rounded-full object-cover bg-gray-700 flex-shrink-0" />
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-gray-200 truncate leading-tight">You</p>
+          <p class="text-xs text-gray-500 leading-tight">now · via Plebs vs. Zombies</p>
+        </div>`;
+      frag.appendChild(head);
+      const body = document.createElement('div');
+      body.className = 'text-[15px] leading-relaxed text-gray-200 whitespace-pre-wrap break-words';
+      for (const p of segmentNote(noteReviewState.content)) {
+        const span = document.createElement('span');
+        if (p.type === 'url') span.className = 'text-zombie-green underline break-all';
+        else if (p.type !== 'text') span.className = 'text-zombie-green font-medium';
+        span.textContent = p.value;
+        body.appendChild(span);
+      }
+      frag.appendChild(body);
+      if (noteReviewState.imageUrl) {
+        const img = document.createElement('img');
+        img.src = noteReviewState.imageUrl;
+        img.alt = 'Card attached to the note';
+        img.className = 'mt-3 w-full rounded-lg border border-gray-700';
+        frag.appendChild(img);
+      }
+      reviewEls.preview.innerHTML = '';
+      reviewEls.preview.appendChild(frag);
+
+      const chips = [...new Set(noteReviewState.tags.filter((t) => t[0] === 't').map((t) => '#' + t[1]))];
+      const footnotes = [];
+      if (noteReviewState.tags.some((t) => t[0] === 'p')) footnotes.push('Notifies the checked user.');
+      if (els.includeImage.checked) footnotes.push('The image uploads when you post.');
+      let tagsHtml = '';
+      if (chips.length) {
+        tagsHtml += '<div class="flex flex-wrap gap-1.5">' + chips
+          .map((c) => `<span class="px-2 py-px rounded-full bg-zombie-green/15 text-xs font-semibold text-zombie-green">${escapeHtml(c)}</span>`)
+          .join('') + '</div>';
+      }
+      if (footnotes.length) {
+        tagsHtml += `<p class="text-xs text-gray-500 mt-2">${escapeHtml(footnotes.join(' '))}</p>`;
+      }
+      reviewEls.tags.innerHTML = tagsHtml;
+    }
+
+    function setReviewPosting(posting) {
+      noteReviewState.posting = posting;
+      reviewEls.post.disabled = posting;
+      reviewEls.back.disabled = posting;
+      reviewEls.postSpinner.classList.toggle('hidden', !posting);
+      reviewEls.postLabel.textContent = posting ? 'Publishing…' : 'Post to Nostr';
+    }
+
+    function closeNoteReview() {
+      if (noteReviewState.imageUrl) URL.revokeObjectURL(noteReviewState.imageUrl);
+      noteReviewState = { open: false, posting: false, content: '', tags: [], imageUrl: null };
+      reviewEls.overlay.classList.add('hidden');
+    }
+
+    async function openNoteReview() {
       if (!lastResult || shareBusy) return;
-      // Publishing is signed-in territory; unsigned visitors have the hint
-      // and the Copy Note Text button instead.
       if (!canPublishNotes()) return;
-      setShareBusy(true, 'Rendering image…');
+      // The preview shows the locally-rendered card; the Blossom upload
+      // happens only on publish (per the footnote below the preview).
+      setShareBusy(true, 'Rendering preview…');
+      try {
+        const blob = await captureResultCard();
+        const { content, tags } = buildShareNote(lastResult, null);
+        noteReviewState = {
+          open: true, posting: false, content, tags,
+          imageUrl: URL.createObjectURL(blob),
+        };
+        reviewEls.error.classList.add('hidden');
+        renderNoteReview();
+        reviewEls.overlay.classList.remove('hidden');
+      } catch (e) {
+        console.error('Note preview failed:', e);
+        setShareStatus(e?.message || 'Could not render the preview. Try again.', 'error');
+      } finally {
+        setShareBusy(false);
+      }
+    }
+
+    async function confirmNoteReview() {
+      if (!noteReviewState.open || noteReviewState.posting) return;
+      setReviewPosting(true);
+      reviewEls.error.classList.add('hidden');
       try {
         const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
         const { content, tags } = buildShareNote(lastResult, imageUrl);
-
-        setShareBusy(true, 'Publishing note…');
         const { ok, eventId } = await publishNote(content, tags);
         if (!ok) throw new Error('Failed to publish to any relays. Try again.');
+        closeNoteReview();
         els.shareNoteLink.href = `https://jumble.social/notes/${nip19.noteEncode(eventId)}`;
         els.shareNoteLink.classList.remove('hidden');
         setShareStatus('Note published!', 'success');
       } catch (e) {
         console.error('Share as note failed:', e);
-        setShareStatus(e?.message || 'Sharing failed. Try again.', 'error');
-      } finally {
-        setShareBusy(false);
+        // Stay in the modal with the reason; Back/Post remain available.
+        reviewEls.error.textContent = e?.message || 'Sharing failed. Try again.';
+        reviewEls.error.classList.remove('hidden');
+        setReviewPosting(false);
       }
     }
+
+    reviewEls.back.addEventListener('click', () => {
+      if (!noteReviewState.posting) closeNoteReview();
+    });
+    reviewEls.post.addEventListener('click', confirmNoteReview);
+    reviewEls.overlay.addEventListener('click', (e) => {
+      if (e.target === reviewEls.overlay && !noteReviewState.posting) closeNoteReview();
+    });
+
+    els.shareBtn.addEventListener('click', openNoteReview);
 
     async function copyNoteText() {
       if (!lastResult || shareBusy) return;
@@ -1624,7 +1779,6 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
     }
 
-    els.shareBtn.addEventListener('click', shareAsNote);
     els.copyNoteBtn.addEventListener('click', copyNoteText);
     els.downloadBtn.addEventListener('click', downloadImage);
     els.copyImgBtn.addEventListener('click', copyImageLink);
