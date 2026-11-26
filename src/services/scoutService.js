@@ -12,19 +12,14 @@ class ScoutService {
   constructor() {
     this.ndk = null;
     this.cancelled = false;
-    // Expanded relay list for better follow list coverage
+    // Expanded relay list for better follow list coverage. current.fyi,
+    // mutinywallet, offchain.pub and mostr.pub all failed hard in the
+    // relay-health sweep (ECONNREFUSED / ENOTFOUND / 301) — dead.
     this.defaultRelays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
       "wss://purplepag.es",
       "wss://relay.snort.social",
-      "wss://offchain.pub",
-      "wss://relay.current.fyi",
-      "wss://eden.nostr.land",
-      "wss://nostr.mutinywallet.com",
-      "wss://relay.mostr.pub",
     ];
   }
 
@@ -240,10 +235,8 @@ class ScoutService {
       // Combine user relays (already merged with defaults by fetchUserRelays)
       // with a small set of reliable archival relays for extra coverage.
       const archivalRelays = [
-        "wss://nostr.mom",
         "wss://relay.nostr.net",
         "wss://relay.noswhere.com",
-        "wss://relay.0xchat.com",
         "wss://atlas.nostr.land",
       ];
 
@@ -612,8 +605,6 @@ class ScoutService {
 
     // Only use well-known, reliable relays for retry to avoid connection failures
     const reliableRelays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
     ];
@@ -627,9 +618,11 @@ class ScoutService {
       retryMap.set(pubkey, []);
     }
 
+    let retryNdk = null;
+
     try {
       // Create single NDK instance with reliable relays
-      const retryNdk = new NDK({
+      retryNdk = new NDK({
         explicitRelayUrls: reliableRelays,
       });
 
@@ -714,6 +707,15 @@ class ScoutService {
       console.warn(
         `⚠️ Reliable relay retry completely failed: ${error.message}`,
       );
+    } finally {
+      // Close the sockets this retry opened — a leaked NDK pool keeps
+      // reconnecting for the life of the tab.
+      try {
+        for (const relay of retryNdk?.pool?.relays?.values() || []) {
+          relay.disconnect();
+        }
+        retryNdk?.pool?.relays?.clear();
+      } catch (_) {}
     }
 
     // Count successful recoveries
@@ -1120,7 +1122,18 @@ class ScoutService {
   disconnect() {
     this.cancelled = true;
     if (this.ndk) {
-      // NDK doesn't have explicit disconnect, connections are managed automatically
+      // NDK relays keep reconnecting for the life of the tab if we only
+      // drop the reference — every socket must be closed explicitly, or
+      // other clients in this browser (other tabs' apps, the signer
+      // extension) can be starved of connections to the same relays.
+      try {
+        for (const relay of this.ndk.pool.relays.values()) {
+          relay.disconnect();
+        }
+        this.ndk.pool.relays.clear();
+      } catch (error) {
+        console.warn("⚠️ Scout teardown failed:", error);
+      }
       this.ndk = null;
       console.log("🔍 Scout Service disconnected");
     }

@@ -340,6 +340,25 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     </div>
   </main>
 
+  <!-- Note review (Mutable-style): preview the exact note — mentions,
+       hashtags, URL and attached card — before it can be signed or
+       published. Nothing posts until the user confirms. -->
+  <div id="note-review" class="hidden fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+    <div class="w-full max-w-md bg-zombie-dark border border-gray-700 rounded-lg p-6 max-h-[85vh] overflow-y-auto">
+      <p class="text-xs text-gray-500 mb-3">Nothing posts until you confirm.</p>
+      <div id="note-review-preview" class="rounded-xl border border-gray-700 bg-gray-800 p-4 text-left"></div>
+      <div id="note-review-tags" class="mt-3"></div>
+      <p id="note-review-error" class="hidden mt-3 p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300"></p>
+      <div class="flex gap-3 mt-4">
+        <button id="note-review-back" class="flex-1 rounded-lg px-4 py-2 border border-gray-600 text-gray-300 hover:bg-gray-700 transition-colors text-sm font-semibold disabled:opacity-50">← Back</button>
+        <button id="note-review-post" class="btn-primary flex-1 flex items-center justify-center gap-2 text-sm font-semibold">
+          <span id="note-review-spinner" class="spinner hidden"></span>
+          <span id="note-review-post-label">Post to Nostr</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Off-screen share frame: the PVZ-branded outer shell that only exists
        for the shared PNG (html2canvas can't capture display:none elements,
        so it parks at -10000px). The visible result card above stays as-is;
@@ -371,13 +390,12 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     import html2canvas from 'https://esm.sh/html2canvas@1.4.1';
 
     const RELAYS = [
-      'wss://relay.damus.io',
-      'wss://nos.lol',
       'wss://relay.primal.net',
       'wss://relay.snort.social',
       'wss://purplepag.es',
-      'wss://nostr.mom',
       'wss://relay.noswhere.com',
+      // Removed dead relays (relay-health findings, cross-checked):
+      // relay.damus.io, nos.lol, nostr.mom
     ];
     // Liveness detection: any event a user signs proves their key is still in
     // use, so the activity query below omits `kinds` entirely. A lurker who
@@ -404,6 +422,10 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     // hold. Relays prune inactive accounts' events, and inactive accounts are
     // exactly what this page checks, so profiles routinely live in few places.
     const PROFILE_TIMEOUT = 6000;
+    // Autocomplete must never wait on relay EOSE — dead relays in the list
+    // never send one, so a querySync bound to PROFILE_TIMEOUT would stall
+    // the dropdown for its full window every keystroke.
+    const AUGMENT_TIMEOUT = 2500;
 
     // High-retention relays: scanned only when the verdict is still unsettled
     // (stale or missing). They keep events long after the defaults have
@@ -546,11 +568,11 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           detail: `Quiet for ${formatGone(days)}. Has anyone done a wellness visit lately?` };
       }
       if (days < 180) {
-        return { key: 'fresh', emoji: '🧟', label: 'Fresh Zombie',
+        return { key: 'fresh', emoji: '⚰️', label: 'Fresh Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
       if (days < 365) {
-        return { key: 'rotting', emoji: '🧟‍♂️', label: 'Rotting Zombie',
+        return { key: 'rotting', emoji: '🪦', label: 'Rotting Zombie',
           detail: `Gone for ${formatGone(days)}.` };
       }
       return { key: 'ancient', emoji: '💀', label: 'Ancient Zombie',
@@ -613,76 +635,74 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       throw new Error('Enter a valid npub, nprofile, or hex pubkey');
     }
 
-    // Final rung: the Nostr Archives name index — the same API Sidecar uses
-    // for name lookups. This sends the checked pubkey to a third-party index
-    // (one more observer, like the Primal cache above), so it only fires when
-    // the relays and Primal both came up empty. A 429 backs off per
-    // retry-after. Returns a pseudo kind-0 event (created_at 0, so any real
-    // relay event wins recency) that the existing profile parsing handles,
-    // or null when the archive has nothing usable.
-    const NA_BASE = 'https://api.nostrarchives.com';
-    let naCooldownUntil = 0; // epoch ms; a 429 backs us off until then
-    async function fetchArchivesProfile(hex) {
-      if (Date.now() < naCooldownUntil) return null;
+    // Final rung: the Vertex relay (wss://relay.vertexlab.io) — an indexer
+    // relay that retains kind-0 profiles the regular relays prune, so it
+    // only fires when the relays and the Primal cache both came up empty.
+    // Returns the newest kind-0 it holds for the pubkey — a real, verifiable
+    // event — or null when it has nothing usable.
+    async function fetchVertexProfile(hex) {
       try {
-        const resp = await fetch(NA_BASE + '/v1/profiles/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pubkeys: [hex] }),
-          signal: AbortSignal.timeout(8000),
-        });
-        if (resp.status === 429) {
-          const secs = Math.min(3600, Math.max(30, Number(resp.headers.get('retry-after')) || 60));
-          naCooldownUntil = Date.now() + secs * 1000;
-          return null;
-        }
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        const p = (data.profiles || []).find(
-          (p) => p && typeof p.pubkey === 'string' && p.pubkey.toLowerCase() === hex,
+        const pool = new SimplePool();
+        const events = await pool.querySync(
+          ['wss://relay.vertexlab.io'],
+          { kinds: [0], authors: [hex], limit: 5 },
+          { maxWait: PROFILE_TIMEOUT },
         );
-        if (!p) return null;
-        const name = p.display_name || p.preferred_name || p.name || null;
-        if (!name && !p.picture) return null; // known-but-empty: not a find
-        return {
-          kind: 0,
-          pubkey: hex,
-          created_at: 0,
-          content: JSON.stringify({
-            name,
-            display_name: name,
-            picture: p.picture || null,
-            nip05: p.nip05 || null,
-          }),
-        };
+        const owned = events.filter(
+          (e) => e && e.kind === 0 && e.pubkey === hex,
+        );
+        const valid = [];
+        for (const e of owned) {
+          try {
+            if (verifyEvent(e)) valid.push(e);
+          } catch (_) {}
+        }
+        valid.sort((a, b) => b.created_at - a.created_at);
+        return valid[0] || null;
       } catch (_) {
         return null; // best-effort — the card already works without a name
       }
     }
 
-    // Global username search from the archive — merged into the dropdown's
-    // results to widen discovery (same third-party note as
-    // fetchArchivesProfile above).
-    async function fetchArchivesSuggest(query, limit = 8) {
-      if (Date.now() < naCooldownUntil) return [];
+    // Global username search from Brainstorm's web-of-trust index — merged
+    // into the dropdown's results to widen discovery. It returns pubkeys
+    // ranked by GrapeRank with no names or pictures, so profiles are
+    // resolved from the relays afterwards; anything that resolves to no
+    // identifiable profile is dropped. The queried text goes to one more
+    // third-party observer, like the Primal cache above.
+    let bsCooldownUntil = 0; // epoch ms; a 429 backs us off until then
+    async function fetchBrainstormSuggest(query, limit = 8, excludePubkeys = []) {
+      if (Date.now() < bsCooldownUntil) return [];
       try {
-        const resp = await fetch(
-          NA_BASE + '/v1/search/suggest?q=' + encodeURIComponent(query) + '&limit=' + limit,
-          { signal: AbortSignal.timeout(5000) },
-        );
+        const resp = await fetch('https://api.brainstorm.world/search/pubkeys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, limit }),
+          signal: AbortSignal.timeout(5000),
+        });
         if (resp.status === 429) {
           const secs = Math.min(3600, Math.max(30, Number(resp.headers.get('retry-after')) || 60));
-          naCooldownUntil = Date.now() + secs * 1000;
+          bsCooldownUntil = Date.now() + secs * 1000;
           return [];
         }
         if (!resp.ok) return [];
         const data = await resp.json();
-        return (data.suggestions || [])
-          .filter((s) => s && typeof s.pubkey === 'string' && /^[0-9a-f]{64}$/i.test(s.pubkey))
-          .map((s) => {
-            const name = s.display_name || s.preferred_name || s.name || null;
-            return { pubkey: s.pubkey.toLowerCase(), name, display_name: name, picture: s.picture || null, nip05: null };
-          });
+        const pubkeys = (data.results || [])
+          .map((r) => (r && typeof r.pubkey === 'string' ? r.pubkey.toLowerCase() : null))
+          .filter((pk) => pk && /^[0-9a-f]{64}$/.test(pk) && !excludePubkeys.includes(pk));
+        if (!pubkeys.length) return [];
+        const pool = new SimplePool();
+        const events = await pool.querySync(
+          RELAYS,
+          { kinds: [0], authors: pubkeys, limit: pubkeys.length * 2 },
+          { maxWait: AUGMENT_TIMEOUT },
+        );
+        const byPubkey = new Map();
+        for (const e of events) {
+          const p = parseProfile(e);
+          if (p && !(p.nip05 && p.nip05.includes('mostr.pub'))) byPubkey.set(p.pubkey, p);
+        }
+        return pubkeys.map((pk) => byPubkey.get(pk)).filter(Boolean);
       } catch (_) {
         return [];
       }
@@ -821,9 +841,17 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     }
 
     let searchSeq = 0;
-    function renderSearchResults(profiles) {
+    let renderProfiles = []; // rows currently shown in the dropdown
+    function spinnerRow() {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2 px-3 py-2 text-gray-400 text-sm';
+      row.innerHTML = '<span class="spinner"></span>Searching…';
+      return row;
+    }
+    function renderSearchResults(profiles, { loading = false } = {}) {
+      renderProfiles = profiles;
       els.results.innerHTML = '';
-      if (!profiles.length) { els.results.classList.add('hidden'); return; }
+      if (!profiles.length && !loading) { els.results.classList.add('hidden'); return; }
       profiles.forEach((p) => {
         const row = document.createElement('button');
         row.type = 'button';
@@ -843,10 +871,12 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         });
         els.results.appendChild(row);
       });
+      if (loading) els.results.appendChild(spinnerRow());
       els.results.classList.remove('hidden');
     }
 
     function hideResults() {
+      renderProfiles = [];
       els.results.classList.add('hidden');
       els.results.innerHTML = '';
     }
@@ -862,6 +892,9 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       if (debounceId) clearTimeout(debounceId);
       if (value.length < 2 || looksLikeIdentifier(value)) { hideResults(); return; }
       const seq = ++searchSeq;
+      // Match the app's search: the spinner shows on the keystroke, keeps
+      // spinning under results while the augmentation resolves.
+      renderSearchResults(renderProfiles, { loading: true });
       debounceId = setTimeout(async () => {
         try {
           const events = await searchUsers(value, 8);
@@ -869,14 +902,30 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           const profiles = events
             .map(parseProfile)
             .filter((p) => p && !(p.nip05 && p.nip05.includes('mostr.pub')));
-          // Widen discovery with the Nostr Archives name index, deduping by
-          // pubkey — Primal results win.
-          const archived = await fetchArchivesSuggest(value, 8);
-          for (const s of archived) {
-            if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
-          }
-          if (seq !== searchSeq) return; // re-check after the archive round-trip
-          renderSearchResults(profiles);
+          // Render Primal's results immediately — same progressive feel as
+          // the app's search. The Brainstorm augmentation appends below when
+          // it lands; its relay resolution can take seconds, and the
+          // dropdown must never wait on it.
+          renderSearchResults(profiles, { loading: true });
+          // Widen discovery with Brainstorm's web-of-trust search,
+          // deduping by pubkey — Primal results win.
+          fetchBrainstormSuggest(value, 8, profiles.map((p) => p.pubkey))
+            .then((augmented) => {
+              // A newer keystroke superseded this, or the user moved on
+              // (clicked elsewhere / picked a result) — don't pop the
+              // dropdown back open for stale rows.
+              if (seq !== searchSeq || document.activeElement !== els.input) return;
+              for (const s of augmented) {
+                if (!profiles.some((p) => p.pubkey === s.pubkey)) profiles.push(s);
+              }
+              renderSearchResults(profiles); // clears the spinner either way
+            })
+            .catch(() => {
+              // Augmentation failed — just stop the spinner.
+              if (seq === searchSeq && document.activeElement === els.input) {
+                renderSearchResults(profiles);
+              }
+            });
         } catch (_) { hideResults(); }
       }, 400);
     });
@@ -926,12 +975,13 @@ Classification bands mirror the in-app ZombieCheck.vue component:
             } catch (_) {}
           }
         }
-        // Still nothing — the Nostr Archives name index, last rung of the
-        // ladder (see fetchArchivesProfile above for the disclosure note).
+        // Still nothing — the Vertex relay, last rung of the ladder. It
+        // retains kind-0 profiles the relays prune (see fetchVertexProfile
+        // above for the disclosure note).
         if (!profileEvents.length) {
-          els.progress.textContent = 'Checking name archives…';
-          const archived = await fetchArchivesProfile(hex);
-          if (archived) profileEvents.push(archived);
+          els.progress.textContent = 'Checking the Vertex relay…';
+          const vertex = await fetchVertexProfile(hex);
+          if (vertex) profileEvents.push(vertex);
         }
 
         // Escalate only when the verdict could still change. If we already
@@ -1121,12 +1171,28 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       else check();
     });
 
-    // Allow deep-linking a target: /zombiecheck?npub=npub1...
+    // Allow deep-linking a target: /zombiecheck?npub=npub1... (the ?q=
+    // form carries raw search text from the dashboard's More Tools box).
     const params = new URLSearchParams(location.search);
-    const preset = params.get('npub') || params.get('pubkey');
+    const preset = params.get('npub') || params.get('pubkey') || params.get('q');
     if (preset) {
       els.input.value = preset;
-      check();
+      if (looksLikeIdentifier(preset)) {
+        check();
+      } else {
+        // Raw search text (dashboard More Tools links): resolve to the top
+        // name match, then check that profile.
+        els.progress.textContent = 'Resolving name…';
+        searchUsers(preset, 1).then((events) => {
+          const profile = events[0] ? parseProfile(events[0]) : null;
+          if (profile) {
+            els.input.value = profile.display_name || profile.name || preset;
+            check(profile.pubkey);
+          } else {
+            check(); // surfaces the usual "enter a valid identifier" error
+          }
+        });
+      }
     }
 
     // =====================================================================
@@ -1483,29 +1549,165 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       ]);
     }
 
-    async function shareAsNote() {
+    // ----- Mutable-style note review: preview before publish -----
+    // Nothing is signed here. The button renders the local card, shows the
+    // exact note the way a client will (mentions, hashtags, URL, image), and
+    // only the explicit "Post to Nostr" reaches publishNote().
+    let noteReviewState = { open: false, posting: false, content: '', tags: [], imageUrl: null };
+    const reviewEls = {
+      overlay: document.getElementById('note-review'),
+      preview: document.getElementById('note-review-preview'),
+      tags: document.getElementById('note-review-tags'),
+      error: document.getElementById('note-review-error'),
+      back: document.getElementById('note-review-back'),
+      post: document.getElementById('note-review-post'),
+      postLabel: document.getElementById('note-review-post-label'),
+      postSpinner: document.getElementById('note-review-spinner'),
+    };
+
+    function segmentNote(content) {
+      // Same segmentation as the app's NoteReviewModal: mentions, hashtags
+      // and URLs get client-style treatment; text runs stay plain.
+      const parts = [];
+      const re = /(nostr:[a-zA-Z0-9]+|https?:\/\/[^\s]+|#[A-Za-z0-9_]+)/g;
+      let last = 0, m;
+      while ((m = re.exec(content)) !== null) {
+        if (m.index > last) parts.push({ type: 'text', value: content.slice(last, m.index) });
+        const token = m[0];
+        if (token.startsWith('nostr:')) {
+          const ref = token.slice(6);
+          const known = lastResult && ref === lastResult.npub;
+          const name = known
+            ? (lastResult.profile.display_name || lastResult.profile.name || 'Anonymous')
+            : null;
+          parts.push({ type: 'mention', value: '@' + (name || ref.slice(0, 10) + '…' + ref.slice(-4)) });
+        } else if (token.startsWith('#')) {
+          parts.push({ type: 'hashtag', value: token });
+        } else {
+          parts.push({ type: 'url', value: token });
+        }
+        last = m.index + token.length;
+      }
+      if (last < content.length) parts.push({ type: 'text', value: content.slice(last) });
+      return parts;
+    }
+
+    function renderNoteReview() {
+      const frag = document.createElement('div');
+      const head = document.createElement('div');
+      head.className = 'flex items-center gap-2.5 mb-2.5';
+      head.innerHTML = `
+        <img src="/default-avatar.svg" alt="" class="w-8 h-8 rounded-full object-cover bg-gray-700 flex-shrink-0" />
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-gray-200 truncate leading-tight">You</p>
+          <p class="text-xs text-gray-500 leading-tight">now · via Plebs vs. Zombies</p>
+        </div>`;
+      frag.appendChild(head);
+      const body = document.createElement('div');
+      body.className = 'text-[15px] leading-relaxed text-gray-200 whitespace-pre-wrap break-words';
+      for (const p of segmentNote(noteReviewState.content)) {
+        const span = document.createElement('span');
+        if (p.type === 'url') span.className = 'text-zombie-green underline break-all';
+        else if (p.type !== 'text') span.className = 'text-zombie-green font-medium';
+        span.textContent = p.value;
+        body.appendChild(span);
+      }
+      frag.appendChild(body);
+      if (noteReviewState.imageUrl) {
+        const img = document.createElement('img');
+        img.src = noteReviewState.imageUrl;
+        img.alt = 'Card attached to the note';
+        img.className = 'mt-3 w-full rounded-lg border border-gray-700';
+        frag.appendChild(img);
+      }
+      reviewEls.preview.innerHTML = '';
+      reviewEls.preview.appendChild(frag);
+
+      const chips = [...new Set(noteReviewState.tags.filter((t) => t[0] === 't').map((t) => '#' + t[1]))];
+      const footnotes = [];
+      if (noteReviewState.tags.some((t) => t[0] === 'p')) footnotes.push('Notifies the checked user.');
+      if (els.includeImage.checked) footnotes.push('The image uploads when you post.');
+      let tagsHtml = '';
+      if (chips.length) {
+        tagsHtml += '<div class="flex flex-wrap gap-1.5">' + chips
+          .map((c) => `<span class="px-2 py-px rounded-full bg-zombie-green/15 text-xs font-semibold text-zombie-green">${escapeHtml(c)}</span>`)
+          .join('') + '</div>';
+      }
+      if (footnotes.length) {
+        tagsHtml += `<p class="text-xs text-gray-500 mt-2">${escapeHtml(footnotes.join(' '))}</p>`;
+      }
+      reviewEls.tags.innerHTML = tagsHtml;
+    }
+
+    function setReviewPosting(posting) {
+      noteReviewState.posting = posting;
+      reviewEls.post.disabled = posting;
+      reviewEls.back.disabled = posting;
+      reviewEls.postSpinner.classList.toggle('hidden', !posting);
+      reviewEls.postLabel.textContent = posting ? 'Publishing…' : 'Post to Nostr';
+    }
+
+    function closeNoteReview() {
+      if (noteReviewState.imageUrl) URL.revokeObjectURL(noteReviewState.imageUrl);
+      noteReviewState = { open: false, posting: false, content: '', tags: [], imageUrl: null };
+      reviewEls.overlay.classList.add('hidden');
+    }
+
+    async function openNoteReview() {
       if (!lastResult || shareBusy) return;
-      // Publishing is signed-in territory; unsigned visitors have the hint
-      // and the Copy Note Text button instead.
       if (!canPublishNotes()) return;
-      setShareBusy(true, 'Rendering image…');
+      // The preview shows the locally-rendered card; the Blossom upload
+      // happens only on publish (per the footnote below the preview).
+      setShareBusy(true, 'Rendering preview…');
+      try {
+        const blob = await captureResultCard();
+        const { content, tags } = buildShareNote(lastResult, null);
+        noteReviewState = {
+          open: true, posting: false, content, tags,
+          imageUrl: URL.createObjectURL(blob),
+        };
+        reviewEls.error.classList.add('hidden');
+        renderNoteReview();
+        reviewEls.overlay.classList.remove('hidden');
+      } catch (e) {
+        console.error('Note preview failed:', e);
+        setShareStatus(e?.message || 'Could not render the preview. Try again.', 'error');
+      } finally {
+        setShareBusy(false);
+      }
+    }
+
+    async function confirmNoteReview() {
+      if (!noteReviewState.open || noteReviewState.posting) return;
+      setReviewPosting(true);
+      reviewEls.error.classList.add('hidden');
       try {
         const imageUrl = els.includeImage.checked ? await ensureShareImage() : null;
         const { content, tags } = buildShareNote(lastResult, imageUrl);
-
-        setShareBusy(true, 'Publishing note…');
         const { ok, eventId } = await publishNote(content, tags);
         if (!ok) throw new Error('Failed to publish to any relays. Try again.');
+        closeNoteReview();
         els.shareNoteLink.href = `https://jumble.social/notes/${nip19.noteEncode(eventId)}`;
         els.shareNoteLink.classList.remove('hidden');
         setShareStatus('Note published!', 'success');
       } catch (e) {
         console.error('Share as note failed:', e);
-        setShareStatus(e?.message || 'Sharing failed. Try again.', 'error');
-      } finally {
-        setShareBusy(false);
+        // Stay in the modal with the reason; Back/Post remain available.
+        reviewEls.error.textContent = e?.message || 'Sharing failed. Try again.';
+        reviewEls.error.classList.remove('hidden');
+        setReviewPosting(false);
       }
     }
+
+    reviewEls.back.addEventListener('click', () => {
+      if (!noteReviewState.posting) closeNoteReview();
+    });
+    reviewEls.post.addEventListener('click', confirmNoteReview);
+    reviewEls.overlay.addEventListener('click', (e) => {
+      if (e.target === reviewEls.overlay && !noteReviewState.posting) closeNoteReview();
+    });
+
+    els.shareBtn.addEventListener('click', openNoteReview);
 
     async function copyNoteText() {
       if (!lastResult || shareBusy) return;
@@ -1576,7 +1778,6 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       }
     }
 
-    els.shareBtn.addEventListener('click', shareAsNote);
     els.copyNoteBtn.addEventListener('click', copyNoteText);
     els.downloadBtn.addEventListener('click', downloadImage);
     els.copyImgBtn.addEventListener('click', copyImageLink);

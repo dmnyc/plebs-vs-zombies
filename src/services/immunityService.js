@@ -1,4 +1,5 @@
 import localforage from 'localforage';
+import nostrService from './nostrService';
 
 // Configure localforage for immunity list
 localforage.config({
@@ -11,12 +12,20 @@ class ImmunityService {
     this.immunePubkeys = new Set();
   }
 
+  // Immunity is per-account: the immune list holds pubkeys the CURRENT
+  // account chose to spare, so two logins on one browser must not share it.
+  scopedKey(base) {
+    return nostrService.pubkey
+      ? `${base}:${nostrService.pubkey}`
+      : `${base}:anonymous`;
+  }
+
   /**
    * Load the immunity list from storage
    */
   async loadImmunityList() {
     try {
-      const immuneList = await localforage.getItem('immunePubkeys') || [];
+      const immuneList = await localforage.getItem(this.scopedKey('immunePubkeys')) || [];
       this.immunePubkeys = new Set(immuneList);
       return this.immunePubkeys;
     } catch (error) {
@@ -31,7 +40,7 @@ class ImmunityService {
   async saveImmunityList() {
     try {
       const immuneArray = Array.from(this.immunePubkeys);
-      await localforage.setItem('immunePubkeys', immuneArray);
+      await localforage.setItem(this.scopedKey('immunePubkeys'), immuneArray);
       return true;
     } catch (error) {
       console.error('Failed to save immunity list:', error);
@@ -48,7 +57,7 @@ class ImmunityService {
     this.immunePubkeys.add(pubkey);
     
     // Store the reason for immunity
-    const immunityReasons = await localforage.getItem('immunityReasons') || {};
+    const immunityReasons = await localforage.getItem(this.scopedKey('immunityReasons')) || {};
     immunityReasons[pubkey] = {
       reason,
       timestamp: Date.now()
@@ -67,7 +76,7 @@ class ImmunityService {
     this.immunePubkeys.delete(pubkey);
     
     // Remove the reason
-    const immunityReasons = await localforage.getItem('immunityReasons') || {};
+    const immunityReasons = await localforage.getItem(this.scopedKey('immunityReasons')) || {};
     delete immunityReasons[pubkey];
     await localforage.setItem('immunityReasons', immunityReasons);
     
@@ -93,7 +102,7 @@ class ImmunityService {
    */
   async getImmunityReason(pubkey) {
     try {
-      const immunityReasons = await localforage.getItem('immunityReasons') || {};
+      const immunityReasons = await localforage.getItem(this.scopedKey('immunityReasons')) || {};
       return immunityReasons[pubkey] || null;
     } catch (error) {
       console.error('Failed to get immunity reason:', error);
@@ -106,7 +115,7 @@ class ImmunityService {
    */
   async getAllImmunityRecords() {
     try {
-      const immunityReasons = await localforage.getItem('immunityReasons') || {};
+      const immunityReasons = await localforage.getItem(this.scopedKey('immunityReasons')) || {};
       const immunePubkeys = this.getImmunePubkeys();
       
       return immunePubkeys.map(pubkey => ({
@@ -168,8 +177,8 @@ class ImmunityService {
    */
   async clearAllImmunity() {
     this.immunePubkeys.clear();
-    await localforage.removeItem('immunePubkeys');
-    await localforage.removeItem('immunityReasons');
+    await localforage.removeItem(this.scopedKey('immunePubkeys'));
+    await localforage.removeItem(this.scopedKey('immunityReasons'));
     return true;
   }
 

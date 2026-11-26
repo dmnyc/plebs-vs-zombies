@@ -21,42 +21,58 @@
  *
  * CAVEAT: this probes from one vantage point using the `ws` client. It sends
  * the site's Origin header (handshake drops without one were the main source
- * of false DEADs — nostr.wine, nos.lol and nostr.mom all showed this), but a
- * DEAD verdict is still only a signal to cross-check in a browser, not proof.
- * Real infrastructure failures look different: ECONNREFUSED / ENOTFOUND (host
- * actually down or DNS gone) survive any re-test.
+ * of false DEADs — nostr.wine still shows this), but a DEAD verdict is still
+ * only a signal to cross-check in a browser, not proof. Real infrastructure
+ * failures look different: ECONNREFUSED / ENOTFOUND (host actually down or
+ * DNS gone) survive any re-test. Confirmed-dead relays (damus, nos.lol,
+ * nostr.mom, nostr.band, e.nos.lol, nostr.mother.net, fmt.wiz) were removed
+ * from the shipped lists and from candidates.
  */
 import WebSocket from "ws";
 
 const LISTS = {
   "in-app defaults (nostrService.this.relays)": [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
     "wss://nostr.wine",
     "wss://purplepag.es",
     "wss://relay.nos.social",
   ],
   "standalone zombiecheck (public/zombiecheck.html RELAYS)": [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
     "wss://relay.snort.social",
     "wss://purplepag.es",
-    "wss://nostr.mom",
     "wss://relay.noswhere.com",
+  ],
+  "scout scan (scoutService.defaultRelays)": [
+    "wss://relay.primal.net",
+    "wss://nostr.wine",
+    "wss://purplepag.es",
+    "wss://relay.snort.social",
+  ],
+  "scout archival (scoutService.archivalRelays)": [
+    "wss://relay.nostr.net",
+    "wss://relay.noswhere.com",
+    "wss://atlas.nostr.land",
+  ],
+  "lazarus archival (lib/lazarus/relays.js)": [
+    "wss://relay.ditto.pub",
+    "wss://hist.nostr.land",
+    "wss://purplepag.es",
+    "wss://nostr.bitcoiner.social",
+  ],
+  "nip46 default (nip46Service.DEFAULT_RELAYS)": [
+    "wss://relay.primal.net",
+    "wss://relay.powr.build",
   ],
   "deep scan (DEEP_SCAN_RELAYS / DEEP_RELAYS)": [
     "wss://soloco.nl",
     "wss://atlas.nostr.land",
     "wss://relay.ditto.pub",
   ],
-  "candidates (not currently shipped)": [
-    "wss://nostr.fmt.wiz.biz",
-    "wss://relay.nostr.band",
-    "wss://e.nos.lol",
-    "wss://nostr.mother.net",
+  "profile-fallback rung (vertexRelayService / zombiecheck fetchVertexProfile)": [
+    "wss://relay.vertexlab.io",
   ],
+  "candidates (not currently shipped)": [],
 };
 
 const TIMEOUT_MS = 6000;

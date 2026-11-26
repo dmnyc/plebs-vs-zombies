@@ -1,6 +1,18 @@
 <template>
   <div class="card">
     <h3 class="section-title">Follow List Backups</h3>
+
+    <!-- Split-brain warning: the newest follow list on relays disagrees with
+         other versions, which is how restored lists get clobbered back. -->
+    <div v-if="followListConflict" class="mb-4 p-3 bg-yellow-900/40 border border-yellow-600 rounded-lg">
+      <p class="text-yellow-100 text-sm font-medium">⚠️ Your follow list looks inconsistent across relays</p>
+      <p class="text-yellow-200/80 text-xs mt-1">
+        The newest version holds {{ followListConflict.newest.count }} follows
+        ({{ formatConflictDate(followListConflict.newest.createdAt) }}), but other versions hold
+        {{ followListConflict.conflicting.map(c => c.count).join(', ') }} follows.
+        Another client may have published an older list — check the Recovery tool before purging or restoring.
+      </p>
+    </div>
     
     <!-- Error Modal -->
     <ConfirmModal
@@ -121,6 +133,7 @@
 <script>
 import { format } from 'date-fns';
 import backupService from '../services/backupService';
+import nostrService from '../services/nostrService';
 import ConfirmModal from './ConfirmModal.vue';
 
 export default {
@@ -134,6 +147,7 @@ export default {
       backups: [],
       loading: false,
       loadingMessage: 'Loading backups...',
+      followListConflict: null,
       showErrorModal: false,
       errorModal: {
         title: '',
@@ -161,6 +175,11 @@ export default {
     formatDate(timestamp) {
       if (!timestamp) return 'Unknown';
       return format(new Date(timestamp), 'MMM d, yyyy, HH:mm');
+    },
+    // Conflict timestamps are nostr created_at (seconds), not ms.
+    formatConflictDate(timestamp) {
+      if (!timestamp) return 'Unknown';
+      return format(new Date(timestamp * 1000), 'MMM d, HH:mm');
     },
     showError(title, message) {
       this.errorModal = {
@@ -196,8 +215,10 @@ export default {
       
       try {
         const result = await backupService.createBackup();
-        
+
         if (result.success) {
+          // getFollowList just ran — surface any cross-relay disagreement.
+          this.followListConflict = nostrService.followListConflict || null;
           await this.loadBackups(true);
           this.$emit('backup-created', result.backup);
         } else {
@@ -266,6 +287,9 @@ export default {
   },
   mounted() {
     this.loadBackups();
+    // If a follow-list fetch already ran this session, surface its
+    // cross-relay conflict state.
+    this.followListConflict = nostrService.followListConflict || null;
   }
 };
 </script>

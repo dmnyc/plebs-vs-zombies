@@ -1,7 +1,7 @@
 import { nip19 } from 'nostr-tools';
 import nostrService from './nostrService';
 import primalCacheService from './primalCacheService';
-import * as nostrArchivesService from './nostrArchivesService';
+import * as brainstormSearchService from './brainstormSearchService';
 
 // DEPRECATED: This cache will be removed once Vertex API is integrated
 // Currently used as fallback when Primal cache is unavailable
@@ -12,8 +12,10 @@ import wellKnownProfilesData from '../data/wellKnownProfiles.json';
  *
  * Search Strategy (in order):
  * 1. Primal cache API (primary) - Fast, comprehensive search (~100-300ms)
- * 2. Well-known profiles cache (deprecated fallback) - Will be removed when Vertex is integrated
- * 3. Direct relay search (last resort) - Slow but works offline (5-15s)
+ * 2. Brainstorm web-of-trust search (augmentation) - Pubkeys ranked by
+ *    GrapeRank, metadata resolved from relays (see brainstormSearchService)
+ * 3. Well-known profiles cache (deprecated fallback) - Will be removed when Vertex is integrated
+ * 4. Direct relay search (last resort) - Slow but works offline (5-15s)
  *
  * Supports npub, nprofile, and username search with autocomplete
  */
@@ -140,9 +142,9 @@ class ProfileSearchService {
     }
 
     try {
-      // Strategy 1: Try Primal cache first (if enabled), then widen with the
-      // Nostr Archives name index — a complementary third-party discovery
-      // source (see nostrArchivesService for the trade it takes).
+      // Strategy 1: Try Primal cache first (if enabled), then widen with
+      // Brainstorm's web-of-trust search — a complementary third-party
+      // discovery source (see brainstormSearchService for the trade it takes).
       let merged = [];
       if (this.usePrimalCache) {
         try {
@@ -186,26 +188,48 @@ class ProfileSearchService {
         }
       }
 
-      // Merge Nostr Archives suggestions, deduping by pubkey (Primal wins).
-      const naSuggestions = await nostrArchivesService.suggestNames(query, limit);
-      if (naSuggestions.length) {
+      // Merge Brainstorm's web-of-trust results, deduping by pubkey (Primal
+      // wins). Brainstorm returns ranked pubkeys without metadata, so names
+      // and pictures are resolved from the relays; a pubkey that resolves to
+      // nothing identifiable is not a useful row and is dropped.
+      const brainstormHits = await brainstormSearchService.searchPubkeys(query, limit);
+      if (brainstormHits.length) {
         const seen = new Set(merged.map((p) => p.pubkey));
-        for (const s of naSuggestions) {
-          if (seen.has(s.pubkey)) continue;
-          const profile = {
-            pubkey: s.pubkey,
-            name: s.name,
-            display_name: s.display_name,
-            picture: s.picture,
-            nip05: null,
-            about: null,
-            npub: nip19.npubEncode(s.pubkey),
-          };
-          this.cacheProfile(s.pubkey, profile);
-          if (onResult) {
-            onResult(profile);
+        const newPubkeys = brainstormHits
+          .map((r) => r.pubkey)
+          .filter((pubkey) => !seen.has(pubkey));
+
+        if (newPubkeys.length) {
+          let metaMap = new Map();
+          try {
+            metaMap = await Promise.race([
+              nostrService.getProfileMetadata(newPubkeys),
+              new Promise((resolve) => setTimeout(() => resolve(new Map()), 8000)),
+            ]);
+          } catch (_) {
+            // Relay resolution is best-effort — augment with whatever lands.
           }
-          merged.push(profile);
+
+          for (const pubkey of newPubkeys) {
+            const meta = metaMap.get(pubkey);
+            const name = meta && (meta.display_name || meta.name);
+            if (!name && !(meta && meta.picture)) continue;
+
+            const profile = {
+              pubkey,
+              name: name || null,
+              display_name: name || null,
+              picture: (meta && meta.picture) || null,
+              nip05: (meta && meta.nip05) || null,
+              about: (meta && meta.about) || null,
+              npub: nip19.npubEncode(pubkey),
+            };
+            this.cacheProfile(pubkey, profile);
+            if (onResult) {
+              onResult(profile);
+            }
+            merged.push(profile);
+          }
         }
       }
 

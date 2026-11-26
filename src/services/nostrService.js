@@ -7,7 +7,7 @@ import { nip19, nip04, nip44, finalizeEvent, SimplePool, verifyEvent } from "nos
 import nip46Service from "./nip46Service.js";
 import syncManager from "./syncManager.js";
 import primalCacheService from "./primalCacheService.js";
-import * as nostrArchivesService from "./nostrArchivesService.js";
+import * as vertexRelayService from "./vertexRelayService.js";
 import zombieClassificationSettings from "./settings/zombieClassificationSettings.js";
 import { markDeliberateEdit } from "../lib/lazarus/deliberate.js";
 
@@ -65,13 +65,12 @@ class NostrService {
     // or restored, per kind. See rememberOwnEvent().
     this.ownEvents = new Map();
     this.relays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
       "wss://purplepag.es",
       "wss://relay.nos.social",
       // Removed problematic relays: relay.nostrich.de, relay.current.fyi, nostr.mutinywallet.com, relay.snort.social
+      // Removed dead relays (relay-health findings, cross-checked): relay.damus.io, nos.lol
     ];
 
     // Signing method management
@@ -86,6 +85,7 @@ class NostrService {
     // NIP-65 relay lists
     this.userRelayList = null; // User's own relay preferences
     this.followsRelayLists = new Map(); // Map of pubkey -> relay list
+    this.followListConflict = null; // Split-brain detection from the last getFollowList()
 
     // Cross-scan last-seen cache (liveness-positive only — see
     // getProfilesActivity's prefilter). Loaded lazily per scan so a
@@ -1085,27 +1085,27 @@ class NostrService {
       `Profile fetch complete. Found metadata for ${Array.from(profileMap.values()).filter((p) => p.name || p.display_name).length} out of ${pubkeys.length} profiles.`,
     );
 
-    // Final rung: the Nostr Archives name index (the same API Sidecar uses).
-    // Relays prune inactive accounts' events — the very accounts this tool
-    // hunts — and caches miss some too, so otherwise-anonymous profiles get
-    // their name/picture resolved here. Follow lists are public kind-3 data;
-    // the trade is that the index sees the queried pubkeys. Only fills
-    // fields the relays and caches left empty.
+    // Final rung: the Vertex relay (wss://relay.vertexlab.io) — an indexer
+    // relay that retains kind-0 profiles the regular relays prune, which is
+    // exactly who this rung is for. Plain NIP-01 REQ for the unresolved
+    // pubkeys. Only fills fields the relays and the Primal cache left empty.
     const unresolved = validPubkeys.filter((pubkey) => {
       const p = profileMap.get(pubkey);
       return p && !p.name && !p.display_name && !p.picture;
     });
     if (unresolved.length) {
-      const meta = await nostrArchivesService.getProfilesMetadata(unresolved);
-      meta.forEach((m, pubkey) => {
+      const cachedEvents = await vertexRelayService.fetchProfiles(unresolved);
+      cachedEvents.forEach((event, pubkey) => {
         const p = profileMap.get(pubkey);
         if (!p) return;
-        if (!nostrArchivesService.hasIdentity(m)) return;
-        const name = m.display_name || m.preferred_name || m.name || null;
+        const m = vertexRelayService.parseProfileEvent(event);
+        if (!m || (!m.name && !m.display_name && !m.picture)) return;
+        const name = m.display_name || m.name || null;
         if (name && !p.name) p.name = name;
         if (name && !p.display_name) p.display_name = name;
         if (m.picture && !p.picture) p.picture = m.picture;
         if (m.nip05 && !p.nip05) p.nip05 = m.nip05;
+        if (m.about && !p.about) p.about = m.about;
       });
     }
 
@@ -1150,45 +1150,86 @@ class NostrService {
     }
     const eventArray = Array.from(events || []);
 
+    // Detect split-brain: when several distinct follow-list versions exist
+    // across relays, a client holding a stale copy can republish it and
+    // clobber the newest version (seen live with dueling 867/1093 lists).
+    // Surface the disagreement so views can warn before the user acts on
+    // the list.
+    const versions = eventArray.map((e) => ({
+      id: e.id,
+      createdAt: e.created_at,
+      count: (e.tags || []).filter((t) => t[0] === "p" && t[1]).length,
+    }));
+    this.followListConflict = null;
+    if (versions.length >= 2) {
+      const sortedVersions = [...versions].sort(
+        (a, b) => b.createdAt - a.createdAt,
+      );
+      const newest = sortedVersions[0];
+      const conflicting = sortedVersions
+        .slice(1)
+        .filter(
+          (v) =>
+            Math.abs(v.count - newest.count) >= 25 ||
+            (newest.count > 0 &&
+              Math.abs(v.count - newest.count) / newest.count >= 0.1),
+        );
+      if (conflicting.length > 0) {
+        this.followListConflict = {
+          newest: { count: newest.count, createdAt: newest.createdAt },
+          conflicting: conflicting.map((v) => ({
+            count: v.count,
+            createdAt: v.createdAt,
+          })),
+        };
+        console.warn(
+          `⚠️ Follow list conflict across relays: newest has ${newest.count} follows, but ${conflicting.length} differing version(s) exist (${conflicting.map((v) => v.count).join(", ")})`,
+        );
+      }
+    }
+
     console.log(
       `Found ${eventArray.length} follow list events, using most recent from ${new Date(mostRecentEvent.created_at * 1000)}`,
     );
 
-    // Extract and validate follow list - only include valid 64-character hex pubkeys
+    // Extract and validate follow list - only include valid 64-character hex pubkeys,
+    // and dedupe (clients can accumulate duplicate p entries over time).
     const rawFollowList = mostRecentEvent.tags
       .filter((tag) => tag[0] === "p" && tag[1]) // Ensure tag[1] exists
       .map((tag) => tag[1]);
 
     console.log(`Raw follow list contains ${rawFollowList.length} entries`);
 
-    // Validate each entry is a proper 64-character hex pubkey
-    const validFollowList = rawFollowList.filter((pubkey) => {
+    const validFollowSet = new Set();
+    for (const pubkey of rawFollowList) {
       if (!pubkey || typeof pubkey !== "string") {
         console.warn(
           `Filtering out non-string follow entry: ${typeof pubkey} "${pubkey}"`,
         );
-        return false;
+        continue;
       }
 
       if (pubkey.length !== 64) {
         console.warn(
           `Filtering out invalid length pubkey: "${pubkey}" (length: ${pubkey.length})`,
         );
-        return false;
+        continue;
       }
 
       if (!/^[0-9a-fA-F]+$/.test(pubkey)) {
         console.warn(`Filtering out non-hex pubkey: "${pubkey}"`);
-        return false;
+        continue;
       }
 
-      return true;
-    });
+      validFollowSet.add(pubkey);
+    }
+
+    const validFollowList = [...validFollowSet];
 
     const filteredCount = rawFollowList.length - validFollowList.length;
     if (filteredCount > 0) {
       console.warn(
-        `⚠️ Filtered out ${filteredCount} invalid entries from follow list`,
+        `⚠️ Filtered out ${filteredCount} invalid/duplicate entries from follow list`,
       );
     }
 
@@ -3431,6 +3472,13 @@ class NostrService {
     try {
       // Use the main NDK instance with per-user relay URLs
       // NDK adds temporary relays to its pool as needed
+      // Per-user relays: NDK adds them to the shared pool permanently, and
+      // a scout that checks dozens of users leaks dozens of sockets —
+      // starving this tab and other clients in this browser (other tabs'
+      // apps, the signer extension) of connections to the same relays.
+      // Snapshot the pool so the relays this call added can be dropped
+      // when the subscription ends.
+      const knownRelayUrls = new Set(this.ndk.pool.relays.keys());
       const subOpts = { closeOnEose: true };
       if (relays && relays.length > 0) {
         subOpts.relayUrls = relays;
@@ -3438,9 +3486,21 @@ class NostrService {
 
       const subscription = this.ndk.subscribe(filter, subOpts);
 
+      const dropTempRelays = () => {
+        for (const url of this.ndk.pool.relays.keys()) {
+          if (knownRelayUrls.has(url)) continue;
+          const relay = this.ndk.pool.relays.get(url);
+          try {
+            relay?.disconnect();
+          } catch (_) {}
+          this.ndk.pool.relays.delete(url);
+        }
+      };
+
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
+          dropTempRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         }, 10000); // 10 second timeout
@@ -3452,6 +3512,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
+          dropTempRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         });
@@ -3459,6 +3520,7 @@ class NostrService {
         subscription.on("error", () => {
           clearTimeout(timeout);
           subscription.stop();
+          dropTempRelays();
           resolve(events);
         });
       });
@@ -3492,12 +3554,24 @@ class NostrService {
 
       await specificNdk.connect();
 
+      // NDKPool has no close() in 2.x — pool.close() is a no-op, so the
+      // sockets must be disconnected explicitly or they stay open (and
+      // keep reconnecting) for the life of the tab.
+      const closeSpecificNdk = () => {
+        for (const relay of specificNdk.pool.relays.values()) {
+          try {
+            relay.disconnect();
+          } catch (_) {}
+        }
+        specificNdk.pool.relays.clear();
+      };
+
       const subscription = specificNdk.subscribe(filter);
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
           resolve(events);
         }, 8000); // 8 second timeout per user
 
@@ -3508,7 +3582,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
 
           // Sort by creation time and limit results
           events.sort((a, b) => b.created_at - a.created_at);
@@ -3518,7 +3592,7 @@ class NostrService {
         subscription.on("error", (error) => {
           clearTimeout(timeout);
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
           console.warn(
             `Error in user-specific relay scan for ${pubkey.substring(0, 8)}...:`,
             error,

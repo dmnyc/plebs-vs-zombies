@@ -62,6 +62,11 @@ const routes = [
     name: 'Zombie Check',
     component: ZombieCheckView,
     meta: { title: 'Zombie Check - Plebs vs Zombies' }
+  },
+  // Unknown URLs render nothing without this — route them to the dashboard.
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ];
 

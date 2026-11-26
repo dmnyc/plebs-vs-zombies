@@ -146,7 +146,7 @@
         v-if="zombieStatsReady"
         title="Zombie Statistics"
         :stats="zombieStats"
-        class="animate-fade-up stagger-2"
+        class="animate-fade-up stagger-3"
       >
         <div class="mt-6">
           <button @click="goToZombieHunting" class="btn-danger w-full">
@@ -155,7 +155,7 @@
         </div>
       </ZombieStats>
 
-      <div class="card card-hover animate-fade-up stagger-3">
+      <div class="card card-hover animate-fade-up stagger-2">
         <h3 class="section-title">Hunt Status</h3>
         <div class="space-y-4">
           <div class="flex justify-between items-center">
@@ -184,8 +184,54 @@
           </button>
         </div>
       </div>
+
     </div>
-    
+
+    <!-- More Tools: horizontal quick-access bar between the grid and Recent Activity.
+         relative z-10 keeps the search dropdown above the sections that follow it
+         in the DOM (they would otherwise paint over the suggestions). -->
+    <div class="mt-8 relative z-10">
+      <h3 class="section-title">More Tools</h3>
+      <div class="card p-4 sm:p-5 animate-fade-up">
+        <div class="flex flex-col lg:flex-row lg:items-start gap-4">
+          <div class="lg:w-72 flex-shrink-0">
+            <ProfileSearchInput
+              ref="toolsSearchInput"
+              placeholder="Optional: name, npub1…, or hex"
+              @profile-selected="handleToolProfileSelected"
+              @input-changed="handleToolInputChanged"
+            />
+          </div>
+          <div class="grid sm:grid-cols-2 gap-2 flex-1">
+            <button
+              @click="goToZombieCheck"
+              class="w-full text-left px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-zombie-green/60 transition-colors"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-xl flex-shrink-0">🧟‍♀️</span>
+                <div class="min-w-0">
+                  <div class="font-bold text-zombie-green text-sm">Zombie Check</div>
+                  <div class="text-xs text-gray-400 truncate">Look up any account's zombie status.</div>
+                </div>
+              </div>
+            </button>
+            <button
+              @click="goToScoutMode"
+              class="w-full text-left px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 hover:bg-gray-700 hover:border-yellow-500/60 transition-colors"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-xl flex-shrink-0">👁️</span>
+                <div class="min-w-0">
+                  <div class="font-bold text-yellow-400 text-sm">Scout Mode</div>
+                  <div class="text-xs text-gray-400 truncate">Analyze anyone's follows and publish a report.</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="mt-8">
       <h3 class="section-title">Recent Activity</h3>
       <div class="card">
@@ -257,11 +303,14 @@ import ZombieStats from '../components/ZombieStats.vue';
 import WelcomeModal from '../components/WelcomeModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import AnimatedNumber from '../components/AnimatedNumber.vue';
+import ProfileSearchInput from '../components/ProfileSearchInput.vue';
+import { nip19 } from 'nostr-tools';
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import immunityService from '../services/immunityService';
 import backupService from '../services/backupService';
 import easterEggData from '../data/easterEggs.js';
+import scanManager, { scanState } from '../services/scanManager';
 
 export default {
   name: 'DashboardView',
@@ -269,13 +318,15 @@ export default {
     ZombieStats,
     WelcomeModal,
     ConfirmModal,
-    AnimatedNumber
+    AnimatedNumber,
+    ProfileSearchInput
   },
+  emits: ['scout-user'],
   data() {
     return {
       loading: true,
-      scanning: false,
-      scanCancelled: false,
+      toolSearch: '',
+      toolProfile: null,
       followStats: {
         total: 0,
         immune: 0,
@@ -286,12 +337,6 @@ export default {
         fresh: 0,
         rotting: 0,
         ancient: 0
-      },
-      scanProgress: {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'initializing'
       },
       huntStats: {
         totalPurged: 0,
@@ -317,6 +362,19 @@ export default {
     };
   },
   computed: {
+    // The scan itself lives in scanManager so it survives leaving this page.
+    huntJob() {
+      return scanState.kind === 'hunt';
+    },
+    scanning() {
+      return this.huntJob && scanState.status === 'running';
+    },
+    scanProgress() {
+      return this.huntJob ? scanState.progress : { total: 0, processed: 0, currentNpub: '', stage: '' };
+    },
+    huntStatus() {
+      return this.huntJob ? scanState.status : 'idle';
+    },
     zombieStatsReady() {
       return this.zombieStats.total > 0;
     },
@@ -474,91 +532,16 @@ export default {
       }
     },
     async scanForZombies() {
-      this.scanning = true;
-      this.scanCancelled = false;
+      // Only one scan at a time — a running Scout scan has to be stopped first.
+      const ok = await scanManager.requestStart('hunt');
+      if (ok !== true) return;
+
       this.currentEasterEgg = '';
-      
-      // Reset progress
-      this.scanProgress = {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'Initializing scan...'
-      };
-      
-      try {
-        // Get settings from localStorage
-        const autoBackupSetting = localStorage.getItem('autoBackupOnScan');
-        const shouldCreateBackup = autoBackupSetting !== null ? JSON.parse(autoBackupSetting) : true;
-        
-        const enhancedScanningSetting = localStorage.getItem('useEnhancedScanning');
-        const useEnhancedScanning = enhancedScanningSetting !== null ? JSON.parse(enhancedScanningSetting) : false;
-        
-        // Choose scanning method based on user preference
-        const scanMethod = useEnhancedScanning ? 'scanForZombiesEnhanced' : 'scanForZombies';
-        console.log(`🔍 Using ${useEnhancedScanning ? 'Enhanced' : 'Standard'} zombie scanning method`);
-        
-        const result = await zombieService[scanMethod](true, (progress) => {
-          console.log('DEBUG: Progress callback called with:', progress);
-          // Check if scan was cancelled
-          if (this.scanCancelled) {
-            throw new Error('Scan cancelled by user');
-          }
-          
-          this.scanProgress = {
-            ...this.scanProgress,
-            ...progress
-          };
-          
-          console.log('DEBUG: About to call updateEasterEgg');
-          // Update easter egg
-          this.updateEasterEgg();
-        }, shouldCreateBackup);
-        
-        if (result.success) {
-          this.lastScanDate = Date.now();
-          
-          this.zombieStats = {
-            total: result.totalFollows,
-            active: result.zombieData.active.length,
-            burned: result.zombieData.burned?.length || 0,
-            fresh: result.zombieData.fresh.length,
-            rotting: result.zombieData.rotting.length,
-            ancient: result.zombieData.ancient.length
-          };
-          
-          // Update immune count after scan
-          this.followStats.immune = result.immuneCount || 0;
-          
-          // Add scan activity
-          this.addActivity({
-            type: 'scan',
-            title: 'Zombie Scan Completed',
-            timestamp: Date.now(),
-            details: `Found ${result.zombieCount} zombies out of ${result.totalFollows} follows`
-          });
-          
-          this.showAlert('Scan Complete', 'Scan completed successfully!', 'success');
-        } else if (!this.scanCancelled) {
-          this.showAlert('Scan Failed', `Failed to scan for zombies: ${result.message}`, 'error');
-        }
-      } catch (error) {
-        if (error.message === 'Scan cancelled by user') {
-          console.log('Scan cancelled by user');
-        } else {
-          console.error('Failed to scan for zombies:', error);
-          this.showAlert('Scan Failed', 'Failed to scan for zombies. See console for details.', 'error');
-        }
-      } finally {
-        this.currentEasterEgg = '';
-        this.scanning = false;
-      }
+      scanManager.startHunt();
     },
     stopScan() {
-      this.scanCancelled = true;
-      this.scanning = false;
+      scanManager.cancel();
       this.currentEasterEgg = '';
-      console.log('Zombie scan stopped by user');
     },
     async loadRecentActivity() {
       try {
@@ -607,6 +590,42 @@ export default {
     },
     goToZombieHunting() {
       this.$router.push('/hunt');
+    },
+    handleToolProfileSelected(profile) {
+      this.toolProfile = profile;
+      this.toolSearch = profile?.npub || profile?.pubkey || this.toolSearch;
+    },
+    handleToolInputChanged(value) {
+      this.toolSearch = value;
+      // Editing the text after a dropdown pick drops the picked profile.
+      if (this.toolProfile && value !== (this.toolProfile.display_name || this.toolProfile.name)) {
+        this.toolProfile = null;
+      }
+    },
+    goToZombieCheck() {
+      // A dropdown pick carries the resolved profile (npub auto-runs the
+      // check); raw text falls through to the ?q= name search.
+      const q = this.toolProfile
+        ? (this.toolProfile.npub || this.toolProfile.pubkey)
+        : this.toolSearch.trim();
+      this.$router.push(q ? { path: '/zombiecheck', query: { q } } : '/zombiecheck');
+    },
+    goToScoutMode() {
+      // A dropdown pick starts Scout Mode properly through the app (which
+      // owns scoutTarget); raw text opens /scout's new-user flow prefilled.
+      if (this.toolProfile && (this.toolProfile.pubkey || this.toolProfile.npub)) {
+        const pubkey = this.toolProfile.pubkey;
+        this.$emit('scout-user', {
+          pubkey,
+          npub: this.toolProfile.npub || (pubkey ? nip19.npubEncode(pubkey) : null),
+          name: this.toolProfile.name || null,
+          display_name: this.toolProfile.display_name || null,
+          picture: this.toolProfile.picture || null
+        });
+        return;
+      }
+      const q = this.toolSearch.trim();
+      this.$router.push(q ? { path: '/scout', query: { q } } : '/scout');
     },
     goToBackups() {
       this.$router.push('/backups');
@@ -690,6 +709,24 @@ export default {
     handleSkipBackup() {
       this.showWelcomeModal = false;
       // Skip backup logic is handled in the modal component
+    }
+  },
+  watch: {
+    scanProgress() {
+      if (this.scanning) this.updateEasterEgg();
+    },
+    async huntStatus(status) {
+      if (status === 'done') {
+        this.currentEasterEgg = '';
+        scanManager.markSeen();
+        // The scan stored its results and history — reload from there.
+        await this.loadDashboardData();
+        this.showAlert('Scan Complete', 'Scan completed successfully!', 'success');
+      } else if (status === 'failed') {
+        this.currentEasterEgg = '';
+        this.showAlert('Scan Failed', `Failed to scan for zombies: ${scanState.error}`, 'error');
+        scanManager.clear();
+      }
     }
   },
   async mounted() {

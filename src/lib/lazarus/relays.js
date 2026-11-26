@@ -21,11 +21,11 @@ const DEFAULT_CONCURRENCY = 12;
 const MAX_EVENTS_PER_REQUEST = 1000;
 
 // Relays observed keeping replaceable history (Lazarus README, 2026-09).
+// nos.lol and nostr.mom were on this list until both went dark
+// (relay-health findings, cross-checked).
 export const LAZARUS_ARCHIVAL_RELAYS = [
   "wss://relay.ditto.pub",
   "wss://hist.nostr.land",
-  "wss://nos.lol",
-  "wss://nostr.mom",
   "wss://purplepag.es",
   "wss://nostr.bitcoiner.social",
 ];

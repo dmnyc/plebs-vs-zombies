@@ -10,7 +10,7 @@ import { ImageResponse } from '@vercel/og';
 import {
   resolveHex,
   canonicalNpub,
-  fetchArchivesProfile,
+  fetchSharedProfile,
 } from './_lib/nostr-profile.js';
 
 export const config = { runtime: 'edge' };
@@ -247,7 +247,7 @@ export default async function handler(request) {
     const hex = resolveHex(raw);
     if (!hex) return redirectToStatic(request);
 
-    const profile = await fetchArchivesProfile(hex);
+    const profile = await fetchSharedProfile(hex, new URL(request.url).origin);
     const npub = canonicalNpub(hex);
     const [fonts, avatar] = await Promise.all([getFonts(), loadAvatar(profile?.picture)]);
 

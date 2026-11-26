@@ -5,7 +5,7 @@
       <!-- Header row with title and buttons -->
       <div class="flex items-start justify-between gap-4 mb-3">
         <div class="flex items-center gap-4">
-          <div class="text-3xl flex-shrink-0 animate-wobble-hover">🔍</div>
+          <div class="text-3xl flex-shrink-0 animate-wobble-hover">👁️</div>
           <h2 class="page-title text-yellow-400 !mb-0">Scout Mode</h2>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
@@ -15,13 +15,13 @@
             :class="{'opacity-50 cursor-not-allowed': scanning}"
             :disabled="scanning"
           >
-            Scout Different User
+            {{ hasScoutTarget ? 'Scout Different User' : 'Scout a User' }}
           </button>
         </div>
       </div>
       
-      <!-- User info section -->
-      <div class="flex items-center gap-3">
+      <!-- User info section (only once a target is set) -->
+      <div v-if="hasScoutTarget" class="flex items-center gap-3">
         <!-- Target User Avatar -->
         <div class="flex-shrink-0">
           <img 
@@ -60,8 +60,8 @@
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       @click="showNewUserModal = false"
     >
-      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" @click.stop>
-        <h3 class="text-lg font-medium text-yellow-400 mb-4">🔍 Scout New User</h3>
+      <div class="modal-panel bg-zombie-dark border border-gray-700 rounded-lg p-6 pb-10 max-w-md w-full mx-4" @click.stop>
+        <h3 class="text-lg font-medium text-yellow-400 mb-4">👁️ Scout New User</h3>
         
         <div class="space-y-4">
           <div>
@@ -99,22 +99,22 @@
     </Transition>
 
     <!-- Scanning Progress -->
-    <div v-if="scanning" class="card mb-6 p-6 animate-fade-up">
+    <div v-if="scanning" class="card mb-6 p-8 animate-fade-up">
       <div class="flex flex-col">
-        <h3 class="text-xl mb-4 text-center text-yellow-400 flex items-center justify-center gap-2">
-          <span class="animate-lurch">🔍</span>
+        <h3 class="text-2xl sm:text-3xl mb-5 text-center text-yellow-400 flex items-center justify-center gap-2">
+          <span class="animate-lurch">👁️</span>
           <span>Scouting {{ targetDisplay }}...</span>
         </h3>
 
         <!-- Progress Bar -->
         <div class="mb-6">
-          <div class="flex justify-between items-center text-sm text-gray-400 mb-2 gap-2">
+          <div class="flex justify-between items-center text-base sm:text-lg text-gray-200 mb-3 gap-2">
             <span class="truncate flex-1 min-w-0">{{ scanProgress.stage || 'Initializing scout...' }}</span>
-            <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}</span>
+            <span class="flex-shrink-0 font-mono whitespace-nowrap">{{ scanProgress.processed || 0 }} / {{ scanProgress.total || 0 }}<span v-if="scanProgress.total > 0">&nbsp;·&nbsp;{{ Math.round((scanProgress.processed || 0) / scanProgress.total * 100) }}%</span></span>
           </div>
-          <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div class="w-full bg-gray-700 rounded-full h-5 overflow-hidden">
             <div
-              class="bg-yellow-400 h-3 rounded-full transition-all duration-300 progress-animated"
+              class="bg-yellow-400 h-5 rounded-full transition-all duration-300 progress-animated shadow-[0_0_10px_rgba(250,204,21,0.45)]"
               :style="{ width: scanProgress.total > 0 ? Math.min(100, (scanProgress.processed / scanProgress.total * 100)) + '%' : '0%' }"
             ></div>
           </div>
@@ -222,7 +222,7 @@
             <!-- Post to Nostr button (only for authenticated users) -->
             <button 
               v-if="isLoggedIn"
-              @click="postToNostr"
+              @click="reviewNote"
               :disabled="posting || posted"
               :class="posted ? 'btn-success' : 'btn-primary'"
               class="flex-1 flex items-center justify-center gap-2"
@@ -290,7 +290,7 @@
               @click="toggleSection('fresh')" 
               class="w-full flex justify-between items-center p-3 bg-yellow-800/20 rounded-lg hover:bg-yellow-800/30 transition-colors"
             >
-              <span class="text-yellow-400">🧟‍♀️ Fresh (120+ days inactive)</span>
+              <span class="text-yellow-400">⚰️ Fresh (120+ days inactive)</span>
               <div class="flex items-center gap-2">
                 <span class="font-bold text-lg">{{ scoutResults.breakdown.fresh }}</span>
                 <span class="text-sm">{{ expandedSections.fresh ? '▼' : '▶' }}</span>
@@ -349,7 +349,7 @@
               @click="toggleSection('rotting')" 
               class="w-full flex justify-between items-center p-3 bg-orange-800/20 rounded-lg hover:bg-orange-800/30 transition-colors"
             >
-              <span class="text-orange-400">🧟‍♂️ Rotting (180+ days inactive)</span>
+              <span class="text-orange-400">🪦 Rotting (180+ days inactive)</span>
               <div class="flex items-center gap-2">
                 <span class="font-bold text-lg">{{ scoutResults.breakdown.rotting }}</span>
                 <span class="text-sm">{{ expandedSections.rotting ? '▼' : '▶' }}</span>
@@ -489,13 +489,13 @@
 
     <!-- Initial State -->
     <div v-else-if="!scanning && !scoutComplete" class="card p-8 text-center">
-      <div class="text-6xl mb-4">🔍</div>
+      <div class="text-6xl mb-4">👁️</div>
       <h3 class="section-title">Ready to Scout</h3>
       <p class="text-gray-400 mb-6">
         Scout mode will analyze {{ targetDisplay }}'s zombie follows.
       </p>
       <button @click="startScout" class="btn-scout">
-        🏹 Begin Scouting
+        👁️ Begin Scouting
       </button>
     </div>
 
@@ -549,6 +549,43 @@
                 <span class="text-green-300">Zombie Score™:</span>
                 <span class="font-bold text-lg">{{ scoutResults?.zombieScore || 0 }}%</span>
               </div>
+            </div>
+          </div>
+
+          <div v-if="posted && postedNevent" class="pt-3 border-t border-gray-700">
+            <div class="text-xs text-gray-400 text-center mb-2">View your post on Nostr:</div>
+            <div class="flex items-center justify-center gap-4">
+              <a
+                v-for="client in nostrClients"
+                :key="client.name"
+                :href="client.url + postedNevent"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors"
+                :title="'Open in ' + client.name"
+              >
+                <img
+                  v-if="client.iconOk !== false"
+                  :src="client.icon"
+                  :alt="client.name"
+                  class="w-8 h-8 rounded object-contain"
+                  :class="client.iconBg"
+                  @error="client.iconOk = false"
+                />
+                <span
+                  v-else
+                  class="w-8 h-8 flex items-center justify-center rounded bg-purple-700 text-sm font-bold text-white"
+                >{{ client.name[0] }}</span>
+                <span class="text-[10px]">{{ client.name }}</span>
+              </a>
+              <button
+                @click="copyEventId"
+                class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors"
+                :title="'Copy event ID'"
+              >
+                <span class="w-8 h-8 flex items-center justify-center rounded bg-gray-700 text-lg">{{ copiedEventId ? '✅' : '🔗' }}</span>
+                <span class="text-[10px]">{{ copiedEventId ? 'Copied' : 'Copy ID' }}</span>
+              </button>
             </div>
           </div>
 
@@ -656,24 +693,45 @@
       </div>
     </div>
     </Transition>
+
+    <!-- Mutable-style review gate: the exact scout report, previewed before
+         it can be signed or published. -->
+    <NoteReviewModal
+      :show="noteReview.show"
+      :content="shareMessage"
+      :tags="noteReview.tags"
+      :mention-names="noteMentionNames"
+      :author-name="noteReviewAuthorName"
+      :author-picture="noteReviewAuthorPicture"
+      :posting="posting"
+      posting-label="Publishing…"
+      :error="noteReview.error || ''"
+      @back="noteReview.show = false"
+      @confirm="confirmNoteReview"
+    />
   </div>
 </template>
 
 <script>
 import scoutService from '../services/scoutService';
+import scanManager, { scanState, isScoutJobFor } from '../services/scanManager';
 import nostrService from '../services/nostrService';
 import ProfileSearchInput from '../components/ProfileSearchInput.vue';
+import NoteReviewModal from '../components/NoteReviewModal.vue';
 import { nip19 } from 'nostr-tools';
 
 export default {
   name: 'ScoutModeView',
   components: {
-    ProfileSearchInput
+    ProfileSearchInput,
+    NoteReviewModal
   },
   props: {
+    // Required for the in-app rendering (App.vue passes it); the routed
+    // /scout instance has no target and shows the new-user flow instead.
     scoutTarget: {
       type: Object,
-      required: true
+      default: null
     },
     isLoggedIn: {
       type: Boolean,
@@ -682,15 +740,8 @@ export default {
   },
   data() {
     return {
-      scanning: false,
       scoutComplete: false,
       scoutResults: null,
-      scanProgress: {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'initializing'
-      },
       showNewUserModal: false,
       selectedProfile: null,
       processingNewUser: false,
@@ -698,6 +749,20 @@ export default {
       posting: false,
       posted: false,
       postError: '',
+      postedNevent: null,
+      copiedEventId: false,
+      // Mutable-style review gate: the exact report is previewed and
+      // nothing is signed until the user confirms in the modal.
+      noteReview: {
+        show: false,
+        tags: [],
+        error: null,
+      },
+      nostrClients: [
+        { name: 'Primal', url: 'https://primal.net/e/', icon: '/clients/primal.png', iconBg: 'bg-white', iconOk: true },
+        { name: 'Jumble', url: 'https://jumble.social/notes/', icon: '/clients/jumble.png', iconBg: 'bg-white', iconOk: true },
+        { name: 'Iris', url: 'https://iris.to/', icon: '/clients/iris.png', iconBg: 'bg-black', iconOk: true },
+      ],
       showPostModal: false,
       isMyReport: false,
       expandedSections: {
@@ -711,14 +776,52 @@ export default {
     }
   },
   computed: {
+    noteReviewAuthorName() {
+      const p = nostrService.userProfile;
+      return p?.display_name || p?.name || 'You';
+    },
+    noteReviewAuthorPicture() {
+      return nostrService.userProfile?.picture || '';
+    },
+    // Names for the two nostr: mentions inside the report — the scouted
+    // user and the app account — so the preview renders them the way a
+    // client will instead of raw truncated npubs.
+    noteMentionNames() {
+      const names = {
+        npub1pvz2c9z4pau26xdwfya24d0qhn6ne8zp9vwjuyxw629wkj9vh5lsrrsd4h: 'plebsvszombies',
+      };
+      if (this.scoutTarget?.npub && this.targetUsername) {
+        names[this.scoutTarget.npub] = this.targetUsername;
+      }
+      return names;
+    },
+    // The scan itself lives in scanManager, so it keeps running (and can be
+    // picked back up here) while the user is elsewhere in the app.
+    scoutJob() {
+      return isScoutJobFor(this.scoutTarget?.pubkey);
+    },
+    scanning() {
+      return this.scoutJob && scanState.status === 'running';
+    },
+    scanProgress() {
+      return this.scoutJob ? scanState.progress : { total: 0, processed: 0, currentNpub: '', stage: '' };
+    },
+    scoutStatus() {
+      return this.scoutJob ? scanState.status : 'idle';
+    },
+    hasScoutTarget() {
+      return !!(this.scoutTarget && this.scoutTarget.pubkey);
+    },
     targetDisplay() {
       // Try to show a readable name if available, otherwise truncated npub
+      if (!this.scoutTarget) return '';
       return this.scoutTarget.name || 
              this.scoutTarget.display_name || 
-             (this.scoutTarget.npub.substring(0, 12) + '...');
+             ((this.scoutTarget.npub || '').substring(0, 12) + '...');
     },
     targetUsername() {
       // Return just the username (name or display_name) without falling back to npub
+      if (!this.scoutTarget) return '';
       return this.scoutTarget.name || this.scoutTarget.display_name;
     },
     shareMessage() {
@@ -729,8 +832,8 @@ export default {
       const zombieScore = this.scoutResults.zombieScore;
       const breakdown = this.scoutResults.breakdown;
       const breakdownLines = [
-        breakdown.fresh > 0 ? `🧟‍♀️ Fresh: ${breakdown.fresh}` : '',
-        breakdown.rotting > 0 ? `🧟‍♂️ Rotting: ${breakdown.rotting}` : '',
+        breakdown.fresh > 0 ? `⚰️ Fresh: ${breakdown.fresh}` : '',
+        breakdown.rotting > 0 ? `🪦 Rotting: ${breakdown.rotting}` : '',
         breakdown.ancient > 0 ? `💀 Ancient: ${breakdown.ancient}` : '',
         breakdown.burned > 0 ? `🔥 Burned: ${breakdown.burned}` : ''
       ].filter(Boolean).join('\n');
@@ -809,66 +912,29 @@ https://plebsvszombies.cc`;
     }
   },
   methods: {
-    async startScout() {
-      this.scanning = true;
+    startScout() {
       this.scoutComplete = false;
       this.scoutResults = null;
       this.postError = '';
-      
-      this.scanProgress = {
-        total: 0,
-        processed: 0,
-        currentNpub: '',
-        stage: 'Starting scout analysis...'
-      };
-      
-      try {
-        console.log('🔍 Starting scout for:', this.scoutTarget);
-        
-        const results = await scoutService.scoutUser(this.scoutTarget.pubkey, (progress) => {
-          this.scanProgress = {
-            ...this.scanProgress,
-            ...progress
-          };
-        });
-        
-        // Check if scan was cancelled - if so, don't show results
-        if (!scoutService.cancelled) {
-          if (results.success) {
-            this.scoutResults = results;
-            this.scoutComplete = true;
-            console.log('✅ Scout completed successfully:', results);
-          } else {
-            console.error('❌ Scout failed:', results.message);
-            this.scoutComplete = true;
-            this.scoutResults = null;
-          }
-        } else {
-          console.log('🛑 Scan was cancelled, not showing results');
-          // Ensure we stay in initial state
-          this.scoutComplete = false;
-          this.scoutResults = null;
-        }
-        
-      } catch (error) {
-        console.error('❌ Scout error:', error);
-        // Only set error state if not cancelled
-        if (!scoutService.cancelled) {
-          this.scoutComplete = true;
-          this.scoutResults = null;
-        } else {
-          // Stay in initial state if cancelled
-          this.scoutComplete = false;
-          this.scoutResults = null;
-        }
-      } finally {
-        this.scanning = false;
+      console.log('🔍 Starting scout for:', this.scoutTarget);
+      // App.vue (or scoutNewUser) has already cleared any other running scan.
+      scanManager.startScout(this.scoutTarget);
+    },
+    applyScoutStatus(status) {
+      if (status === 'done') {
+        this.scoutResults = scanState.result;
+        this.scoutComplete = true;
+        scanManager.markSeen();
+        console.log('✅ Scout completed successfully:', scanState.result);
+      } else if (status === 'failed') {
+        console.error('❌ Scout failed:', scanState.error);
+        this.scoutResults = null;
+        this.scoutComplete = true;
+        scanManager.markSeen();
       }
     },
     async stopScan() {
-      // Force shutdown all scout activity
-      await scoutService.forceShutdown();
-      this.scanning = false;
+      await scanManager.cancel();
       // Reset to initial state - don't show incomplete results
       this.scoutComplete = false;
       this.scoutResults = null;
@@ -889,8 +955,8 @@ https://plebsvszombies.cc`;
       });
     },
     async scoutNewUser() {
-      if (!this.selectedProfile) {
-        console.log('❌ No profile selected, returning');
+      if (!this.selectedProfile?.pubkey) {
+        console.log('❌ No usable profile selected, returning');
         return;
       }
 
@@ -899,8 +965,15 @@ https://plebsvszombies.cc`;
         console.log('⚠️ scoutNewUser already processing, ignoring duplicate call');
         return;
       }
+      // Replacing this view's own scout is the point of this flow; any other
+      // running scan (e.g. a Hunt) gets the one-at-a-time confirm first.
+      if (!this.scoutJob && scanState.status === 'running') {
+        const ok = await scanManager.requestStart('scout', this.selectedProfile);
+        if (ok === false) return;
+      }
+
       this.processingNewUser = true;
-      
+
       try {
         console.log('🔄 Starting new user scout process...');
         
@@ -942,7 +1015,7 @@ https://plebsvszombies.cc`;
           picture: this.selectedProfile.picture
         };
 
-        console.log('🔄 Switching scout target from', this.scoutTarget.pubkey.substring(0, 8), 'to', newTarget.pubkey.substring(0, 8));
+        console.log('🔄 Switching scout target from', this.scoutTarget?.pubkey?.substring(0, 8) ?? '(none)', 'to', newTarget.pubkey.substring(0, 8));
         
         // Update the target and close modal
         this.$emit('update-target', newTarget);
@@ -966,7 +1039,7 @@ https://plebsvszombies.cc`;
         
         // Wait for next tick to ensure the target is updated
         await this.$nextTick();
-        console.log('✅ Target updated, starting scout for:', this.scoutTarget.pubkey.substring(0, 8));
+        console.log('✅ Target updated, starting scout for:', this.scoutTarget?.pubkey?.substring(0, 8));
         await this.startScout();
         
       } catch (error) {
@@ -1048,11 +1121,38 @@ https://plebsvszombies.cc`;
         document.body.removeChild(textArea);
       }
     },
+    scoutNoteTags() {
+      // Tags that ride with the report; also summarized in the review step
+      // (NoteReviewModal).
+      return [
+        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.primal.net'],
+        ['t', 'PlebsVsZombies']
+      ];
+    },
+    reviewNote() {
+      // Mutable-style preview step: nothing is signed or published until
+      // the user confirms in the modal.
+      if (!this.isLoggedIn || this.posting || this.posted) return;
+      this.noteReview = { show: true, tags: this.scoutNoteTags(), error: null };
+    },
+    async confirmNoteReview() {
+      if (!this.noteReview.show || this.noteReview.posting) return;
+      this.noteReview.error = null;
+      try {
+        await this.postToNostr();
+        if (this.posted) this.noteReview.show = false;
+        else this.noteReview.error = this.postError || 'Failed to publish';
+      } finally {
+        this.noteReview.posting = false;
+      }
+    },
     async postToNostr() {
       if (!this.isLoggedIn) return;
 
       this.posting = true;
       this.postError = '';
+      this.postedNevent = null;
+      this.copiedEventId = false;
       
       try {
         console.log('📡 Posting scout report to Nostr...');
@@ -1061,10 +1161,7 @@ https://plebsvszombies.cc`;
         const event = {
           kind: 1, // Text note
           created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
-            ['t', 'PlebsVsZombies']
-          ],
+          tags: this.scoutNoteTags(),
           content: this.shareMessage
         };
         
@@ -1108,6 +1205,28 @@ https://plebsvszombies.cc`;
         
         if (publishResults.successful > 0) {
           this.posted = true;
+          // Build an nevent (id + author + relay hints) so the note can be
+          // opened in any client. Prefer the relays that actually accepted it;
+          // fall back to the configured publish relays.
+          try {
+            const relayHints = (
+              publishResults.accepted && publishResults.accepted.length > 0
+                ? publishResults.accepted
+                : nostrService.getPublishRelays()
+            ).slice(0, 3);
+            this.postedNevent = nip19.neventEncode({
+              id: signedEvent.id,
+              author: signedEvent.pubkey,
+              relays: relayHints,
+            });
+          } catch (encodeError) {
+            console.warn('Could not build nevent, falling back to note id:', encodeError);
+            try {
+              this.postedNevent = nip19.noteEncode(signedEvent.id);
+            } catch (_) {
+              this.postedNevent = null;
+            }
+          }
           this.showPostModal = true;
           console.log(`✅ Scout report posted to ${publishResults.successful}/${nostrService.getPublishRelays().length} relays`);
         } else {
@@ -1141,6 +1260,26 @@ https://plebsvszombies.cc`;
         return "Couldn't publish to any relays — check your connection, then try again.";
       }
       return message || 'Posting failed — please try again.';
+    },
+    async copyEventId() {
+      if (!this.postedNevent) return;
+      try {
+        await navigator.clipboard.writeText(this.postedNevent);
+      } catch (error) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = this.postedNevent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (e) {
+          console.error('Unable to copy the event ID:', e);
+        }
+        document.body.removeChild(textArea);
+      }
+      this.copiedEventId = true;
+      setTimeout(() => { this.copiedEventId = false; }, 2000);
     },
     /**
      * Get all zombies sorted by ranking (from most zombie to least zombie/most pleb)
@@ -1243,7 +1382,7 @@ https://plebsvszombies.cc`;
       txtContent += `Zombie Score™: ${this.scoutResults.zombieScore}%\n`;
       txtContent += `Sorted by: Ranking (most zombie to least zombie)\n`;
       txtContent += `\n`;
-      txtContent += `Legend: 🔥 burned | 💀 ancient | 🧟 rotting | 🌱 fresh\n`;
+      txtContent += `Legend: 🔥 burned | 💀 ancient | 🪦 rotting | ⚰️ fresh\n`;
       txtContent += `====================================\n\n`;
 
       sortedZombies.forEach((zombie, index) => {
@@ -1257,8 +1396,8 @@ https://plebsvszombies.cc`;
         const typeEmoji = {
           burned: '🔥',
           ancient: '💀',
-          rotting: '🧟',
-          fresh: '🌱'
+          rotting: '🪦',
+          fresh: '⚰️'
         }[zombie.type] || '❓';
 
         const displayName = this.getUserDisplayName(zombie);
@@ -1303,9 +1442,52 @@ https://plebsvszombies.cc`;
       URL.revokeObjectURL(url);
     }
   },
+  watch: {
+    scoutStatus(status) {
+      this.applyScoutStatus(status);
+    }
+  },
   async mounted() {
+    // The routed /scout instance has no scoutTarget (App.vue passes it only
+    // for its own Scout Mode rendering) — nothing to auto-scan, so open the
+    // new-user flow, applying any ?q= deep link. The in-app instance has a
+    // target and auto-scans it as before.
+    if (!this.hasScoutTarget) {
+      const shared = String(this.$route?.query?.q || '').trim();
+      this.showNewUserModal = true;
+      if (shared) {
+        // Same bounded wait as the landing prefill — the modal body mounts a
+        // tick after the flag flips.
+        let tries = 0;
+        const prefill = () => {
+          const comp = this.$refs.scoutInput;
+          if (!comp && tries++ < 40) {
+            setTimeout(prefill, 100);
+            return;
+          }
+          if (comp) {
+            comp.setValue(shared);
+            // Run the search/validation so the dropdown offers the profile and
+            // Start Scouting can enable.
+            comp.handleInput();
+          }
+        };
+        this.$nextTick(prefill);
+      }
+      return;
+    }
+
+    // Coming back to a scout that ran (or is still running) in the
+    // background: pick it up instead of starting over.
+    if (this.scoutJob) {
+      this.applyScoutStatus(scanState.status);
+      return;
+    }
+
     // Auto-start scouting when component mounts
-    await this.startScout();
+    const ok = await scanManager.requestStart('scout', this.scoutTarget);
+    if (ok === true) this.startScout();
+    else if (ok === false) this.exitScoutMode();
   }
 }
 </script>

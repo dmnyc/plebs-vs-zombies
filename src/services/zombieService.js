@@ -1134,6 +1134,14 @@ class ZombieService {
   /**
    * Store scan results for later use
    */
+  // Persisted scan data is per-account: two logins on one browser must not
+  // see each other's hunt statistics, purge history, or scan results.
+  scopedKey(base) {
+    return nostrService.pubkey
+      ? `${base}:${nostrService.pubkey}`
+      : `${base}:anonymous`;
+  }
+
   async storeScanResults(zombieData, profileData = null) {
     const scanResults = {
       timestamp: Date.now(),
@@ -1141,18 +1149,19 @@ class ZombieService {
       hasProfiles: !!profileData,
     };
 
-    await localforage.setItem("latestScan", scanResults);
+    await localforage.setItem(this.scopedKey("latestScan"), scanResults);
 
     // Store profile data separately to avoid bloat
     if (profileData) {
       await localforage.setItem(
-        "latestProfiles",
+        this.scopedKey("latestProfiles"),
         Object.fromEntries(profileData),
       );
     }
 
     // Also keep a history of scans
-    let scanHistory = (await localforage.getItem("scanHistory")) || [];
+    let scanHistory =
+      (await localforage.getItem(this.scopedKey("scanHistory"))) || [];
     scanHistory.push({
       timestamp: scanResults.timestamp,
       activeCount: zombieData.active.length,
@@ -1167,21 +1176,21 @@ class ZombieService {
       scanHistory = scanHistory.slice(-10);
     }
 
-    await localforage.setItem("scanHistory", scanHistory);
+    await localforage.setItem(this.scopedKey("scanHistory"), scanHistory);
   }
 
   /**
    * Get the latest scan results
    */
   async getLatestScanResults() {
-    return await localforage.getItem("latestScan");
+    return await localforage.getItem(this.scopedKey("latestScan"));
   }
 
   /**
    * Get scan history
    */
   async getScanHistory() {
-    return (await localforage.getItem("scanHistory")) || [];
+    return (await localforage.getItem(this.scopedKey("scanHistory"))) || [];
   }
 
   /**
@@ -1257,10 +1266,11 @@ class ZombieService {
 
     try {
       // Get existing purge history
-      let purgeHistory = (await localforage.getItem("purgeHistory")) || [];
+      let purgeHistory =
+        (await localforage.getItem(this.scopedKey("purgeHistory"))) || [];
       purgeHistory.push(purgeRecord);
 
-      await localforage.setItem("purgeHistory", purgeHistory);
+      await localforage.setItem(this.scopedKey("purgeHistory"), purgeHistory);
       console.log("Zombie purge recorded successfully");
     } catch (error) {
       console.error("Failed to record zombie purge:", error);
@@ -1272,7 +1282,9 @@ class ZombieService {
    * Get purge history
    */
   async getPurgeHistory() {
-    return (await localforage.getItem("purgeHistory")) || [];
+    return (
+      (await localforage.getItem(this.scopedKey("purgeHistory"))) || []
+    );
   }
 
   /**
