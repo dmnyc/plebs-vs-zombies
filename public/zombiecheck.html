@@ -1648,24 +1648,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
       reviewEls.postLabel.textContent = posting ? 'Publishing…' : 'Post to Nostr';
     }
 
-    // Mutable-style scroll lock: while the review modal is open, the page
-    // behind it can't scroll.
-    let reviewScrollSaved = null;
-    function lockPageScroll() {
-      if (reviewScrollSaved === null) {
-        reviewScrollSaved = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-      }
-    }
-    function unlockPageScroll() {
-      if (reviewScrollSaved !== null) {
-        document.body.style.overflow = reviewScrollSaved;
-        reviewScrollSaved = null;
-      }
-    }
-
     function closeNoteReview() {
-      unlockPageScroll();
       if (noteReviewState.imageUrl) URL.revokeObjectURL(noteReviewState.imageUrl);
       noteReviewState = { open: false, posting: false, content: '', tags: [], imageUrl: null };
       reviewEls.overlay.classList.add('hidden');
@@ -1687,7 +1670,6 @@ Classification bands mirror the in-app ZombieCheck.vue component:
         reviewEls.error.classList.add('hidden');
         renderNoteReview();
         reviewEls.overlay.classList.remove('hidden');
-        lockPageScroll();
       } catch (e) {
         console.error('Note preview failed:', e);
         setShareStatus(e?.message || 'Could not render the preview. Try again.', 'error');
