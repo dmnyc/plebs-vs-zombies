@@ -15,8 +15,6 @@ class RelayConfigSettings {
 
     // Default relays
     this.defaultRelays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
       "wss://purplepag.es",

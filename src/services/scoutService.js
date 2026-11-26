@@ -12,19 +12,14 @@ class ScoutService {
   constructor() {
     this.ndk = null;
     this.cancelled = false;
-    // Expanded relay list for better follow list coverage
+    // Expanded relay list for better follow list coverage. current.fyi,
+    // mutinywallet, offchain.pub and mostr.pub all failed hard in the
+    // relay-health sweep (ECONNREFUSED / ENOTFOUND / 301) — dead.
     this.defaultRelays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
       "wss://purplepag.es",
       "wss://relay.snort.social",
-      "wss://offchain.pub",
-      "wss://relay.current.fyi",
-      "wss://eden.nostr.land",
-      "wss://nostr.mutinywallet.com",
-      "wss://relay.mostr.pub",
     ];
   }
 
@@ -240,10 +235,8 @@ class ScoutService {
       // Combine user relays (already merged with defaults by fetchUserRelays)
       // with a small set of reliable archival relays for extra coverage.
       const archivalRelays = [
-        "wss://nostr.mom",
         "wss://relay.nostr.net",
         "wss://relay.noswhere.com",
-        "wss://relay.0xchat.com",
         "wss://atlas.nostr.land",
       ];
 
@@ -612,8 +605,6 @@ class ScoutService {
 
     // Only use well-known, reliable relays for retry to avoid connection failures
     const reliableRelays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
     ];

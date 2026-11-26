@@ -550,7 +550,7 @@ https://plebsvszombies.cc`;
       const { nip19 } = await import('nostr-tools');
       const { data: developerPubkey } = nip19.decode(this.developerNpub);
       return [
-        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.primal.net'],
         ['p', developerPubkey, '', 'plebsvszombies'],
         ['t', 'PlebsVsZombies'],
         ['t', 'nostr'],
