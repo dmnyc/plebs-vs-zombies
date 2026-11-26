@@ -3225,6 +3225,13 @@ class NostrService {
     try {
       // Use the main NDK instance with per-user relay URLs
       // NDK adds temporary relays to its pool as needed
+      // Per-user relays: NDK adds them to the shared pool permanently, and
+      // a scout that checks dozens of users leaks dozens of sockets —
+      // starving this tab and other clients in this browser (other tabs'
+      // apps, the signer extension) of connections to the same relays.
+      // Snapshot the pool so the relays this call added can be dropped
+      // when the subscription ends.
+      const knownRelayUrls = new Set(this.ndk.pool.relays.keys());
       const subOpts = { closeOnEose: true };
       if (relays && relays.length > 0) {
         subOpts.relayUrls = relays;
@@ -3232,9 +3239,21 @@ class NostrService {
 
       const subscription = this.ndk.subscribe(filter, subOpts);
 
+      const dropTempRelays = () => {
+        for (const url of this.ndk.pool.relays.keys()) {
+          if (knownRelayUrls.has(url)) continue;
+          const relay = this.ndk.pool.relays.get(url);
+          try {
+            relay?.disconnect();
+          } catch (_) {}
+          this.ndk.pool.relays.delete(url);
+        }
+      };
+
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
+          dropTempRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         }, 10000); // 10 second timeout
@@ -3246,6 +3265,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
+          dropTempRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         });
@@ -3253,6 +3273,7 @@ class NostrService {
         subscription.on("error", () => {
           clearTimeout(timeout);
           subscription.stop();
+          dropTempRelays();
           resolve(events);
         });
       });
@@ -3286,12 +3307,24 @@ class NostrService {
 
       await specificNdk.connect();
 
+      // NDKPool has no close() in 2.x — pool.close() is a no-op, so the
+      // sockets must be disconnected explicitly or they stay open (and
+      // keep reconnecting) for the life of the tab.
+      const closeSpecificNdk = () => {
+        for (const relay of specificNdk.pool.relays.values()) {
+          try {
+            relay.disconnect();
+          } catch (_) {}
+        }
+        specificNdk.pool.relays.clear();
+      };
+
       const subscription = specificNdk.subscribe(filter);
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
           resolve(events);
         }, 8000); // 8 second timeout per user
 
@@ -3302,7 +3335,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
 
           // Sort by creation time and limit results
           events.sort((a, b) => b.created_at - a.created_at);
@@ -3312,7 +3345,7 @@ class NostrService {
         subscription.on("error", (error) => {
           clearTimeout(timeout);
           subscription.stop();
-          specificNdk.pool.close();
+          closeSpecificNdk();
           console.warn(
             `Error in user-specific relay scan for ${pubkey.substring(0, 8)}...:`,
             error,

@@ -147,6 +147,11 @@ export function startScout(target) {
       if (id !== runId || scoutService.cancelled) return;
       console.error('Scout scan failed:', error);
       finish(id, { status: 'failed', error: error?.message || 'Scout failed' });
+    } finally {
+      // The scan is over — close every socket it opened. A completed scout
+      // used to leave its NDK pool (plus every per-user NIP-65 relay it had
+      // added) connected for the life of the tab.
+      scoutService.reset();
     }
   })();
 }
