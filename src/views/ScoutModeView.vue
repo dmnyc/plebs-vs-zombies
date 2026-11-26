@@ -1125,7 +1125,7 @@ https://plebsvszombies.cc`;
       // Tags that ride with the report; also summarized in the review step
       // (NoteReviewModal).
       return [
-        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.primal.net'],
         ['t', 'PlebsVsZombies']
       ];
     },

@@ -64,13 +64,12 @@ class NostrService {
     // or restored, per kind. See rememberOwnEvent().
     this.ownEvents = new Map();
     this.relays = [
-      "wss://relay.damus.io",
-      "wss://nos.lol",
       "wss://relay.primal.net",
       "wss://nostr.wine",
       "wss://purplepag.es",
       "wss://relay.nos.social",
       // Removed problematic relays: relay.nostrich.de, relay.current.fyi, nostr.mutinywallet.com, relay.snort.social
+      // Removed dead relays (relay-health findings, cross-checked): relay.damus.io, nos.lol
     ];
 
     // Signing method management

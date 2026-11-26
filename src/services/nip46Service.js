@@ -15,9 +15,7 @@ import { generateSecretKey, getPublicKey } from 'nostr-tools';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 
 const DEFAULT_RELAYS = [
-  'wss://relay.damus.io',
   'wss://relay.primal.net',
-  'wss://nos.lol',
   // Clave's relay proxy keeps a persistent subscription on this relay and
   // wakes Clave via APNs on any kind:24133 event addressed to a paired
   // signer, even while backgrounded. Including it in our nostrconnect URI

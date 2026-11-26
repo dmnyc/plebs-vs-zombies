@@ -390,13 +390,12 @@ Classification bands mirror the in-app ZombieCheck.vue component:
     import html2canvas from 'https://esm.sh/html2canvas@1.4.1';
 
     const RELAYS = [
-      'wss://relay.damus.io',
-      'wss://nos.lol',
       'wss://relay.primal.net',
       'wss://relay.snort.social',
       'wss://purplepag.es',
-      'wss://nostr.mom',
       'wss://relay.noswhere.com',
+      // Removed dead relays (relay-health findings, cross-checked):
+      // relay.damus.io, nos.lol, nostr.mom
     ];
     // Liveness detection: any event a user signs proves their key is still in
     // use, so the activity query below omits `kinds` entirely. A lurker who
