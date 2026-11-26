@@ -98,7 +98,7 @@
           <!-- Action Buttons -->
           <div class="flex flex-col gap-3">
             <button
-              @click="postToNostr"
+              @click="reviewNote"
               :disabled="posting || posted"
               :class="[
                 posted ? 'btn-success' : 'btn-nostr post-to-nostr-glow',
@@ -282,6 +282,21 @@
       @confirm="closeStatusModal"
       @cancel="closeStatusModal"
     />
+
+    <!-- Mutable-style review gate: the exact victory note, previewed before
+         it can be signed or published. -->
+    <NoteReviewModal
+      :show="noteReview.show"
+      :content="shareMessage"
+      :tags="noteReview.tags"
+      :author-name="noteReviewAuthorName"
+      :author-picture="noteReviewAuthorPicture"
+      :posting="posting"
+      posting-label="Publishing…"
+      :error="noteReview.error || ''"
+      @back="noteReview.show = false"
+      @confirm="confirmNoteReview"
+    />
   </div>
 </template>
 
@@ -289,11 +304,13 @@
 import nostrService from '../services/nostrService';
 import zombieService from '../services/zombieService';
 import ConfirmModal from './ConfirmModal.vue';
+import NoteReviewModal from './NoteReviewModal.vue';
 
 export default {
   name: 'ZombiePurgeCelebration',
   components: {
-    ConfirmModal
+    ConfirmModal,
+    NoteReviewModal
   },
   props: {
     purgeResult: {
@@ -326,6 +343,13 @@ export default {
       copied: false,
       postedNevent: null,
       copiedEventId: false,
+      // Mutable-style review gate: the exact note is previewed and nothing
+      // is signed until the user confirms in the modal.
+      noteReview: {
+        show: false,
+        tags: [],
+        error: null,
+      },
       nostrClients: [
         { name: 'Primal', url: 'https://primal.net/e/', icon: '/clients/primal.png', iconBg: 'bg-white', iconOk: true },
         { name: 'Jumble', url: 'https://jumble.social/notes/', icon: '/clients/jumble.png', iconBg: 'bg-white', iconOk: true },
@@ -346,6 +370,13 @@ export default {
     };
   },
   computed: {
+    noteReviewAuthorName() {
+      const p = nostrService.userProfile;
+      return p?.display_name || p?.name || 'You';
+    },
+    noteReviewAuthorPicture() {
+      return nostrService.userProfile?.picture || '';
+    },
     thresholds() {
       return zombieService.zombieThresholds;
     },
@@ -513,6 +544,50 @@ https://plebsvszombies.cc`;
     }
   },
   methods: {
+    async noteTags() {
+      // Tags that ride with the victory note; also summarized in the review
+      // step (NoteReviewModal).
+      const { nip19 } = await import('nostr-tools');
+      const { data: developerPubkey } = nip19.decode(this.developerNpub);
+      return [
+        ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
+        ['p', developerPubkey, '', 'plebsvszombies'],
+        ['t', 'PlebsVsZombies'],
+        ['t', 'nostr'],
+        ['t', 'zombiehunting']
+      ];
+    },
+    reviewNote() {
+      // Mutable-style preview step: nothing is signed or published until
+      // the user confirms in the modal.
+      if (this.posting || this.posted) return;
+      this.noteReview = { show: true, tags: [], error: null };
+      this.noteTags().then((tags) => {
+        this.noteReview.tags = tags;
+      }).catch(() => {
+        this.noteReview.show = false;
+        this.showStatusModal('Error', 'Could not prepare the note. Try again.', 'error');
+      });
+    },
+    async confirmNoteReview() {
+      if (!this.noteReview.show || this.noteReview.posting) return;
+      this.noteReview.error = null;
+      try {
+        await this.postToNostr();
+        if (this.posted) {
+          this.noteReview.show = false;
+        } else {
+          // postToNostr reported the failure through its status modal
+          // (behind this one) — mirror it inline so the modal explains
+          // why it is still open.
+          this.noteReview.error = 'Posting failed — you can retry, or copy the message to post manually.';
+        }
+      } catch (_) {
+        this.noteReview.error = 'Posting failed — you can retry, or copy the message to post manually.';
+      } finally {
+        this.noteReview.posting = false;
+      }
+    },
     async postToNostr() {
       this.posting = true;
       
@@ -526,21 +601,11 @@ https://plebsvszombies.cc`;
           }
         }
 
-        // Decode the developer npub to get pubkey for tagging
-        const { nip19 } = await import('nostr-tools');
-        const { data: developerPubkey } = nip19.decode(this.developerNpub);
-
         // Create note event
         const event = {
           kind: 1, // Note
           created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['client', 'Plebs vs. Zombies', '31990:acd7818ead75a59d18a96ed87c8c0db56c98785c7df34eaeb9ab11fc7add70e7:1736530923', 'wss://relay.damus.io'],
-            ['p', developerPubkey, '', 'plebsvszombies'],
-            ['t', 'PlebsVsZombies'],
-            ['t', 'nostr'],
-            ['t', 'zombiehunting']
-          ],
+          tags: await this.noteTags(),
           content: this.shareMessage
         };
 
