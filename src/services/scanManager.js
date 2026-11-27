@@ -8,6 +8,7 @@
 import { reactive } from 'vue';
 import zombieService from './zombieService';
 import scoutService from './scoutService';
+import nostrService from './nostrService';
 
 export const SCAN_CANCELLED = 'Scan cancelled by user';
 
@@ -127,6 +128,8 @@ export function startHunt() {
       if (error?.message === SCAN_CANCELLED) return;
       console.error('Zombie scan failed:', error);
       finish(id, { status: 'failed', error: error?.message || 'Unknown error' });
+    } finally {
+      nostrService.closeNonPermanentRelays();
     }
   })();
 }
@@ -152,8 +155,10 @@ export function startScout(target) {
       // used to leave its NDK pool (plus every per-user NIP-65 relay it had
       // added) connected for the life of the tab.
       scoutService.reset();
+      nostrService.closeNonPermanentRelays();
     }
   })();
+
 }
 
 /** Stop the running scan (if any) and clear it. */
@@ -162,6 +167,9 @@ export async function cancel() {
   runId += 1; // orphan the in-flight run
   clear();
   if (wasScout) await scoutService.forceShutdown();
+  // Hard guarantee: stopping a scan closes every socket it opened, even
+  // mid-flight ones whose own cleanup hasn't run yet.
+  nostrService.closeNonPermanentRelays();
   console.log('🛑 Scan stopped by user');
 }
 

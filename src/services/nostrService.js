@@ -3120,10 +3120,12 @@ class NostrService {
    * Smart relay-aware retry for users with no detected activity
    * This targets only users who have specific relay preferences to prevent false positives
    */
-  async smartRelayRetry(pubkeys, progressCallback = null) {
+  async smartRelayRetry(pubkeys, progressCallback = null, shouldStop = null) {
     if (!pubkeys || pubkeys.length === 0) {
       return new Map();
     }
+
+    const stopped = () => (shouldStop ? shouldStop() : false);
 
     console.log(
       `🎯 Starting smart relay retry for ${pubkeys.length} users with cached relay preferences`,
@@ -3213,6 +3215,54 @@ class NostrService {
   /**
    * Fetch activity for a single user from their preferred relays (optimized for retry)
    */
+<<<<<<< Updated upstream
+=======
+  // Close every non-default relay socket in the shared pool, regardless of
+  // any in-flight lookups, and reset the activity refcounts. This is the
+  // hard guarantee behind scan teardown: whether a scan completes, fails,
+  // or is stopped mid-flight, the only sockets it may leave behind are the
+  // app's own default relays. In-flight subscriptions on swept relays wind
+  // down via their own timeouts/errors, and their later cleanup calls
+  // no-op safely against the cleared refcounts.
+  closeNonPermanentRelays() {
+    if (!this.ndk) return;
+    const permanent = new Set(this.relays.map((url) => url.toLowerCase()));
+    for (const [url, relay] of this.ndk.pool.relays) {
+      if (permanent.has(url.toLowerCase())) continue;
+      try {
+        relay.disconnect();
+      } catch (_) {}
+      this.ndk.pool.relays.delete(url);
+    }
+    activityRelayUses.clear();
+  }
+
+  // Pool keys may be normalized differently from the URLs we pass in —
+  // find the relay for a lowercase url without depending on exact casing.
+  findPoolRelay(lowercaseUrl) {
+    for (const [url, relay] of this.ndk.pool.relays) {
+      if (url.toLowerCase() === lowercaseUrl) return relay;
+    }
+    return null;
+  }
+
+  // Force-release every activity-lookup socket still open. Called when a
+  // scan is stopped so nothing outlives the stop: refcounts are drained and
+  // the sockets disconnected immediately, instead of waiting for each
+  // lookup's own timeout.
+  releaseActivityRelays() {
+    if (!this.ndk) return;
+    for (const [key] of activityRelayUses) {
+      const relay = this.findPoolRelay(key);
+      try {
+        relay?.disconnect();
+      } catch (_) {}
+      if (relay) this.ndk.pool.relays.delete(relay.url);
+    }
+    activityRelayUses.clear();
+  }
+
+>>>>>>> Stashed changes
   async fetchUserActivitySingle(pubkey, relays, limit = 5) {
     const filter = {
       kinds: LIVENESS_KINDS,
