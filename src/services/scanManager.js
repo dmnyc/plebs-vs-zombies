@@ -158,7 +158,6 @@ export function startScout(target) {
       nostrService.closeNonPermanentRelays();
     }
   })();
-
 }
 
 /** Stop the running scan (if any) and clear it. */

@@ -3126,12 +3126,10 @@ class NostrService {
    * Smart relay-aware retry for users with no detected activity
    * This targets only users who have specific relay preferences to prevent false positives
    */
-  async smartRelayRetry(pubkeys, progressCallback = null, shouldStop = null) {
+  async smartRelayRetry(pubkeys, progressCallback = null) {
     if (!pubkeys || pubkeys.length === 0) {
       return new Map();
     }
-
-    const stopped = () => (shouldStop ? shouldStop() : false);
 
     console.log(
       `🎯 Starting smart relay retry for ${pubkeys.length} users with cached relay preferences`,
