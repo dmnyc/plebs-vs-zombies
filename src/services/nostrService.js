@@ -30,6 +30,12 @@ const LIVENESS_KINDS = [
   34235, 34550,
 ];
 
+// Reference counts of concurrent activity lookups per non-default relay.
+// fetchUserActivitySingle runs in parallel batches, so cleanup must be
+// reference-counted: a relay socket is disconnected only when the last
+// concurrent user of it finishes. See fetchUserActivitySingle.
+const activityRelayUses = new Map();
+
 // NDKRelayStatus.CONNECTED is 5 in NDK 2.x (1 is DISCONNECTED). Older code in
 // this file compared against 1, which counted *disconnected* relays as ready
 // and made the connection-wait loops meaningless. Accept both so a version
@@ -3255,14 +3261,27 @@ class NostrService {
 
     try {
       // Use the main NDK instance with per-user relay URLs
-      // NDK adds temporary relays to its pool as needed
+      //
       // Per-user relays: NDK adds them to the shared pool permanently, and
       // a scout that checks dozens of users leaks dozens of sockets —
       // starving this tab and other clients in this browser (other tabs'
       // apps, the signer extension) of connections to the same relays.
-      // Snapshot the pool so the relays this call added can be dropped
-      // when the subscription ends.
-      const knownRelayUrls = new Set(this.ndk.pool.relays.keys());
+      //
+      // These lookups run CONCURRENTLY (smart relay retry fans out in
+      // parallel), so cleanup is reference-counted per relay: the socket is
+      // disconnected only when the last concurrent user of it finishes.
+      // A mid-flight disconnect here is what once made every write relay
+      // time out during a restore. The app's own default relays are
+      // permanent and never touched.
+      const permanent = new Set(this.relays.map((url) => url.toLowerCase()));
+      const tracked = (relays || [])
+        .map((url) => url.toLowerCase())
+        .filter((key) => !permanent.has(key));
+
+      for (const key of tracked) {
+        activityRelayUses.set(key, (activityRelayUses.get(key) || 0) + 1);
+      }
+
       const subOpts = { closeOnEose: true };
       if (relays && relays.length > 0) {
         subOpts.relayUrls = relays;
@@ -3270,21 +3289,26 @@ class NostrService {
 
       const subscription = this.ndk.subscribe(filter, subOpts);
 
-      const dropTempRelays = () => {
-        for (const url of this.ndk.pool.relays.keys()) {
-          if (knownRelayUrls.has(url)) continue;
-          const relay = this.ndk.pool.relays.get(url);
+      const releaseTrackedRelays = () => {
+        for (const key of tracked) {
+          const uses = (activityRelayUses.get(key) || 0) - 1;
+          if (uses > 0) {
+            activityRelayUses.set(key, uses);
+            continue;
+          }
+          activityRelayUses.delete(key);
+          const relay = this.findPoolRelay(key);
           try {
             relay?.disconnect();
           } catch (_) {}
-          this.ndk.pool.relays.delete(url);
+          if (relay) this.ndk.pool.relays.delete(relay.url);
         }
       };
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
           subscription.stop();
-          dropTempRelays();
+          releaseTrackedRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         }, 10000); // 10 second timeout
@@ -3296,7 +3320,7 @@ class NostrService {
         subscription.on("eose", () => {
           clearTimeout(timeout);
           subscription.stop();
-          dropTempRelays();
+          releaseTrackedRelays();
           events.sort((a, b) => b.created_at - a.created_at);
           resolve(events.slice(0, limit));
         });
@@ -3304,7 +3328,7 @@ class NostrService {
         subscription.on("error", () => {
           clearTimeout(timeout);
           subscription.stop();
-          dropTempRelays();
+          releaseTrackedRelays();
           resolve(events);
         });
       });
