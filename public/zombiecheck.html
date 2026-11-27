@@ -648,6 +648,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           { kinds: [0], authors: [hex], limit: 5 },
           { maxWait: PROFILE_TIMEOUT },
         );
+        try { pool.close(['wss://relay.vertexlab.io']); } catch (_) {}
         const owned = events.filter(
           (e) => e && e.kind === 0 && e.pubkey === hex,
         );
@@ -697,6 +698,7 @@ Classification bands mirror the in-app ZombieCheck.vue component:
           { kinds: [0], authors: pubkeys, limit: pubkeys.length * 2 },
           { maxWait: AUGMENT_TIMEOUT },
         );
+        try { pool.close(RELAYS); } catch (_) {}
         const byPubkey = new Map();
         for (const e of events) {
           const p = parseProfile(e);
