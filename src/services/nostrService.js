@@ -3215,8 +3215,6 @@ class NostrService {
   /**
    * Fetch activity for a single user from their preferred relays (optimized for retry)
    */
-<<<<<<< Updated upstream
-=======
   // Close every non-default relay socket in the shared pool, regardless of
   // any in-flight lookups, and reset the activity refcounts. This is the
   // hard guarantee behind scan teardown: whether a scan completes, fails,
@@ -3246,23 +3244,6 @@ class NostrService {
     return null;
   }
 
-  // Force-release every activity-lookup socket still open. Called when a
-  // scan is stopped so nothing outlives the stop: refcounts are drained and
-  // the sockets disconnected immediately, instead of waiting for each
-  // lookup's own timeout.
-  releaseActivityRelays() {
-    if (!this.ndk) return;
-    for (const [key] of activityRelayUses) {
-      const relay = this.findPoolRelay(key);
-      try {
-        relay?.disconnect();
-      } catch (_) {}
-      if (relay) this.ndk.pool.relays.delete(relay.url);
-    }
-    activityRelayUses.clear();
-  }
-
->>>>>>> Stashed changes
   async fetchUserActivitySingle(pubkey, relays, limit = 5) {
     const filter = {
       kinds: LIVENESS_KINDS,
