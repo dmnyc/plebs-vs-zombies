@@ -3219,6 +3219,26 @@ class NostrService {
   /**
    * Fetch activity for a single user from their preferred relays (optimized for retry)
    */
+  // Close every non-default relay socket in the shared pool, regardless of
+  // any in-flight lookups, and reset the activity refcounts. This is the
+  // hard guarantee behind scan teardown: whether a scan completes, fails,
+  // or is stopped mid-flight, the only sockets it may leave behind are the
+  // app's own default relays. In-flight subscriptions on swept relays wind
+  // down via their own timeouts/errors, and their later cleanup calls
+  // no-op safely against the cleared refcounts.
+  closeNonPermanentRelays() {
+    if (!this.ndk) return;
+    const permanent = new Set(this.relays.map((url) => url.toLowerCase()));
+    for (const [url, relay] of this.ndk.pool.relays) {
+      if (permanent.has(url.toLowerCase())) continue;
+      try {
+        relay.disconnect();
+      } catch (_) {}
+      this.ndk.pool.relays.delete(url);
+    }
+    activityRelayUses.clear();
+  }
+
   // Pool keys may be normalized differently from the URLs we pass in —
   // find the relay for a lowercase url without depending on exact casing.
   findPoolRelay(lowercaseUrl) {
