@@ -37,6 +37,13 @@ const LIVENESS_KINDS = [
 // concurrent user of it finishes. See fetchUserActivitySingle.
 const activityRelayUses = new Map();
 
+// Canonical form for comparing relay URLs. NDK keys its pool with a trailing
+// slash ("wss://relay.primal.net/") while our configured defaults and users'
+// NIP-65 lists are written both ways, so every permanent-relay check must
+// compare normalized forms — otherwise the app's own default relays look
+// disposable and get disconnected by the cleanup paths.
+const relayKey = (url) => String(url || "").trim().toLowerCase().replace(/\/+$/, "");
+
 // NDKRelayStatus.CONNECTED is 5 in NDK 2.x (1 is DISCONNECTED). Older code in
 // this file compared against 1, which counted *disconnected* relays as ready
 // and made the connection-wait loops meaningless. Accept both so a version
@@ -1594,58 +1601,12 @@ class NostrService {
   }
 
   /**
-   * Count relays in the main pool that are currently connected.
+   * Liveness-positive prefilter shared by the hunt and Scout. Fills
+   * activityMap with a synthetic single-event entry for every pubkey
+   * already proven alive, so callers can skip relay queries for them.
+   * Returns the number of users skipped.
    */
-  getConnectedRelayCount() {
-    try {
-      const pool = this.ndk?.pool;
-      if (typeof pool?.connectedRelays === "function") {
-        return pool.connectedRelays().length;
-      }
-      const stats = pool?.stats?.();
-      if (stats && typeof stats.connected === "number") {
-        return stats.connected;
-      }
-      return Array.from(pool?.relays?.values() || []).filter((relay) =>
-        isRelayConnected(relay),
-      ).length;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  async getProfilesActivity(pubkeys, limit = 10, progressCallback = null) {
-    if (!pubkeys || pubkeys.length === 0) {
-      return new Map();
-    }
-
-    await this.initialize();
-
-    const activityMap = new Map();
-    pubkeys.forEach((pubkey) => {
-      activityMap.set(pubkey, []);
-    });
-
-    console.log(
-      `🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`,
-    );
-
-    // Concurrent lanes: instead of one strictly sequential batch loop, run
-    // ACTIVITY_LANES lanes at once, each pulling batches from a shared
-    // cursor. Same filters, same batch size, same per-batch recheck and
-    // delay — identical queries, just overlapped, so per-relay load per
-    // lane is unchanged and wall time drops roughly by the lane count.
-    // Classification logic is untouched.
-    const ACTIVITY_LANES = 5;
-
-    // Smaller batches ensure each user gets relay coverage
-    // Larger batches cause prolific posters to crowd out quieter users in results
-    const batchSize = 10;
-    const totalBatches = Math.ceil(pubkeys.length / batchSize);
-
-    let cursor = 0;
-    let completedBatches = 0;
-
+  async applyLivenessPrefilter(pubkeys, activityMap) {
     // ---- Prefilter: skip relay queries for provably-alive users ----
     // Two evidence sources, both LIVENESS-POSITIVE ONLY:
     //
@@ -1722,6 +1683,98 @@ class NostrService {
         `⚡ Prefilter: ${cacheProvenAlive} proven alive by scan cache, ${primalProvenAlive} by Primal — skipped relay queries for both`,
       );
     }
+
+    return cacheProvenAlive + primalProvenAlive;
+  }
+
+  /**
+   * Record fresh liveness for the next scan's prefilter (shared by the hunt
+   * and Scout).
+   */
+  recordLastSeen(pubkeys, activityMap) {
+    // Record fresh liveness for the next scan's prefilter. Only real relay
+    // evidence updates the cache — synthetic prefilter entries are skipped
+    // so a wrong hint can never perpetuate itself. The cache is only ever
+    // read to prove users ALIVE, so a stale entry costs relay queries,
+    // never accuracy.
+    const updatedCache = this.loadLastSeenCache();
+    let cacheWrites = 0;
+    for (const pk of pubkeys) {
+      const events = activityMap.get(pk) || [];
+      if (
+        events.length > 0 &&
+        events[0].id !== `lastseen-cache:${pk}` &&
+        typeof events[0].created_at === "number"
+      ) {
+        const prev = updatedCache.get(pk) || 0;
+        if (events[0].created_at > prev) {
+          updatedCache.set(pk, events[0].created_at);
+          cacheWrites++;
+        }
+      }
+    }
+    this.saveLastSeenCache(updatedCache);
+    if (cacheWrites > 0) {
+      console.log(
+        `💾 Last-seen cache: ${cacheWrites} updates for future scans`,
+      );
+    }
+  }
+
+  /**
+   * Count relays in the main pool that are currently connected.
+   */
+  getConnectedRelayCount() {
+    try {
+      const pool = this.ndk?.pool;
+      if (typeof pool?.connectedRelays === "function") {
+        return pool.connectedRelays().length;
+      }
+      const stats = pool?.stats?.();
+      if (stats && typeof stats.connected === "number") {
+        return stats.connected;
+      }
+      return Array.from(pool?.relays?.values() || []).filter((relay) =>
+        isRelayConnected(relay),
+      ).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  async getProfilesActivity(pubkeys, limit = 10, progressCallback = null) {
+    if (!pubkeys || pubkeys.length === 0) {
+      return new Map();
+    }
+
+    await this.initialize();
+
+    const activityMap = new Map();
+    pubkeys.forEach((pubkey) => {
+      activityMap.set(pubkey, []);
+    });
+
+    console.log(
+      `🔍 Starting balanced activity scan for ${pubkeys.length} profiles...`,
+    );
+
+    // Concurrent lanes: instead of one strictly sequential batch loop, run
+    // ACTIVITY_LANES lanes at once, each pulling batches from a shared
+    // cursor. Same filters, same batch size, same per-batch recheck and
+    // delay — identical queries, just overlapped, so per-relay load per
+    // lane is unchanged and wall time drops roughly by the lane count.
+    // Classification logic is untouched.
+    const ACTIVITY_LANES = 5;
+
+    // Smaller batches ensure each user gets relay coverage
+    // Larger batches cause prolific posters to crowd out quieter users in results
+    const batchSize = 10;
+    const totalBatches = Math.ceil(pubkeys.length / batchSize);
+
+    let cursor = 0;
+    let completedBatches = 0;
+
+    await this.applyLivenessPrefilter(pubkeys, activityMap);
 
     const runBatch = async (i, lane) => {
       const batch = pubkeys.slice(i, i + batchSize);
@@ -1896,33 +1949,7 @@ class NostrService {
       if (progressTicker) clearInterval(progressTicker);
     }
 
-    // Record fresh liveness for the next scan's prefilter. Only real relay
-    // evidence updates the cache — synthetic prefilter entries are skipped
-    // so a wrong hint can never perpetuate itself. The cache is only ever
-    // read to prove users ALIVE, so a stale entry costs relay queries,
-    // never accuracy.
-    const updatedCache = this.loadLastSeenCache();
-    let cacheWrites = 0;
-    for (const pk of pubkeys) {
-      const events = activityMap.get(pk) || [];
-      if (
-        events.length > 0 &&
-        events[0].id !== `lastseen-cache:${pk}` &&
-        typeof events[0].created_at === "number"
-      ) {
-        const prev = updatedCache.get(pk) || 0;
-        if (events[0].created_at > prev) {
-          updatedCache.set(pk, events[0].created_at);
-          cacheWrites++;
-        }
-      }
-    }
-    this.saveLastSeenCache(updatedCache);
-    if (cacheWrites > 0) {
-      console.log(
-        `💾 Last-seen cache: ${cacheWrites} updates for future scans`,
-      );
-    }
+    this.recordLastSeen(pubkeys, activityMap);
 
     const activeProfiles = Array.from(activityMap.values()).filter(
       (events) => events.length > 0,
@@ -3475,9 +3502,9 @@ class NostrService {
   // no-op safely against the cleared refcounts.
   closeNonPermanentRelays() {
     if (!this.ndk) return;
-    const permanent = new Set(this.relays.map((url) => url.toLowerCase()));
+    const permanent = new Set(this.relays.map(relayKey));
     for (const [url, relay] of this.ndk.pool.relays) {
-      if (permanent.has(url.toLowerCase())) continue;
+      if (permanent.has(relayKey(url))) continue;
       try {
         relay.disconnect();
       } catch (_) {}
@@ -3489,8 +3516,9 @@ class NostrService {
   // Pool keys may be normalized differently from the URLs we pass in —
   // find the relay for a lowercase url without depending on exact casing.
   findPoolRelay(lowercaseUrl) {
+    const target = relayKey(lowercaseUrl);
     for (const [url, relay] of this.ndk.pool.relays) {
-      if (url.toLowerCase() === lowercaseUrl) return relay;
+      if (relayKey(url) === target) return relay;
     }
     return null;
   }
@@ -3518,10 +3546,10 @@ class NostrService {
       // A mid-flight disconnect here is what once made every write relay
       // time out during a restore. The app's own default relays are
       // permanent and never touched.
-      const permanent = new Set(this.relays.map((url) => url.toLowerCase()));
-      const tracked = (relays || [])
-        .map((url) => url.toLowerCase())
-        .filter((key) => !permanent.has(key));
+      const permanent = new Set(this.relays.map(relayKey));
+      const tracked = [
+        ...new Set((relays || []).map(relayKey).filter(Boolean)),
+      ].filter((key) => !permanent.has(key));
 
       for (const key of tracked) {
         activityRelayUses.set(key, (activityRelayUses.get(key) || 0) + 1);
