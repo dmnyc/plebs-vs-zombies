@@ -9,9 +9,12 @@ const DEFAULT_RELAY = "wss://default.example";
 function installFakeNdk() {
   const pool = { relays: new Map() };
   const subs = [];
+  // NDK keys its pool with a trailing slash; mirror that so these tests catch
+  // URL-normalization mismatches against our slash-less configured relays.
+  const poolKey = (url) => (url.endsWith("/") ? url : `${url}/`);
   const addRelay = (url) => {
-    const relay = { url, disconnect: vi.fn() };
-    pool.relays.set(url, relay);
+    const relay = { url: poolKey(url), disconnect: vi.fn() };
+    pool.relays.set(poolKey(url), relay);
     return relay;
   };
   nostrService.relays = [DEFAULT_RELAY];
@@ -47,12 +50,12 @@ describe("fetchUserActivitySingle relay cleanup", () => {
     await first;
     // Another lookup is still in flight on this relay: must not disconnect.
     expect(shared.disconnect).not.toHaveBeenCalled();
-    expect(fake.pool.relays.has("wss://shared.example")).toBe(true);
+    expect(fake.pool.relays.has("wss://shared.example/")).toBe(true);
 
     fake.subs[1].fire("eose");
     await second;
     expect(shared.disconnect).toHaveBeenCalledTimes(1);
-    expect(fake.pool.relays.has("wss://shared.example")).toBe(false);
+    expect(fake.pool.relays.has("wss://shared.example/")).toBe(false);
   });
 
   it("never disconnects the app's default relays", async () => {
@@ -61,7 +64,19 @@ describe("fetchUserActivitySingle relay cleanup", () => {
     fake.subs[0].fire("eose");
     await lookup;
     expect(def.disconnect).not.toHaveBeenCalled();
-    expect(fake.pool.relays.has(DEFAULT_RELAY)).toBe(true);
+    expect(fake.pool.relays.has(`${DEFAULT_RELAY}/`)).toBe(true);
+  });
+
+  it("never disconnects a default relay a user lists with a trailing slash or odd casing", async () => {
+    const def = fake.addRelay(DEFAULT_RELAY);
+    const lookup = nostrService.fetchUserActivitySingle(PUBKEY, [
+      `${DEFAULT_RELAY}/`,
+      "WSS://DEFAULT.example",
+    ]);
+    fake.subs[0].fire("eose");
+    await lookup;
+    expect(def.disconnect).not.toHaveBeenCalled();
+    expect(fake.pool.relays.has(`${DEFAULT_RELAY}/`)).toBe(true);
   });
 
   it("releases the relay when the subscription errors", async () => {
@@ -87,7 +102,7 @@ describe("closeNonPermanentRelays", () => {
     expect(a.disconnect).toHaveBeenCalledTimes(1);
     expect(b.disconnect).toHaveBeenCalledTimes(1);
     expect(def.disconnect).not.toHaveBeenCalled();
-    expect([...fake.pool.relays.keys()]).toEqual([DEFAULT_RELAY]);
+    expect([...fake.pool.relays.keys()]).toEqual([`${DEFAULT_RELAY}/`]);
 
     // The swept lookup's own later cleanup must no-op safely, not double-disconnect.
     fake.subs[0].fire("eose");

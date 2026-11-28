@@ -7,6 +7,7 @@ import { SimplePool } from "nostr-tools";
 import immunityService from "./immunityService.js";
 import nostrService from "./nostrService.js";
 import zombieService from "./zombieService.js";
+import zombieClassificationSettings from "./settings/zombieClassificationSettings.js";
 
 class ScoutService {
   constructor() {
@@ -410,6 +411,18 @@ class ScoutService {
         });
       }
 
+      // Scout never loaded NIP-65 relay lists, so smartRelayRetry had no
+      // per-user relays to target and fell straight through to the
+      // aggressive fallback. One bulk fetch (only for the users still
+      // unresolved) gives it real targets.
+      await nostrService.initialize();
+      await nostrService.fetchFollowsRelayLists(usersWithNoActivity);
+
+      if (this.cancelled) {
+        console.log("🛑 Scout scan cancelled before relay retry");
+        return { active: [], fresh: [], rotting: [], ancient: [], burned: [] };
+      }
+
       const retryResults = await nostrService.smartRelayRetry(
         usersWithNoActivity,
         progressCallback,
@@ -431,11 +444,21 @@ class ScoutService {
         `🎉 SMART RETRY COMPLETE: Recovered ${recoveredUsers}/${usersWithNoActivity.length} users from false positive classification`,
       );
 
-      // 1c. Fall back to aggressive retry for remaining users without relay lists
-      const stillNoActivity = usersWithNoActivity.filter((pubkey) => {
-        const events = activityMap.get(pubkey) || [];
-        return events.length === 0;
-      });
+      // 1c. Fall back to aggressive retry for everyone smart retry did not
+      // PROVE alive. A user's declared relays can hold only stale events
+      // while they actually post elsewhere, so "found some events" is not
+      // enough to stop looking: only evidence newer than the shortest
+      // zombie threshold ends the search. Everyone else — nothing found, or
+      // only stale events found — still gets the broad fallback search.
+      const { fresh, rotting, ancient } =
+        zombieClassificationSettings.getSettings();
+      const aliveCutoff =
+        Math.floor(Date.now() / 1000) - Math.min(fresh, rotting, ancient) * 86400;
+      const newestAt = (events) =>
+        (events || []).reduce((max, e) => Math.max(max, e.created_at || 0), 0);
+      const stillNoActivity = usersWithNoActivity.filter(
+        (pubkey) => newestAt(activityMap.get(pubkey)) <= aliveCutoff,
+      );
 
       if (stillNoActivity.length > 0) {
         console.log(
@@ -449,7 +472,9 @@ class ScoutService {
 
         let fallbackRecovered = 0;
         for (const [pubkey, events] of aggressiveResults.entries()) {
-          if (events.length > 0) {
+          // Keep whichever result shows the newer activity — the fallback
+          // must never replace fresher evidence with staler evidence.
+          if (events.length > 0 && newestAt(events) >= newestAt(activityMap.get(pubkey))) {
             activityMap.set(pubkey, events);
             fallbackRecovered++;
           }
@@ -520,25 +545,29 @@ class ScoutService {
       `🔍 Starting enhanced activity scan for ${pubkeys.length} profiles...`,
     );
 
-    // PASS 1: Standard scanning with default relays
+    // PASS 0: liveness-positive prefilter (shared with the hunt). Users the
+    // last-seen cache or Primal already prove alive get a synthetic entry and
+    // skip relay queries entirely. Silence from either source proves nothing,
+    // so everyone else goes through the normal relay pass below.
+    await nostrService.applyLivenessPrefilter(pubkeys, activityMap);
+
+    // PASS 1: Standard scanning with default relays, over concurrent lanes.
+    // Same filter, batch size and timeout as before — the batches are just
+    // overlapped. Scout talks to only a few public relays, so it uses fewer
+    // lanes than the hunt to stay clear of per-connection rate limits.
+    const SCOUT_LANES = 3;
     const batchSize = 25;
+    const totalBatches = Math.ceil(pubkeys.length / batchSize);
+    let cursor = 0;
+    let completedBatches = 0;
 
-    for (let i = 0; i < pubkeys.length; i += batchSize) {
-      // Check for cancellation
-      if (this.cancelled) {
-        console.log("🛑 Scout scan cancelled during batch processing");
-        break;
-      }
-
-      const batch = pubkeys.slice(i, i + batchSize);
-
-      if (progressCallback) {
-        progressCallback({
-          stage: `Scanning batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(pubkeys.length / batchSize)}...`,
-          processed: Math.min(i + batch.length, pubkeys.length),
-          total: pubkeys.length,
-        });
-      }
+    const runBatch = async (i) => {
+      const batchNum = Math.floor(i / batchSize) + 1;
+      // Prefilter-proven users keep their synthetic entry and are not queried
+      const batch = pubkeys
+        .slice(i, i + batchSize)
+        .filter((pk) => !activityMap.get(pk)?.length);
+      if (batch.length === 0) return;
 
       try {
         const filter = {
@@ -586,12 +615,38 @@ class ScoutService {
           }
         }
       } catch (error) {
-        console.warn(
-          `⚠️ Error in batch ${Math.floor(i / batchSize) + 1}:`,
-          error.message,
-        );
+        console.warn(`⚠️ Error in batch ${batchNum}:`, error.message);
       }
-    }
+    };
+
+    // Lane worker: claim the next unprocessed batch until none remain. The
+    // cursor read/increment is atomic across awaits (single-threaded JS).
+    const laneWorker = async () => {
+      while (cursor < pubkeys.length) {
+        if (this.cancelled) {
+          console.log("🛑 Scout scan cancelled during batch processing");
+          return;
+        }
+        const i = cursor;
+        cursor += batchSize;
+        await runBatch(i);
+        completedBatches++;
+        if (progressCallback) {
+          progressCallback({
+            stage: `Scanning batch ${completedBatches}/${totalBatches}...`,
+            processed: Math.min(completedBatches * batchSize, pubkeys.length),
+            total: pubkeys.length,
+          });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: SCOUT_LANES }, laneWorker));
+
+    // Remember real relay evidence for future scans (hunt and scout share
+    // the cache). Skipped when cancelled: the map is incomplete, and the
+    // cache only ever holds positive evidence anyway.
+    if (!this.cancelled) nostrService.recordLastSeen(pubkeys, activityMap);
 
     console.log(
       `✅ Scout Mode activity scan complete. Found activity for ${Array.from(activityMap.values()).filter((events) => events.length > 0).length}/${pubkeys.length} users`,
